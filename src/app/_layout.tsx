@@ -1,16 +1,67 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import React from 'react';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
+import { useFonts } from 'expo-font';
+import {
+  Tajawal_400Regular,
+  Tajawal_500Medium,
+  Tajawal_700Bold,
+} from '@expo-google-fonts/tajawal';
+import {
+  ReemKufi_500Medium,
+  ReemKufi_700Bold,
+} from '@expo-google-fonts/reem-kufi';
+import { useEffect } from 'react';
+import { I18nManager, Platform, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { colors } from '@/theme/tokens';
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+// Force RTL once, at startup. On native this normally requires an app reload
+// the first time; in development that's a no-op cost. On web we also set
+// document.dir so the page itself flows right-to-left.
+function configureRTL() {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    document.documentElement.dir = 'rtl';
+    document.documentElement.lang = 'ar';
+  }
+  if (!I18nManager.isRTL) {
+    try {
+      I18nManager.allowRTL(true);
+      I18nManager.forceRTL(true);
+    } catch {
+      // Some platforms throw when called more than once — safe to ignore.
+    }
+  }
+}
+
+configureRTL();
+
+export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Tajawal_400Regular,
+    Tajawal_500Medium,
+    Tajawal_700Bold,
+    ReemKufi_500Medium,
+    ReemKufi_700Bold,
+  });
+
+  useEffect(() => {
+    // Belt-and-suspenders: re-assert RTL after the first render in case
+    // a hot reload reset the document direction.
+    configureRTL();
+  }, []);
+
+  if (!fontsLoaded) {
+    return <View style={{ flex: 1, backgroundColor: colors.cream }} />;
+  }
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.cream },
+        }}
+      />
+    </SafeAreaProvider>
   );
 }

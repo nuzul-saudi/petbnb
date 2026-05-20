@@ -26,15 +26,22 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
+# OS junk
 .DS_Store
+Thumbs.db
 *.pem
 
-# local env files
+# local env files — never commit secrets
+.env
+.env.*
 .env*.local
+!.env.example
 
 # typescript
 *.tsbuildinfo
+
+# claude code per-developer settings
+.claude/settings.local.json
 
 app-example
 
