@@ -10,7 +10,7 @@ import {
   ReemKufi_700Bold,
 } from '@expo-google-fonts/reem-kufi';
 import { useEffect } from 'react';
-import { I18nManager, Platform, View } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/tokens';
@@ -36,7 +36,10 @@ function configureRTL() {
 configureRTL();
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  // Kick off font loading but never gate render on it. System fonts show
+  // briefly until Tajawal/Reem Kufi swap in. This keeps server-rendered
+  // HTML non-empty for SEO and avoids a blank flash on slow networks.
+  useFonts({
     Tajawal_400Regular,
     Tajawal_500Medium,
     Tajawal_700Bold,
@@ -49,10 +52,6 @@ export default function RootLayout() {
     // a hot reload reset the document direction.
     configureRTL();
   }, []);
-
-  if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: colors.cream }} />;
-  }
 
   return (
     <SafeAreaProvider>
