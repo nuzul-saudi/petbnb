@@ -7,6 +7,12 @@
     "welcome": "مرحبا بكم في Petbnb",
     "foundation_ok": "تم إعداد الأساس بنجاح"
   },
+  "supabase": {
+    "checking": "جارٍ التحقق من الاتصال بـ Supabase…",
+    "connected": "متصل بـ Supabase ✓",
+    "failed": "تعذّر الاتصال بـ Supabase",
+    "missing_config": "لم يتم العثور على إعدادات Supabase في ملف .env"
+  },
   "common": {
     "loading": "جارٍ التحميل…",
     "error": "حدث خطأ، يرجى المحاولة لاحقاً",
