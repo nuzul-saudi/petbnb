@@ -133,3 +133,41 @@ Warm, premium, trust-conveying. Deep moss green primary, sand/cream backgrounds,
 ## 10. Definition of done (the entire MVP)
 
 A test user can: sign up with a Saudi phone number via SMS code → browse Riyadh hosts → open a host with a home photo gallery → request a booking with one add-on → (as host) accept it → both complete a check-in condition report → host posts a daily update → owner sees it → both complete check-out → both leave a review. All in Arabic, RTL, on web + one mobile platform. Nothing more until that works end to end.
+
+---
+
+## 11. Pre-launch tasks (do NOT skip before going live)
+
+These are deferred from MVP build but MUST land before public launch. Each one
+has a specific reason it's safe to defer during build but unsafe to defer at
+launch.
+
+- **Swap email OTP → Saudi phone OTP.** Step 4 ships with email OTP for dev
+  speed. Before launch: enable Supabase Phone Auth, wire a Send SMS Hook (Edge
+  Function calling Unifonic or Taqnyat), swap `{email}` for `{phone}` in
+  `signInWithOtp` / `verifyOtp`. The E.164 normalizer in `src/lib/phone.ts` is
+  pre-staged; see the TODO block at the top of `src/lib/auth.tsx`.
+  **Blocker:** requires Saudi CR + CITC alpha sender ID registration
+  (multi-day approval).
+
+- **Configure custom SMTP for transactional email.** Supabase's built-in email
+  sender is rate-limited to **2 emails per hour per recipient** — fine for dev
+  but will break sign-up at any meaningful volume, and any password-reset
+  retry will silently fail for an hour. Recommended: Resend (free tier covers
+  ~3,000 emails/month, instant signup, no domain verification required for
+  their default sending domain). Set in Supabase: Project Settings → Auth →
+  SMTP Settings.
+
+- **Payments.** MVP uses a mock `PaymentProvider`. Swap to Moyasar or
+  HyperPay (mada + STC Pay + Apple Pay) before any real money moves.
+
+- **Nafath ID verification for hosts.** `profiles.nafath_verified` ships as a
+  `false` default with no UI to set it. Before launch hosts must complete
+  Nafath to be listable.
+
+- **Push notifications + prayer-time awareness.** The `notificationsAllowed()`
+  helper stub exists; wire to expo-notifications and add the prayer-time
+  silence window.
+
+- **Real insurance integration.** The `insurance` booking-addon type is a
+  placeholder; partner with a Saudi insurer before launch.

@@ -18,7 +18,7 @@ export function getLocale(): Locale {
   return currentLocale;
 }
 
-export function t(key: string): string {
+export function t(key: string, params?: Record<string, string | number>): string {
   const segments = key.split('.');
   let node: unknown = dictionaries[currentLocale];
   for (const seg of segments) {
@@ -30,7 +30,13 @@ export function t(key: string): string {
       return key;
     }
   }
-  return typeof node === 'string' ? node : key;
+  let out = typeof node === 'string' ? node : key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    }
+  }
+  return out;
 }
 
 export function useTranslation() {

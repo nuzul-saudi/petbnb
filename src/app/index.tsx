@@ -1,59 +1,45 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect } from 'expo-router';
 
+import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
-import { pingSupabase } from '@/lib/supabase';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
-
-type ConnState = 'checking' | 'ok' | 'fail';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
-  const [conn, setConn] = useState<ConnState>('checking');
-  const [detail, setDetail] = useState<string>('');
+  const { initializing, session, profile, signOut } = useAuth();
 
-  useEffect(() => {
-    let cancelled = false;
-    pingSupabase().then((result) => {
-      if (cancelled) return;
-      setConn(result.ok ? 'ok' : 'fail');
-      setDetail(result.detail);
-      // Mirror to the browser console so you can confirm wiring without
-      // squinting at the on-screen pill.
-      // eslint-disable-next-line no-console
-      console.log('[supabase ping]', result);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Initial boot — Auth context is reading the persisted session.
+  if (initializing) return <SafeAreaView style={styles.safe} />;
 
-  const statusLabel =
-    conn === 'checking'
-      ? t('supabase.checking')
-      : conn === 'ok'
-      ? t('supabase.connected')
-      : detail === 'missing_config'
-      ? t('supabase.missing_config')
-      : t('supabase.failed');
+  // Not signed in → sign-in flow.
+  if (!session) return <Redirect href="/sign-in" />;
 
-  const statusStyle =
-    conn === 'ok'
-      ? styles.statusOk
-      : conn === 'fail'
-      ? styles.statusFail
-      : styles.statusChecking;
+  // Signed in but profile row hasn't loaded yet (one round-trip).
+  if (!profile) return <SafeAreaView style={styles.safe} />;
+
+  // Signed in, profile loaded, but onboarding never completed
+  // (full_name empty = "fresh profile" signal, agreed in Phase 4 plan).
+  if (profile.full_name.trim() === '') return <Redirect href="/role" />;
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <Text style={styles.heading}>{t('home.welcome')}</Text>
-        <Text style={styles.body}>{t('home.foundation_ok')}</Text>
+        <Text style={styles.greeting}>
+          {t('home.signed_in_greeting', { name: profile.full_name })}
+        </Text>
 
-        <View style={[styles.statusPill, statusStyle]}>
-          <Text style={styles.statusText}>{statusLabel}</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaLabel}>{t('home.your_role')}:</Text>
+          <Text style={styles.metaValue}>{t(`role.${profile.role}`)}</Text>
         </View>
+
+        <Text style={styles.placeholder}>{t('home.step5_placeholder')}</Text>
+
+        <Pressable onPress={signOut} style={styles.signOut}>
+          <Text style={styles.signOutText}>{t('home.sign_out')}</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -71,39 +57,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.lg,
   },
-  heading: {
+  greeting: {
     fontFamily: fonts.headingBold,
-    fontSize: 32,
+    fontSize: 28,
     color: colors.mossDeep,
     textAlign: 'center',
   },
-  body: {
+  metaRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'baseline',
+  },
+  metaLabel: {
     fontFamily: fonts.body,
-    fontSize: 18,
+    fontSize: 14,
     color: colors.inkSoft,
-    textAlign: 'center',
   },
-  statusPill: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-  },
-  statusText: {
+  metaValue: {
     fontFamily: fonts.bodyBold,
     fontSize: 14,
+    color: colors.moss,
   },
-  statusChecking: {
-    backgroundColor: colors.whisper,
-    borderColor: colors.gold,
+  placeholder: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.inkSoft,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.xl,
   },
-  statusOk: {
-    backgroundColor: colors.whisper,
-    borderColor: colors.moss,
-  },
-  statusFail: {
-    backgroundColor: colors.whisper,
+  signOut: {
+    marginTop: spacing.xl,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.pill,
+    borderWidth: 1,
     borderColor: colors.terracotta,
+  },
+  signOutText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.terracotta,
   },
 });

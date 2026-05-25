@@ -5,13 +5,59 @@
   },
   "home": {
     "welcome": "مرحبا بكم في Petbnb",
-    "foundation_ok": "تم إعداد الأساس بنجاح"
+    "foundation_ok": "تم إعداد الأساس بنجاح",
+    "signed_in_greeting": "أهلاً، {name}",
+    "your_role": "دورك",
+    "sign_out": "تسجيل الخروج",
+    "step5_placeholder": "تصفّح المضيفين سيظهر هنا في الخطوة التالية"
   },
   "supabase": {
     "checking": "جارٍ التحقق من الاتصال بـ Supabase…",
     "connected": "متصل بـ Supabase ✓",
     "failed": "تعذّر الاتصال بـ Supabase",
     "missing_config": "لم يتم العثور على إعدادات Supabase في ملف .env"
+  },
+  "auth": {
+    "sign_in_title": "مرحباً بك في Petbnb",
+    "sign_in_subtitle": "رعاية القطط في الرياض",
+    "email_label": "البريد الإلكتروني",
+    "email_placeholder": "you@example.com",
+    "send_otp_button": "إرسال رمز التحقق",
+    "sending_otp": "جارٍ الإرسال…",
+    "send_otp_hint": "سنرسل لك رمزاً مكوناً من ٦ أرقام عبر البريد الإلكتروني",
+    "send_failed": "تعذّر إرسال الرمز. يرجى المحاولة مرة أخرى.",
+    "invalid_email": "يرجى إدخال بريد إلكتروني صحيح",
+
+    "verify_title": "أدخل الرمز",
+    "verify_subtitle_prefix": "أرسلنا رمزاً مكوناً من ٦ أرقام إلى",
+    "verify_otp_placeholder": "______",
+    "verify_button": "تحقق",
+    "verifying": "جارٍ التحقق…",
+    "verify_failed": "الرمز غير صحيح أو منتهي الصلاحية",
+    "resend_button": "إعادة إرسال",
+    "resend_countdown": "إعادة إرسال ({seconds})",
+    "resend_hint": "لم يصلك الرمز؟",
+    "back": "← رجوع",
+
+    "role_title": "أهلاً بك في Petbnb",
+    "role_subtitle": "نحتاج بعض المعلومات للبدء",
+    "name_label": "اسمك الكامل",
+    "name_placeholder": "محمد العتيبي",
+    "role_question": "كيف تريد استخدام Petbnb؟",
+    "continue_button": "متابعة",
+    "saving": "جارٍ الحفظ…",
+    "save_failed": "تعذّر حفظ التغييرات"
+  },
+  "role": {
+    "owner": "مالك",
+    "host": "مضيف",
+    "both": "كلاهما",
+    "owner_title": "أبحث عن مكان لقطتي",
+    "owner_desc": "ابحث عن مضيف موثوق في منطقتك",
+    "host_title": "أستضيف القطط في منزلي",
+    "host_desc": "استقبل الحيوانات واكسب دخلاً",
+    "both_title": "كلاهما",
+    "both_desc": "أحتاج كلا الدورين"
   },
   "common": {
     "loading": "جارٍ التحميل…",
