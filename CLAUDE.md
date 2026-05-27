@@ -212,6 +212,19 @@ launch.
   The mock provider currently charges 0%; pre-launch this must reflect
   reality. See Section 13.
 
+- **Completed-bookings counter visible across users.**
+  `countCompletedBookingsForHost()` in `src/lib/listings.ts` returns 0
+  when the viewer isn't the host of the listing, because bookings RLS
+  restricts SELECT to the booking owner / listing host / admin. For MVP
+  this is fine (no completed bookings exist, every host shows "جديد").
+  Before real completions ship (post-Step 10 reviews), pick one of:
+  (a) `SECURITY DEFINER` RPC returning the count, bypassing RLS, OR
+  (b) Denormalized `completed_bookings_count` column on `profiles`,
+  updated via Postgres trigger on `bookings.status` transitions.
+  Lean toward (b) — cheaper at read time, single source of truth,
+  matches how Rover/Airbnb track host stats. See JSDoc on the helper
+  for context.
+
 ---
 
 ## 12. Roles
