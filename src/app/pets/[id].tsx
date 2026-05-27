@@ -115,7 +115,8 @@ export default function PetDetailScreen() {
       } else {
         await updatePet(id, patch);
       }
-      router.back();
+      // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
+      router.replace('/pets');
     } catch (e) {
       console.warn('[pets.save_failed]', e);
       setError(t('pets.save_failed'));
@@ -136,7 +137,8 @@ export default function PetDetailScreen() {
     setError(null);
     try {
       await deletePet(id);
-      router.back();
+      // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
+      router.replace('/pets');
     } catch (e) {
       console.warn('[pets.delete_failed]', e);
       setError(t('pets.delete_failed'));
@@ -159,7 +161,11 @@ export default function PetDetailScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backLink}>
+          <Pressable
+            // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
+            onPress={() => router.replace('/pets')}
+            style={styles.backLink}
+          >
             <Text style={styles.backText}>{t('pets.back')}</Text>
           </Pressable>
           <Text style={styles.title}>

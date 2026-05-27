@@ -65,7 +65,7 @@ export default function ListingDetailScreen() {
           <Text style={styles.errorText}>
             {error ?? t('listing.not_found')}
           </Text>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => router.replace('/')} style={styles.backButton}>
             <Text style={styles.backText}>{t('listing.back')}</Text>
           </Pressable>
         </View>
@@ -174,7 +174,7 @@ export default function ListingDetailScreen() {
             <Text style={styles.ctaText}>{t('listing.request_button')}</Text>
           </Pressable>
 
-          <Pressable onPress={() => router.back()} style={styles.backLink}>
+          <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
             <Text style={styles.backText}>{t('listing.back')}</Text>
           </Pressable>
         </View>

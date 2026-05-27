@@ -88,7 +88,7 @@ export default function AdminUserDetailScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
           <Text style={styles.error}>{t('admin.load_failed')}</Text>
-          <Pressable onPress={() => router.back()} style={styles.backPill}>
+          <Pressable onPress={() => router.replace('/admin/users')} style={styles.backPill}>
             <Text style={styles.backPillText}>{t('admin.back')}</Text>
           </Pressable>
         </View>
@@ -102,7 +102,7 @@ export default function AdminUserDetailScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backLink}>
+          <Pressable onPress={() => router.replace('/admin/users')} style={styles.backLink}>
             <Text style={styles.backText}>{t('admin.back')}</Text>
           </Pressable>
           <Text style={styles.title}>{t('admin.user_detail_title')}</Text>

@@ -39,7 +39,7 @@ export default function AdminBookingsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={() => router.replace('/admin')} style={styles.backLink}>
           <Text style={styles.backText}>{t('admin.back')}</Text>
         </Pressable>
         <Text style={styles.title}>{t('admin.bookings_title')}</Text>

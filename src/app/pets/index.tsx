@@ -47,7 +47,7 @@ export default function PetsListScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={() => router.replace('/profile')} style={styles.backLink}>
           <Text style={styles.backText}>{t('pets.back')}</Text>
         </Pressable>
         <Text style={styles.title}>{t('pets.list_title')}</Text>

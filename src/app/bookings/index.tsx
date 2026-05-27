@@ -60,7 +60,7 @@ export default function MyBookingsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
           <Text style={styles.backText}>{t('mybookings.back')}</Text>
         </Pressable>
         <Text style={styles.title}>{t('mybookings.title')}</Text>

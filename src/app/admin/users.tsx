@@ -96,7 +96,7 @@ export default function AdminUsersScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={() => router.replace('/admin')} style={styles.backLink}>
           <Text style={styles.backText}>{t('admin.back')}</Text>
         </Pressable>
         <Text style={styles.title}>{t('admin.users_title')}</Text>

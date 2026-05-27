@@ -76,7 +76,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backLink}>
+          <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
             <Text style={styles.backText}>{t('profile.back')}</Text>
           </Pressable>
           <Text style={styles.title}>{t('profile.title')}</Text>
