@@ -1,8 +1,9 @@
 // Pet CRUD. Read/list/create existed since Step 5 (inline pet creation in
-// the booking flow). Step 5.5 adds the full surface — update + delete +
+// the booking flow). Step 5.5 added the full surface — update + delete +
 // the health fields (medical_needs / dietary_restrictions / medications)
-// from migration 0006 — so the customer profile's "My Cats" section can
-// manage pets outside the booking flow.
+// from migration 0006. Step 5.6 adds the photo upload helpers below.
+
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import type { Tables, TablesUpdate } from '@/types/database';
@@ -110,4 +111,107 @@ export async function deletePet(id: string): Promise<void> {
   if (!supabase) throw new Error('No Supabase client');
   const { error } = await supabase.from('pets').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Photo upload (Step 5.6).
+//
+// The pet-photos bucket is private (per Phase 3 setup), so we return a
+// signed URL — 7 days, which exceeds any MVP testing window. Production
+// fix is to store the storage path and call createSignedUrl on render
+// (logged in CLAUDE.md Section 13 as a follow-up). For now the signed URL
+// goes into pets.photo_url and re-uploads when it expires.
+//
+// Path convention enforced by the bucket's RLS:
+//   pet-photos/<owner_id>/<pet_id>/<filename>
+// ---------------------------------------------------------------------------
+
+export type PetPhotoSource =
+  | { kind: 'web-file'; file: File }
+  | { kind: 'native-uri'; uri: string; mimeType?: string };
+
+/** Opens the platform's image picker. Returns null on cancel or denial. */
+export async function pickPetPhoto(): Promise<PetPhotoSource | null> {
+  if (Platform.OS === 'web') {
+    // Render a transient hidden input, await selection, then resolve.
+    return new Promise((resolve) => {
+      if (typeof document === 'undefined') {
+        resolve(null);
+        return;
+      }
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        resolve(file ? { kind: 'web-file', file } : null);
+      };
+      // Some browsers won't fire change at all if the dialog is dismissed
+      // without selecting; we just leave the promise pending in that case
+      // (the UI's "uploading" state should let the user cancel).
+      input.click();
+    });
+  }
+  try {
+    const ImagePicker = await import('expo-image-picker');
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') return null;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (result.canceled || result.assets.length === 0) return null;
+    const a = result.assets[0];
+    return { kind: 'native-uri', uri: a.uri, mimeType: a.mimeType ?? undefined };
+  } catch (e) {
+    if (__DEV__) console.warn('[pets.pickPetPhoto]', e);
+    return null;
+  }
+}
+
+/**
+ * Uploads a picked photo to the pet-photos bucket and returns a signed
+ * URL. Caller is expected to write the returned URL back to the pet via
+ * updatePet({ photo_url: <url> }).
+ *
+ * Throws on storage write failure. Returns the signed URL on success.
+ */
+export async function uploadPetPhoto(args: {
+  petId: string;
+  ownerId: string;
+  source: PetPhotoSource;
+}): Promise<string> {
+  if (!supabase) throw new Error('No Supabase client');
+
+  let blob: Blob;
+  let ext = 'jpg';
+
+  if (args.source.kind === 'web-file') {
+    blob = args.source.file;
+    const nameExt = args.source.file.name.split('.').pop()?.toLowerCase();
+    if (nameExt && /^(jpe?g|png|webp)$/.test(nameExt)) {
+      ext = nameExt === 'jpeg' ? 'jpg' : nameExt;
+    }
+  } else {
+    const resp = await fetch(args.source.uri);
+    blob = await resp.blob();
+    const mt = args.source.mimeType ?? blob.type;
+    if (mt.includes('png')) ext = 'png';
+    else if (mt.includes('webp')) ext = 'webp';
+  }
+
+  const path = `${args.ownerId}/${args.petId}/${Date.now()}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from('pet-photos')
+    .upload(path, blob, { upsert: true, contentType: blob.type || `image/${ext}` });
+  if (upErr) throw upErr;
+
+  // 7-day signed URL. Long enough to comfortably exceed any MVP testing
+  // window; UI re-uploads if it ever expires in practice.
+  const { data, error: urlErr } = await supabase.storage
+    .from('pet-photos')
+    .createSignedUrl(path, 60 * 60 * 24 * 7);
+  if (urlErr || !data) throw urlErr ?? new Error('Failed to sign pet photo URL');
+  return data.signedUrl;
 }
