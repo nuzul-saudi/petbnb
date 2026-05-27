@@ -116,9 +116,23 @@ function OwnerFeedHome() {
             {t('home.signed_in_greeting', { name: profile!.full_name })}
           </Text>
         </View>
-        <Pressable onPress={signOut} style={styles.signOutSmall}>
-          <Text style={styles.signOutSmallText}>{t('home.sign_out')}</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => router.push('/bookings/index')}
+            style={styles.navChip}
+          >
+            <Text style={styles.navChipText}>{t('mybookings.title')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/profile')}
+            style={styles.navChip}
+          >
+            <Text style={styles.navChipText}>{t('profile.title')}</Text>
+          </Pressable>
+          <Pressable onPress={signOut} style={styles.signOutSmall}>
+            <Text style={styles.signOutSmallText}>{t('home.sign_out')}</Text>
+          </Pressable>
+        </View>
       </View>
 
       <Pressable
@@ -253,6 +267,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkSoft,
     textAlign: 'right',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
+  navChip: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.moss,
+  },
+  navChipText: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.moss,
   },
   signOutSmall: {
     paddingVertical: spacing.xs,

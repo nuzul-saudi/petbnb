@@ -11,11 +11,65 @@ type Props = {
   onPress: () => void;
 };
 
+// Sitter-first listing card (refactored in Step 5.5C from a photo-first
+// layout). The sitter is the hero — avatar, name, verified badge, tier,
+// gender, neighborhood. The home photo is a secondary strip below.
+//
+// "جديد" badge is shown unconditionally for now: every visible listing
+// has zero completed bookings in MVP, and computing per-card counts via
+// countCompletedBookingsForHost() would return 0 across the board anyway
+// thanks to the bookings-RLS limitation (see Section 11 of CLAUDE.md and
+// the JSDoc on the helper). Once a SECURITY DEFINER count RPC or counter
+// cache lands, this card can show real "{N} إقامة • ⭐ {avg}" stats and
+// only fall back to "جديد" for genuinely-new hosts.
 export function ListingCard({ listing, onPress }: Props) {
   const { t } = useTranslation();
 
+  const host = listing.host;
+  const initial = host?.full_name?.trim().charAt(0) ?? '?';
+  const genderLabel = t(
+    listing.host_gender === 'female' ? 'listing.host_female' : 'listing.host_male',
+  );
+
   return (
     <Pressable onPress={onPress} style={styles.card}>
+      {/* Sitter header — the hero of the card */}
+      <View style={styles.hostRow}>
+        {host?.avatar_url ? (
+          <Image
+            source={{ uri: host.avatar_url }}
+            style={styles.avatar}
+            contentFit="cover"
+            transition={150}
+          />
+        ) : (
+          <View style={[styles.avatar, styles.avatarFallback]}>
+            <Text style={styles.avatarInitial}>{initial}</Text>
+          </View>
+        )}
+
+        <View style={styles.hostText}>
+          <View style={styles.nameRow}>
+            <Text style={styles.hostName} numberOfLines={1}>
+              {host?.full_name ?? '—'}
+            </Text>
+            <Text style={styles.verifiedMark}>✓</Text>
+          </View>
+
+          <View style={styles.metaRow}>
+            <TierBadge tier={listing.tier} />
+            <Text style={styles.metaText}>
+              {genderLabel} • 📍 {listing.neighborhood}
+            </Text>
+          </View>
+
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>{t('listing.host_new_badge')}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Secondary home photo */}
       {listing.cover_photo ? (
         <Image
           source={{ uri: listing.cover_photo }}
@@ -29,19 +83,11 @@ export function ListingCard({ listing, onPress }: Props) {
         </View>
       )}
 
-      <View style={styles.body}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={2}>
-            {listing.title_ar}
-          </Text>
-          <TierBadge tier={listing.tier} />
-        </View>
-
-        <Text style={styles.meta}>
-          {listing.neighborhood}
-          {listing.host?.full_name ? ` • ${listing.host.full_name}` : ''}
+      {/* Footer with title + price */}
+      <View style={styles.footer}>
+        <Text style={styles.title} numberOfLines={2}>
+          {listing.title_ar}
         </Text>
-
         <Text style={styles.price}>
           {formatSAR(listing.nightly_price_sar)}{' '}
           <Text style={styles.priceSuffix}>{t('listing.nightly_suffix')}</Text>
@@ -74,9 +120,77 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.card,
   },
+  hostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.whisper,
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontFamily: fonts.headingBold,
+    fontSize: 24,
+    color: colors.mossDeep,
+  },
+  hostText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  hostName: {
+    flex: 1,
+    fontFamily: fonts.headingBold,
+    fontSize: 16,
+    color: colors.mossDeep,
+    textAlign: 'right',
+  },
+  verifiedMark: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.moss,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    textAlign: 'right',
+  },
+  newBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+  },
+  newBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: colors.cream,
+    letterSpacing: 0.5,
+  },
   photo: {
     width: '100%',
-    aspectRatio: 16 / 10,
+    aspectRatio: 5 / 2,
     backgroundColor: colors.whisper,
   },
   photoPlaceholder: {
@@ -87,35 +201,21 @@ const styles = StyleSheet.create({
     fontSize: 48,
     opacity: 0.4,
   },
-  body: {
+  footer: {
     padding: spacing.lg,
     gap: spacing.xs,
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
   title: {
-    flex: 1,
-    fontFamily: fonts.headingBold,
-    fontSize: 18,
-    color: colors.mossDeep,
-    textAlign: 'right',
-  },
-  meta: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.inkSoft,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
     textAlign: 'right',
   },
   price: {
     fontFamily: fonts.bodyBold,
     fontSize: 16,
-    color: colors.ink,
+    color: colors.mossDeep,
     textAlign: 'right',
-    marginTop: spacing.xs,
   },
   priceSuffix: {
     fontFamily: fonts.body,
@@ -126,7 +226,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radii.pill,
-    alignSelf: 'flex-start',
   },
   tierBronze: {
     backgroundColor: colors.goldDeep,

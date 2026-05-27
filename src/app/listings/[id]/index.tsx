@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -8,7 +9,7 @@ import { formatSAR, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { useAuth } from '@/lib/auth';
-import { colors, fonts, radii, spacing } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function ListingDetailScreen() {
   const router = useRouter();
@@ -74,6 +75,62 @@ export default function ListingDetailScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Sitter-first header — hero of the detail screen. */}
+        <View style={styles.sitterHeader}>
+          {listing.host?.avatar_url ? (
+            <Image
+              source={{ uri: listing.host.avatar_url }}
+              style={styles.avatar}
+              contentFit="cover"
+              transition={150}
+            />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarInitial}>
+                {listing.host?.full_name?.trim().charAt(0) ?? '?'}
+              </Text>
+            </View>
+          )}
+          <View style={styles.sitterText}>
+            <View style={styles.sitterNameRow}>
+              <Text style={styles.sitterName} numberOfLines={1}>
+                {listing.host?.full_name ?? '—'}
+              </Text>
+              <Text style={styles.verifiedMark}>✓</Text>
+            </View>
+            <Text style={styles.sitterMeta}>
+              {t(
+                listing.host_gender === 'female'
+                  ? 'listing.host_female'
+                  : 'listing.host_male',
+              )}{' '}
+              • 📍 {listing.neighborhood}
+            </Text>
+            <View style={styles.badgeRow}>
+              <View
+                style={[
+                  styles.tier,
+                  listing.tier === 'gold'
+                    ? styles.tierGold
+                    : listing.tier === 'silver'
+                      ? styles.tierSilver
+                      : styles.tierBronze,
+                ]}
+              >
+                <Text style={styles.tierText}>
+                  {t(`listing.tier_${listing.tier}`)}
+                </Text>
+              </View>
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>
+                  {t('listing.host_new_badge')}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Photos as secondary evidence */}
         <PhotoGallery photos={listing.photos} />
 
         <View style={styles.body}>
@@ -85,35 +142,6 @@ export default function ListingDetailScreen() {
               <Text style={styles.priceSuffix}>
                 {t('listing.nightly_suffix')}
               </Text>
-            </Text>
-            <View
-              style={[
-                styles.tier,
-                listing.tier === 'gold'
-                  ? styles.tierGold
-                  : listing.tier === 'silver'
-                    ? styles.tierSilver
-                    : styles.tierBronze,
-              ]}
-            >
-              <Text style={styles.tierText}>
-                {t(`listing.tier_${listing.tier}`)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.metaBlock}>
-            <Text style={styles.metaLine}>
-              📍 {listing.neighborhood}
-            </Text>
-            <Text style={styles.metaLine}>
-              👤{' '}
-              {listing.host?.full_name ?? '—'} ·{' '}
-              {t(
-                listing.host_gender === 'female'
-                  ? 'listing.host_female'
-                  : 'listing.host_male',
-              )}
             </Text>
           </View>
 
@@ -246,6 +274,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
     textAlign: 'right',
+  },
+  sitterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.paper,
+    margin: spacing.xl,
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radii.xl,
+    gap: spacing.md,
+    ...shadows.card,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.whisper,
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontFamily: fonts.headingBold,
+    fontSize: 28,
+    color: colors.mossDeep,
+  },
+  sitterText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  sitterNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  sitterName: {
+    flex: 1,
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.mossDeep,
+    textAlign: 'right',
+  },
+  verifiedMark: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    color: colors.moss,
+  },
+  sitterMeta: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    textAlign: 'right',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  newBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+  },
+  newBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: colors.cream,
+    letterSpacing: 0.5,
   },
   description: {
     fontFamily: fonts.body,

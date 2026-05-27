@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -49,17 +50,14 @@ export default function BookingRequestScreen() {
   const [endDate, setEndDate] = useState('');
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [newPetName, setNewPetName] = useState('');
-  const [addonType, setAddonType] = useState<Enums<'booking_addon_type'> | null>(
-    null,
+  const [selectedAddons, setSelectedAddons] = useState<Set<Enums<'booking_addon_type'>>>(
+    new Set(),
   );
 
   const [submitting, setSubmitting] = useState(false);
-  const [submitStage, setSubmitStage] = useState<'idle' | 'paying' | 'saving'>(
-    'idle',
-  );
+  const [submitStage, setSubmitStage] = useState<'idle' | 'paying' | 'saving'>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  // Load listing + existing pets in parallel.
   useEffect(() => {
     if (!listingId || !user) return;
     let cancelled = false;
@@ -85,11 +83,15 @@ export default function BookingRequestScreen() {
 
   const nights = nightsBetween(startDate, endDate);
   const baseCost = listing ? nights * listing.nightly_price_sar : 0;
-  const selectedAddon = useMemo(
-    () => ADDON_OPTIONS.find((a) => a.type === addonType) ?? null,
-    [addonType],
+  const addonsList = useMemo<AddonInput[]>(
+    () =>
+      ADDON_OPTIONS.filter((opt) => selectedAddons.has(opt.type)).map((opt) => ({
+        type: opt.type,
+        priceSAR: opt.priceSAR,
+      })),
+    [selectedAddons],
   );
-  const addonCost = selectedAddon?.priceSAR ?? 0;
+  const addonCost = addonsList.reduce((sum, a) => sum + a.priceSAR, 0);
   const total = baseCost + addonCost;
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
@@ -115,6 +117,15 @@ export default function BookingRequestScreen() {
     );
   }
 
+  const toggleAddon = (type: Enums<'booking_addon_type'>) => {
+    setSelectedAddons((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
   const validate = (): string | null => {
     if (!startDate || startDate < todayIso()) return t('booking.invalid_start_date');
     if (!endDate || nights <= 0) return t('booking.invalid_end_date');
@@ -131,17 +142,12 @@ export default function BookingRequestScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      // 1. Ensure we have a pet to attach to the booking.
       let petId = selectedPetId;
       if (!petId) {
-        const created = await createPet({
-          ownerId: user.id,
-          name: newPetName,
-        });
+        const created = await createPet({ ownerId: user.id, name: newPetName });
         petId = created.id;
       }
 
-      // 2. Authorize payment (mocked).
       setSubmitStage('paying');
       const result = await MockPaymentProvider.authorize({
         bookingId: 'pending',
@@ -152,14 +158,7 @@ export default function BookingRequestScreen() {
         throw new Error(result.reason);
       }
 
-      // 3. Write the booking + addon.
       setSubmitStage('saving');
-      const addon: AddonInput | undefined = selectedAddon
-        ? {
-            type: selectedAddon.type,
-            priceSAR: selectedAddon.priceSAR,
-          }
-        : undefined;
       const booking = await createBookingRequest({
         listingId: listing.id,
         ownerId: user.id,
@@ -168,10 +167,10 @@ export default function BookingRequestScreen() {
         endDate,
         basePriceSAR: listing.nightly_price_sar,
         totalSAR: total,
-        addon,
+        addons: addonsList,
       });
 
-      router.replace(`/bookings/${booking.id}`);
+      router.replace({ pathname: '/bookings/[id]', params: { id: booking.id } });
     } catch (e) {
       setError(e instanceof Error ? e.message : t('booking.submit_failed'));
     } finally {
@@ -193,31 +192,17 @@ export default function BookingRequestScreen() {
         <Text style={styles.heading}>{t('booking.request_title')}</Text>
         <Text style={styles.subheading}>{listing.title_ar}</Text>
 
-        {/* Dates */}
+        {/* Dates — DateField branches on platform */}
         <View style={styles.field}>
           <Text style={styles.label}>{t('booking.start_date_label')}</Text>
-          <TextInput
-            value={startDate}
-            onChangeText={setStartDate}
-            placeholder={t('booking.date_placeholder')}
-            placeholderTextColor={colors.inkSoft}
-            autoCapitalize="none"
-            autoCorrect={false}
-            inputMode="numeric"
-            style={styles.input}
-          />
+          <DateField value={startDate} onChange={setStartDate} min={todayIso()} />
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>{t('booking.end_date_label')}</Text>
-          <TextInput
+          <DateField
             value={endDate}
-            onChangeText={setEndDate}
-            placeholder={t('booking.date_placeholder')}
-            placeholderTextColor={colors.inkSoft}
-            autoCapitalize="none"
-            autoCorrect={false}
-            inputMode="numeric"
-            style={styles.input}
+            onChange={setEndDate}
+            min={startDate || todayIso()}
           />
         </View>
 
@@ -269,32 +254,32 @@ export default function BookingRequestScreen() {
           style={styles.input}
         />
 
-        {/* Addons */}
+        {/* Addons — multi-select checkboxes */}
         <Text style={styles.sectionLabel}>{t('booking.addon_section_label')}</Text>
         <View style={styles.addonList}>
-          <Pressable
-            onPress={() => setAddonType(null)}
-            style={[
-              styles.addonRow,
-              addonType === null && styles.addonRowSelected,
-            ]}
-          >
-            <Text style={styles.addonLabel}>{t('booking.addon_none')}</Text>
-            {addonType === null ? <Text style={styles.checkmark}>✓</Text> : null}
-          </Pressable>
           {ADDON_OPTIONS.map((opt) => {
             const available = opt.available(listing);
+            const checked = selectedAddons.has(opt.type);
             return (
               <Pressable
                 key={opt.type}
-                onPress={() => available && setAddonType(opt.type)}
+                onPress={() => available && toggleAddon(opt.type)}
                 disabled={!available}
                 style={[
                   styles.addonRow,
-                  addonType === opt.type && styles.addonRowSelected,
+                  checked && styles.addonRowSelected,
                   !available && styles.addonRowDisabled,
                 ]}
               >
+                <View
+                  style={[
+                    styles.checkbox,
+                    checked && styles.checkboxChecked,
+                    !available && styles.checkboxDisabled,
+                  ]}
+                >
+                  {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                </View>
                 <View style={styles.addonLeft}>
                   <Text
                     style={[
@@ -310,15 +295,12 @@ export default function BookingRequestScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <Text style={styles.addonPrice}>
-                  +{formatSAR(opt.priceSAR)}
-                </Text>
+                <Text style={styles.addonPrice}>+{formatSAR(opt.priceSAR)}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        {/* Total */}
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>{t('booking.total_label')}</Text>
           <Text style={styles.totalValue}>{formatSAR(total)}</Text>
@@ -335,6 +317,68 @@ export default function BookingRequestScreen() {
         </Pressable>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DateField — Platform-branched date input.
+//
+// Web: native HTML5 <input type="date"> (handles RTL, min/max, calendar UI
+//   via the browser).
+// Native: TextInput placeholder until @react-native-community/datetimepicker
+//   is wired (installed in Step 5.5C, but the native picker render path is
+//   left for a follow-up).
+// ---------------------------------------------------------------------------
+function DateField({
+  value,
+  onChange,
+  min,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  min?: string;
+}) {
+  if (Platform.OS === 'web') {
+    return (
+      // React Native Web passes raw HTML elements straight through. The
+      // styling here mirrors the TextInput style so the field blends in.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((<input
+        type="date"
+        value={value}
+        min={min}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          backgroundColor: colors.paper,
+          borderColor: colors.whisper,
+          borderWidth: 1,
+          borderRadius: radii.lg,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.md,
+          paddingLeft: spacing.lg,
+          paddingRight: spacing.lg,
+          fontFamily: fonts.body,
+          fontSize: 16,
+          color: colors.ink,
+          width: '100%',
+          boxSizing: 'border-box',
+        } as any}
+      />) as unknown) as React.ReactElement
+    );
+  }
+  // Native fallback — TODO: render @react-native-community/datetimepicker
+  // via a modal pattern when we ship native builds.
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChange}
+      placeholder="YYYY-MM-DD"
+      placeholderTextColor={colors.inkSoft}
+      autoCapitalize="none"
+      autoCorrect={false}
+      inputMode="numeric"
+      style={styles.input}
+    />
   );
 }
 
@@ -446,7 +490,6 @@ const styles = StyleSheet.create({
   },
   addonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -454,6 +497,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderColor: colors.whisper,
     borderWidth: 2,
+    gap: spacing.md,
   },
   addonRowSelected: {
     borderColor: colors.moss,
@@ -461,6 +505,28 @@ const styles = StyleSheet.create({
   },
   addonRowDisabled: {
     opacity: 0.45,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.inkSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cream,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.moss,
+    borderColor: colors.moss,
+  },
+  checkboxDisabled: {
+    borderColor: colors.whisper,
+  },
+  checkboxMark: {
+    color: colors.cream,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
   },
   addonLeft: {
     flex: 1,

@@ -20,6 +20,7 @@
     "female_filter": "مضيفات فقط"
   },
   "listing": {
+    "host_new_badge": "جديد",
     "loading": "جارٍ تحميل الإعلان…",
     "not_found": "الإعلان غير موجود",
     "nightly_suffix": "/ ليلة",

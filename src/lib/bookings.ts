@@ -23,13 +23,15 @@ export type CreateBookingInput = {
   endDate: string; // yyyy-mm-dd
   basePriceSAR: number;
   totalSAR: number;
-  addon?: AddonInput;
+  addons?: AddonInput[];
 };
 
 export async function createBookingRequest(
   input: CreateBookingInput,
 ): Promise<Tables<'bookings'>> {
   if (!supabase) throw new Error('No Supabase client');
+
+  const addons: AddonInput[] = input.addons ?? [];
 
   const { data: booking, error: bErr } = await supabase
     .from('bookings')
@@ -41,7 +43,7 @@ export async function createBookingRequest(
       end_date: input.endDate,
       base_price_sar: input.basePriceSAR,
       total_sar: input.totalSAR,
-      addons_total_sar: input.addon?.priceSAR ?? 0,
+      addons_total_sar: addons.reduce((sum, a) => sum + a.priceSAR, 0),
       status: 'requested',
     })
     .select()
@@ -49,16 +51,18 @@ export async function createBookingRequest(
 
   if (bErr || !booking) throw bErr ?? new Error('Failed to create booking');
 
-  if (input.addon) {
-    const { error: aErr } = await supabase.from('booking_addons').insert({
-      booking_id: booking.id,
-      type: input.addon.type,
-      provider_label: input.addon.providerLabel ?? null,
-      price_sar: input.addon.priceSAR,
-    });
+  if (addons.length > 0) {
+    const { error: aErr } = await supabase.from('booking_addons').insert(
+      addons.map((a) => ({
+        booking_id: booking.id,
+        type: a.type,
+        provider_label: a.providerLabel ?? null,
+        price_sar: a.priceSAR,
+      })),
+    );
     if (aErr) {
       throw new Error(
-        `Booking saved (${booking.id}) but addon insert failed: ${aErr.message}`,
+        `Booking saved (${booking.id}) but addons insert failed: ${aErr.message}`,
       );
     }
   }
