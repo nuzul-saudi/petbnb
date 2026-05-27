@@ -3,26 +3,18 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
+import { RoleEditor, type SelectableRole } from '@/components/RoleEditor';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
-import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
-import type { Enums } from '@/types/database';
-
-type Role = Enums<'user_role'>;
-
-const ROLES: { value: Role; icon: string }[] = [
-  { value: 'owner', icon: '🐈' },
-  { value: 'host', icon: '🏠' },
-  { value: 'both', icon: '⚭' },
-];
+import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function RoleScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session, user, refreshProfile } = useAuth();
   const [name, setName] = useState('');
-  const [selected, setSelected] = useState<Role | null>(null);
+  const [selected, setSelected] = useState<SelectableRole | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,22 +62,7 @@ export default function RoleScreen() {
 
         <Text style={styles.question}>{t('auth.role_question')}</Text>
 
-        <View style={styles.cards}>
-          {ROLES.map(({ value, icon }) => (
-            <Pressable
-              key={value}
-              onPress={() => setSelected(value)}
-              style={[styles.card, selected === value && styles.cardSelected]}
-            >
-              <Text style={styles.cardIcon}>{icon}</Text>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>{t(`role.${value}_title`)}</Text>
-                <Text style={styles.cardDesc}>{t(`role.${value}_desc`)}</Text>
-              </View>
-              {selected === value ? <Text style={styles.check}>✓</Text> : null}
-            </Pressable>
-          ))}
-        </View>
+        <RoleEditor value={selected} onChange={setSelected} />
 
         <Pressable
           onPress={onSave}
@@ -155,48 +132,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
-  },
-  cards: {
-    gap: spacing.md,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.paper,
-    borderColor: colors.whisper,
-    borderWidth: 2,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    gap: spacing.md,
-    ...shadows.card,
-  },
-  cardSelected: {
-    borderColor: colors.moss,
-    backgroundColor: colors.whisper,
-  },
-  cardIcon: {
-    fontSize: 32,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    color: colors.ink,
-    textAlign: 'right',
-  },
-  cardDesc: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.inkSoft,
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  check: {
-    fontSize: 24,
-    color: colors.moss,
-    fontFamily: fonts.bodyBold,
   },
   button: {
     backgroundColor: colors.moss,
