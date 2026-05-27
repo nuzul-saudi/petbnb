@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
-import { formatSAR } from '@/lib/format';
+import { formatSAR, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import type { ListingFeedItem } from '@/lib/listings';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -60,6 +60,9 @@ export function ListingCard({ listing, onPress }: Props) {
             <TierBadge tier={listing.tier} />
             <Text style={styles.metaText}>
               {genderLabel} • 📍 {listing.neighborhood}
+              {listing.distance_km != null
+                ? ` · ${t('feed.distance_label', { km: toArabicDigits(listing.distance_km.toFixed(1)) })}`
+                : ''}
             </Text>
           </View>
 

@@ -17,7 +17,9 @@
     "loading": "جارٍ تحميل الإعلانات…",
     "empty": "لا يوجد مضيفون متاحون حالياً",
     "load_failed": "تعذّر تحميل الإعلانات",
-    "female_filter": "مضيفات فقط"
+    "female_filter": "مضيفات فقط",
+    "distance_label": "{km} كم",
+    "geo_denied_hint": "شارك موقعك للحصول على ترتيب أفضل حسب القرب"
   },
   "listing": {
     "host_new_badge": "جديد",

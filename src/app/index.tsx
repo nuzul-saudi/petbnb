@@ -12,6 +12,7 @@ import { Redirect, useRouter } from 'expo-router';
 
 import { ListingCard } from '@/components/ListingCard';
 import { useAuth } from '@/lib/auth';
+import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
 import { listActiveListings, type ListingFeedItem } from '@/lib/listings';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
@@ -80,13 +81,34 @@ function OwnerFeedHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [femaleOnly, setFemaleOnly] = useState(false);
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [geoDenied, setGeoDenied] = useState(false);
+
+  // Fetch the user's location once on mount. On success, the load
+  // callback below picks up the new coords via its dependency and
+  // re-queries with sortByDistance. On denial we set geoDenied so
+  // the UI can show a small "share your location" hint.
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentLocation().then((c) => {
+      if (cancelled) return;
+      if (c) setCoords(c);
+      else setGeoDenied(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(
     async (opts: { silent?: boolean } = {}) => {
       if (!opts.silent) setLoading(true);
       setError(null);
       try {
-        const rows = await listActiveListings({ femaleHostsOnly: femaleOnly });
+        const rows = await listActiveListings({
+          femaleHostsOnly: femaleOnly,
+          sortByDistance: coords ?? undefined,
+        });
         setItems(rows);
       } catch (e) {
         console.warn('[feed.load_failed]', e);
@@ -96,7 +118,7 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [femaleOnly, t],
+    [femaleOnly, coords, t],
   );
 
   useEffect(() => {
@@ -156,6 +178,10 @@ function OwnerFeedHome() {
           {t('feed.female_filter')}
         </Text>
       </Pressable>
+
+      {geoDenied ? (
+        <Text style={styles.geoHint}>{t('feed.geo_denied_hint')}</Text>
+      ) : null}
 
       {loading ? (
         <View style={styles.centered}>
@@ -305,6 +331,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 11,
     color: colors.terracotta,
+  },
+  geoHint: {
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    textAlign: 'right',
   },
   filterChip: {
     alignSelf: 'flex-start',
