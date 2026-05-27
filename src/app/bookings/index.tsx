@@ -4,42 +4,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { useAuth } from '@/lib/auth';
+import { listBookingsForOwner, type MyBookingListItem } from '@/lib/bookings';
 import { formatSAR, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
-import { supabase } from '@/lib/supabase';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
-import type { Enums, Tables } from '@/types/database';
-
-type MyBooking = Tables<'bookings'> & {
-  listing: Pick<Tables<'listings'>, 'id' | 'title_ar' | 'neighborhood'> | null;
-};
+import type { Enums } from '@/types/database';
 
 export default function MyBookingsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session, user } = useAuth();
 
-  const [bookings, setBookings] = useState<MyBooking[]>([]);
+  const [bookings, setBookings] = useState<MyBookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!user || !supabase) return;
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const { data, error: e } = await supabase
-        .from('bookings')
-        .select(
-          `
-          *,
-          listing:listings(id, title_ar, neighborhood)
-        `,
-        )
-        .eq('owner_id', user.id)
-        .order('created_at', { ascending: false });
-      if (e) throw e;
-      setBookings((data ?? []) as MyBooking[]);
+      setBookings(await listBookingsForOwner(user.id));
     } catch (e) {
       console.warn('[mybookings.load_failed]', e);
       setError(t('mybookings.load_failed'));
@@ -99,6 +84,11 @@ export default function MyBookingsScreen() {
               </View>
               {item.listing?.neighborhood ? (
                 <Text style={styles.rowMeta}>📍 {item.listing.neighborhood}</Text>
+              ) : null}
+              {item.pets.length > 0 ? (
+                <Text style={styles.rowMeta}>
+                  🐈 {item.pets.map((p) => p.name).join('، ')}
+                </Text>
               ) : null}
               <Text style={styles.rowMeta}>
                 {toArabicDigits(item.start_date)} → {toArabicDigits(item.end_date)} ·{' '}

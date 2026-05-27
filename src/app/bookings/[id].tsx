@@ -91,6 +91,12 @@ export default function BookingDetailScreen() {
 
           <View style={styles.summaryDivider} />
 
+          {booking.pets.length > 0 ? (
+            <Text style={styles.summaryLine}>
+              🐈 {booking.pets.map((p) => p.name).join('، ')}
+            </Text>
+          ) : null}
+
           <Text style={styles.summaryLine}>
             {t('booking.dates_range', {
               start: toArabicDigits(booking.start_date),

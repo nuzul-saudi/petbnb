@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -17,7 +18,7 @@ import { formatSAR, nightsBetween, toArabicDigits, todayIso } from '@/lib/format
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
-import { createPet, listPetsForOwner } from '@/lib/pets';
+import { listPetsForOwner } from '@/lib/pets';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 import type { Enums, Tables } from '@/types/database';
 
@@ -48,8 +49,7 @@ export default function BookingRequestScreen() {
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
-  const [newPetName, setNewPetName] = useState('');
+  const [selectedPetIds, setSelectedPetIds] = useState<Set<string>>(new Set());
   const [selectedAddons, setSelectedAddons] = useState<Set<Enums<'booking_addon_type'>>>(
     new Set(),
   );
@@ -57,6 +57,11 @@ export default function BookingRequestScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitStage, setSubmitStage] = useState<'idle' | 'paying' | 'saving'>('idle');
   const [error, setError] = useState<string | null>(null);
+
+  // Ref for the departure date input — used to auto-focus after the
+  // user picks an arrival date. Web-only (HTMLInputElement); on native
+  // the date picker UX is modal-based so auto-open isn't meaningful.
+  const endDateRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!listingId || !user) return;
@@ -67,7 +72,8 @@ export default function BookingRequestScreen() {
         if (cancelled) return;
         setListing(l);
         setPets(p);
-        if (p.length === 1) setSelectedPetId(p[0].id);
+        // Pre-select the only pet if they have exactly one.
+        if (p.length === 1) setSelectedPetIds(new Set([p[0].id]));
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -81,6 +87,16 @@ export default function BookingRequestScreen() {
       cancelled = true;
     };
   }, [listingId, user]);
+
+  // Calendar UX: when user picks arrival, focus the departure field so
+  // they can continue without an extra tap. Web-only; native picker
+  // auto-open requires a modal we don't have yet (Section 13 TODO).
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (startDate && !endDate) {
+      endDateRef.current?.focus();
+    }
+  }, [startDate, endDate]);
 
   const nights = nightsBetween(startDate, endDate);
   const baseCost = listing ? nights * listing.nightly_price_sar : 0;
@@ -118,6 +134,15 @@ export default function BookingRequestScreen() {
     );
   }
 
+  const togglePet = (id: string) => {
+    setSelectedPetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const toggleAddon = (type: Enums<'booking_addon_type'>) => {
     setSelectedAddons((prev) => {
       const next = new Set(prev);
@@ -130,7 +155,7 @@ export default function BookingRequestScreen() {
   const validate = (): string | null => {
     if (!startDate || startDate < todayIso()) return t('booking.invalid_start_date');
     if (!endDate || nights <= 0) return t('booking.invalid_end_date');
-    if (!selectedPetId && newPetName.trim() === '') return t('booking.pet_required');
+    if (selectedPetIds.size === 0) return t('booking.pet_required');
     return null;
   };
 
@@ -143,12 +168,6 @@ export default function BookingRequestScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      let petId = selectedPetId;
-      if (!petId) {
-        const created = await createPet({ ownerId: user.id, name: newPetName });
-        petId = created.id;
-      }
-
       setSubmitStage('paying');
       const result = await MockPaymentProvider.authorize({
         bookingId: 'pending',
@@ -163,7 +182,7 @@ export default function BookingRequestScreen() {
       const booking = await createBookingRequest({
         listingId: listing.id,
         ownerId: user.id,
-        petId,
+        petIds: Array.from(selectedPetIds),
         startDate,
         endDate,
         basePriceSAR: listing.nightly_price_sar,
@@ -217,6 +236,7 @@ export default function BookingRequestScreen() {
             value={endDate}
             onChange={setEndDate}
             min={startDate || todayIso()}
+            inputRef={endDateRef}
           />
         </View>
 
@@ -230,43 +250,64 @@ export default function BookingRequestScreen() {
           </Text>
         ) : null}
 
-        {/* Pet */}
+        {/* Pet picker — multi-select from existing pets, or empty-state CTA */}
         <Text style={styles.sectionLabel}>{t('booking.pet_section_label')}</Text>
-        {pets.length > 0 ? (
-          <View style={styles.petList}>
-            {pets.map((p) => (
-              <Pressable
-                key={p.id}
-                onPress={() => {
-                  setSelectedPetId(p.id);
-                  setNewPetName('');
-                }}
-                style={[
-                  styles.petRow,
-                  selectedPetId === p.id && styles.petRowSelected,
-                ]}
-              >
-                <Text style={styles.petName}>🐈 {p.name}</Text>
-                {selectedPetId === p.id ? (
-                  <Text style={styles.checkmark}>✓</Text>
-                ) : null}
-              </Pressable>
-            ))}
+        {pets.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>{t('booking.no_pets_title')}</Text>
+            <Text style={styles.emptyBody}>{t('booking.no_pets_body')}</Text>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/pets/[id]',
+                  params: { id: 'new' },
+                })
+              }
+              style={styles.emptyButton}
+            >
+              <Text style={styles.emptyButtonText}>
+                {t('booking.no_pets_button')}
+              </Text>
+            </Pressable>
           </View>
-        ) : null}
-        <Text style={styles.subtleLabel}>
-          {pets.length > 0 ? t('booking.pet_add_new_label') : ''}
-        </Text>
-        <TextInput
-          value={newPetName}
-          onChangeText={(v) => {
-            setNewPetName(v);
-            if (v.trim() !== '') setSelectedPetId(null);
-          }}
-          placeholder={t('booking.pet_name_placeholder')}
-          placeholderTextColor={colors.inkSoft}
-          style={styles.input}
-        />
+        ) : (
+          <View style={styles.petList}>
+            {pets.map((p) => {
+              const checked = selectedPetIds.has(p.id);
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => togglePet(p.id)}
+                  style={[styles.petRow, checked && styles.petRowSelected]}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      checked && styles.checkboxChecked,
+                    ]}
+                  >
+                    {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                  </View>
+                  {p.photo_url ? (
+                    <Image
+                      source={{ uri: p.photo_url }}
+                      style={styles.petThumb}
+                      contentFit="cover"
+                      transition={120}
+                    />
+                  ) : (
+                    <View style={[styles.petThumb, styles.petThumbPlaceholder]}>
+                      <Text style={styles.petThumbEmoji}>🐈</Text>
+                    </View>
+                  )}
+                  <Text style={styles.petName}>{p.name}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         {/* Addons — multi-select checkboxes */}
         <Text style={styles.sectionLabel}>{t('booking.addon_section_label')}</Text>
@@ -324,8 +365,11 @@ export default function BookingRequestScreen() {
 
         <Pressable
           onPress={onSubmit}
-          disabled={submitting}
-          style={[styles.cta, submitting && styles.ctaDisabled]}
+          disabled={submitting || pets.length === 0}
+          style={[
+            styles.cta,
+            (submitting || pets.length === 0) && styles.ctaDisabled,
+          ]}
         >
           <Text style={styles.ctaText}>{submitLabel}</Text>
         </Pressable>
@@ -337,27 +381,27 @@ export default function BookingRequestScreen() {
 // ---------------------------------------------------------------------------
 // DateField — Platform-branched date input.
 //
-// Web: native HTML5 <input type="date"> (handles RTL, min/max, calendar UI
-//   via the browser).
-// Native: TextInput placeholder until @react-native-community/datetimepicker
-//   is wired (installed in Step 5.5C, but the native picker render path is
-//   left for a follow-up).
+// Web: native HTML5 <input type="date">. inputRef forwards to the HTML
+//   element so callers can call .focus() for auto-advance.
+// Native: TextInput placeholder until @react-native-community/datetime
+//   picker is wired in a follow-up (Section 13 TODO).
 // ---------------------------------------------------------------------------
 function DateField({
   value,
   onChange,
   min,
+  inputRef,
 }: {
   value: string;
   onChange: (v: string) => void;
   min?: string;
+  inputRef?: React.Ref<HTMLInputElement>;
 }) {
   if (Platform.OS === 'web') {
     return (
-      // React Native Web passes raw HTML elements straight through. The
-      // styling here mirrors the TextInput style so the field blends in.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ((<input
+        ref={inputRef}
         type="date"
         value={value}
         min={min}
@@ -380,8 +424,6 @@ function DateField({
       />) as unknown) as React.ReactElement
     );
   }
-  // Native fallback — TODO: render @react-native-community/datetimepicker
-  // via a modal pattern when we ship native builds.
   return (
     <TextInput
       value={value}
@@ -449,12 +491,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: 'right',
   },
-  subtleLabel: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.inkSoft,
-    textAlign: 'right',
-  },
   input: {
     backgroundColor: colors.paper,
     borderColor: colors.whisper,
@@ -481,33 +517,76 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     textAlign: 'right',
   },
+  emptyCard: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.moss,
+    borderRadius: radii.pill,
+  },
+  emptyButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.cream,
+  },
   petList: {
     gap: spacing.sm,
   },
   petRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     backgroundColor: colors.paper,
     borderRadius: radii.lg,
     borderColor: colors.whisper,
     borderWidth: 2,
+    gap: spacing.md,
   },
   petRowSelected: {
     borderColor: colors.moss,
     backgroundColor: colors.whisper,
   },
+  petThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.whisper,
+  },
+  petThumbPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  petThumbEmoji: {
+    fontSize: 22,
+  },
   petName: {
-    fontFamily: fonts.body,
+    flex: 1,
+    fontFamily: fonts.bodyBold,
     fontSize: 15,
     color: colors.ink,
-  },
-  checkmark: {
-    fontSize: 18,
-    color: colors.moss,
-    fontFamily: fonts.bodyBold,
+    textAlign: 'right',
   },
   addonList: {
     gap: spacing.sm,
