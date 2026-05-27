@@ -68,7 +68,7 @@ review with the founder, we agreed:
 5. Owner flow: browse Riyadh hosts → host detail with home photo gallery → request booking + optional add-on → confirmation (mock payment). Feed filters to `is_active = true` AND host not suspended.
 6. Check-in / check-out condition report flow (CRITICAL — Section 6)
 7. Host flow: create listing + upload home gallery photos + accept/decline requests + post daily updates. **Self-registered listings default to `is_active = false`** and enter the admin approval queue (Step 4.5).
-8. Bookings list + status tracking for both sides
+8. Bookings list + status tracking + profile/settings expansion (pickup/dropoff coordination, emergency vet contact — see Section 13 items i, j)
 9. Basic in-app messaging (owner ↔ host)
 10. Marketplace screen (display only — products + "sold by X" label, NO cart/checkout)
 
@@ -200,6 +200,18 @@ launch.
   showing a "coming soon" overlay. Does not block launch but is the path
   to expanding from hosting wedge → super-app.
 
+- **Cancellation policy.** No policy exists today. Pre-launch decision
+  needed: flexible / moderate / strict tiers per sitter (Rover model) or
+  a single platform-wide policy (simpler). Affects what we show on the
+  listing detail and what we let users do on a confirmed booking. See
+  Section 13 for the test-round-1 surfacing.
+
+- **Service fee model.** Decide Petbnb's cut per booking (Rover ~20%,
+  Cat in a Flat ~15%, Trusted Housesitters subscription-based). Affects
+  every displayed price across the owner feed, detail, and booking flow.
+  The mock provider currently charges 0%; pre-launch this must reflect
+  reality. See Section 13.
+
 ---
 
 ## 12. Roles
@@ -231,3 +243,51 @@ daily updates, or reviews — enforced at the RLS layer via
 Verified hosts (`profiles.is_verified = true`) display a verified badge in
 the feed. Verification is **not** gating visibility — that's controlled by
 `listings.is_active`. Admin sets both independently.
+
+---
+
+## 13. Known gaps from test round 1 (2026-05-27)
+
+Surfaced when the founder first browsed the Step 5 owner feed with a
+non-developer eye. Items split into "fixed in Step 5.5" and "deferred" —
+each deferred item names where it lands and why it's safe to skip for now.
+
+### Fixed in Step 5.5 (post-Step-5 customer polish pass)
+
+1. **Pet profile model.** "My Cats" section in customer profile, with
+   name / breed / age / behavioral_notes / medical_needs /
+   dietary_restrictions / medications / photo / vaccination doc. Booking
+   flow picks from existing pets or adds one inline.
+2. **Multi-select addons.** UI changes from radio to checkboxes;
+   `booking_addons` was already a child table so no schema change.
+3. **Real date-picker UI.** Replaces the free-text date fields, rejects
+   past dates, RTL-aware.
+4. **"My Bookings" screen.** Accessible from customer home, shows all
+   bookings with status badges, taps through to the existing
+   `/bookings/[id]` screen.
+5. **Customer profile screen.** View + edit name, view/edit pets list,
+   role switcher reusing the Step 4 RoleEditor (extracted to a shared
+   component in Step 5.5).
+6. **Listing card refactor — sitter-first framing.** Avatar + name +
+   verified ✓ + tier + neighborhood up top; home photo as secondary
+   evidence. Mirrored as a light header rearrangement on the listing
+   detail screen. Hosts with no completed bookings show a "جديد" badge
+   instead of fabricated stats — no fake numbers.
+
+### Deferred — with rationale and target step
+
+| # | Gap | Lands in | Why deferred |
+|---|-----|----------|--------------|
+| a | Booking type variants (overnight / day-care / hourly). `bookings` needs `booking_type` enum + start_time/end_time; per-listing pricing needs hourly_rate/daycare_rate. | Step 5.6 (day-care); hourly indefinite | MVP target is overnight cat boarding; day-care is common in KSA but adds significant schema/UI scope. Hourly sitting is rare for cats. |
+| b | Cancellation policy — flexible/moderate/strict per sitter vs single platform-wide. | Section 11 (launch-blocker) | Business decision required first; both models are easy to implement once chosen. |
+| c | Sitter availability calendar — per-listing available/blocked days. | Step 7 | Belongs in the host flow; today every listing is bookable any time. |
+| d | Daily photo updates during stay. | Step 7 | Lives where host listing creation lives — host needs to be set up before they can post updates. |
+| e | Messaging (owner ↔ sitter). | Step 9 | Already in build order. Critical pre-booking comms; nobody books without messaging first. |
+| f | Reviews / two-way ratings after completed stay. | Step 10 | Already in build order. |
+| g | Service fee — Petbnb's cut per booking. | Section 11 (launch-blocker) | Affects every displayed price; needs founder decision before any UI work. |
+| h | Insurance partnership. | Section 11 | Need a real Saudi insurance partner before the `تأمين` addon can sell. |
+| i | Pickup / dropoff coordination — address on profile + drop-off method per booking. | Step 8 expansion | Folds with profile/settings expansion (Step 8 renamed to "Bookings list + status tracking + profile/settings expansion"). |
+| j | Emergency vet contact — preferred vet + emergency phone on profile. | Step 8 expansion | Same as above. |
+| k | Photo requirements for listings — mandatory categories (sleeping area, etc.). | Step 7 | Quality lever for host listings; lives where listing creation lives. |
+| l | Pet temperament tagging. | Parked indefinitely | Nice-to-have; not MVP. |
+| m | Family / household considerations — multi-occupant Saudi homes, who counts as "verified". | Open — investigate during first 5 host interviews | Unresolved spec question; can't write code against an unknown answer. |
