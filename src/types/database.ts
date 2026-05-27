@@ -152,6 +152,8 @@ export type Database = {
           tier: Database['public']['Enums']['listing_tier'];
           offers_grooming: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
+          lat: number | null;
+          lng: number | null;
           created_at: string;
         };
         Insert: {
@@ -168,6 +170,8 @@ export type Database = {
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
+          lat?: number | null;
+          lng?: number | null;
           created_at?: string;
         };
         Update: {
@@ -184,6 +188,8 @@ export type Database = {
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender?: Database['public']['Enums']['host_gender'];
+          lat?: number | null;
+          lng?: number | null;
           created_at?: string;
         };
         Relationships: [
@@ -292,6 +298,44 @@ export type Database = {
           },
           {
             foreignKeyName: 'bookings_pet_id_fkey';
+            columns: ['pet_id'];
+            isOneToOne: false;
+            referencedRelation: 'pets';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+
+      // ---------------------------------------------------------------------
+      // Junction table for multi-pet bookings (added in Step 5.6). The
+      // singular bookings.pet_id stays in place for now; will be dropped
+      // in a follow-up migration once no callers remain on it.
+      booking_pets: {
+        Row: {
+          booking_id: string;
+          pet_id: string;
+          created_at: string;
+        };
+        Insert: {
+          booking_id: string;
+          pet_id: string;
+          created_at?: string;
+        };
+        Update: {
+          booking_id?: string;
+          pet_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'booking_pets_booking_id_fkey';
+            columns: ['booking_id'];
+            isOneToOne: false;
+            referencedRelation: 'bookings';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'booking_pets_pet_id_fkey';
             columns: ['pet_id'];
             isOneToOne: false;
             referencedRelation: 'pets';
