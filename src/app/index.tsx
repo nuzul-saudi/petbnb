@@ -118,7 +118,13 @@ function OwnerFeedHome() {
         </View>
         <View style={styles.headerActions}>
           <Pressable
-            onPress={() => router.push('/bookings/index')}
+            // Runtime URL is /bookings (resolves to bookings/index.tsx).
+            // Using the file-path form /bookings/index would be matched
+            // by the dynamic /bookings/[id] route with id="index" and
+            // 400 against /rest/v1/bookings?id=eq.index. The typed-routes
+            // union doesn't list /bookings, hence the directive.
+            // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
+            onPress={() => router.push('/bookings')}
             style={styles.navChip}
           >
             <Text style={styles.navChipText}>{t('mybookings.title')}</Text>
