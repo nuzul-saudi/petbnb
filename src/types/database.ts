@@ -39,6 +39,8 @@ export type Database = {
           avatar_url: string | null;
           nafath_verified: boolean;
           id_document_url: string | null;
+          is_verified: boolean;
+          is_suspended: boolean;
           created_at: string;
         };
         Insert: {
@@ -49,6 +51,8 @@ export type Database = {
           avatar_url?: string | null;
           nafath_verified?: boolean;
           id_document_url?: string | null;
+          is_verified?: boolean;
+          is_suspended?: boolean;
           created_at?: string;
         };
         Update: {
@@ -59,6 +63,8 @@ export type Database = {
           avatar_url?: string | null;
           nafath_verified?: boolean;
           id_document_url?: string | null;
+          is_verified?: boolean;
+          is_suspended?: boolean;
           created_at?: string;
         };
         Relationships: [
@@ -557,7 +563,33 @@ export type Database = {
     };
 
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      admin_list_users: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          full_name: string;
+          phone: string | null;
+          role: Database['public']['Enums']['user_role'];
+          avatar_url: string | null;
+          nafath_verified: boolean;
+          is_verified: boolean;
+          is_suspended: boolean;
+          profile_created_at: string;
+          email: string;
+          auth_created_at: string;
+          last_sign_in_at: string | null;
+        }[];
+      };
+      is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_active_user: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+    };
 
     // These mirror the CHECK constraints in 0001_initial_schema.sql. They
     // aren't real Postgres ENUM types (we chose TEXT+CHECK for ease of
@@ -565,7 +597,7 @@ export type Database = {
     // app the same type-safety as if they were. If we ever migrate to real
     // Postgres ENUMs, `supabase gen types` will produce identical names.
     Enums: {
-      user_role: 'owner' | 'host' | 'both';
+      user_role: 'owner' | 'host' | 'both' | 'admin';
       listing_tier: 'bronze' | 'silver' | 'gold';
       host_gender: 'female' | 'male';
       booking_status:

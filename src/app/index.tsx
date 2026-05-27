@@ -22,7 +22,10 @@ export default function HomeScreen() {
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session) return <Redirect href="/sign-in" />;
   if (!profile) return <SafeAreaView style={styles.safe} />;
+  // Suspended check runs before role gating so admins can also be locked out.
+  if (profile.is_suspended) return <Redirect href="/suspended" />;
   if (profile.full_name.trim() === '') return <Redirect href="/role" />;
+  if (profile.role === 'admin') return <Redirect href="/admin" />;
 
   if (profile.role === 'host') return <HostPlaceholderHome />;
   return <OwnerFeedHome />;

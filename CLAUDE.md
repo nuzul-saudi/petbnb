@@ -13,6 +13,25 @@ A two-sided mobile marketplace for Saudi Arabia connecting cat owners with verif
 
 ---
 
+## Scope clarification (post-prototype review, 2026-05-26)
+
+A long-term-vision prototype surfaced a multi-service pet super-app (hosting,
+vet, grooming, transport, store, insurance, records, consultation). After
+review with the founder, we agreed:
+
+- **MVP = hosting wedge only.** The current build (Steps 1–10) ships hosting
+  exclusively. The other seven services are post-launch.
+- **Prototype = North Star, not roadmap.** Its visual language (warm sand,
+  moss, gold, generous spacing) is the design target. Its scope is the
+  1–2 year horizon.
+- **Hub-style home with "قريباً" tiles** for the other seven services is a
+  Phase 2 polish task — listed in Section 11.
+- **Female-trust positioning is the wedge.** Every early host is personally
+  vetted by the founder. This is why Step 4.5 introduces the `admin` role
+  and the admin dashboard *before* Step 5 resumes.
+
+---
+
 ## 1. Working with a non-technical founder (READ THIS CAREFULLY)
 
 - The founder has done light technical work before but is NOT an engineer.
@@ -45,9 +64,10 @@ A two-sided mobile marketplace for Saudi Arabia connecting cat owners with verif
 2. Supabase project connection + `.env` + client helper (founder creates the Supabase project — give instructions)
 3. Database schema + Row Level Security (Section 5)
 4. Auth: Saudi phone number → SMS OTP → verify → create profile → choose role (owner/host/both)
-5. Owner flow: browse Riyadh hosts → host detail with home photo gallery → request booking + optional add-on → confirmation (mock payment)
+4.5. **Admin role + admin dashboard** (added after prototype review — see Scope clarification above). Extends `profiles.role` with `'admin'`, adds `is_verified` (host trust badge) and `is_suspended` (account block) columns. Builds an admin dashboard for the founder to personally vet every early host. **Must land before Step 5 resumes** so the host-vetting workflow is in place when self-signups arrive.
+5. Owner flow: browse Riyadh hosts → host detail with home photo gallery → request booking + optional add-on → confirmation (mock payment). Feed filters to `is_active = true` AND host not suspended.
 6. Check-in / check-out condition report flow (CRITICAL — Section 6)
-7. Host flow: create listing + upload home gallery photos + accept/decline requests + post daily updates
+7. Host flow: create listing + upload home gallery photos + accept/decline requests + post daily updates. **Self-registered listings default to `is_active = false`** and enter the admin approval queue (Step 4.5).
 8. Bookings list + status tracking for both sides
 9. Basic in-app messaging (owner ↔ host)
 10. Marketplace screen (display only — products + "sold by X" label, NO cart/checkout)
@@ -58,13 +78,15 @@ STOP after each numbered item. Run it. Show the founder. Wait for "continue."
 
 ## 4. Scope discipline (do NOT build these in MVP)
 
-Even if useful: real payments, real insurance, Nafath, push notifications, merchandise cart/checkout, admin dashboard (use Supabase dashboard), multi-city, dogs, ratings algorithm (simple 1–5 stars + text only), subscriptions/wellness plans. If you think something out of scope is needed, ASK first.
+Even if useful: real payments, real insurance, Nafath, push notifications, merchandise cart/checkout, multi-city, dogs, ratings algorithm (simple 1–5 stars + text only), subscriptions/wellness plans. If you think something out of scope is needed, ASK first.
+
+(Admin dashboard was previously out of scope but moved IN-scope by Step 4.5 — see Scope clarification above. Founder personally vets early hosts; this is the female-trust wedge.)
 
 ---
 
 ## 5. Data model (core tables, RLS ON for every table)
 
-- **profiles**: id (uuid fk auth.users), full_name, phone, role (`owner`|`host`|`both`), avatar_url, created_at, nafath_verified (bool default false), id_document_url (nullable, future)
+- **profiles**: id (uuid fk auth.users), full_name, phone, role (`owner`|`host`|`both`|`admin`), avatar_url, created_at, nafath_verified (bool default false), id_document_url (nullable, future), is_verified (bool default false — admin marks hosts trusted), is_suspended (bool default false — admin blocks abusers from writes)
 - **pets**: id, owner_id, name, species (default 'cat'), breed, age_months, vaccination_doc_url, behavioral_notes, photo_url
 - **listings**: id, host_id, title_ar, description_ar, neighborhood, nightly_price_sar, max_concurrent_pets, has_resident_pets (bool), resident_pets_note, is_active, tier (`bronze`|`silver`|`gold` default bronze), offers_grooming (bool default false), host_gender (`female`|`male`)
 - **listing_photos**: id, listing_id, photo_url, sort_order  (THE AIRBNB-STYLE HOME GALLERY)
@@ -171,3 +193,41 @@ launch.
 
 - **Real insurance integration.** The `insurance` booking-addon type is a
   placeholder; partner with a Saudi insurer before launch.
+
+- **Hub-style home with "قريباً" tiles for the other 7 services** (vet,
+  grooming, transport, store, insurance, records, consultation). Phase 2
+  polish — the prototype's grid of service tiles, with the deferred ones
+  showing a "coming soon" overlay. Does not block launch but is the path
+  to expanding from hosting wedge → super-app.
+
+---
+
+## 12. Roles
+
+The `profiles.role` column has four values. Each describes both what UI the
+user sees on signed-in home and what they can do across the app.
+
+- **`owner`** — has at least one cat needing care. Browses hosts, requests
+  bookings, posts in messaging, files condition reports as a participant,
+  leaves reviews. Cannot create listings.
+- **`host`** — boards cats. Creates listings (pending admin approval),
+  accepts/declines bookings, posts daily updates, files condition reports
+  as a participant, leaves reviews. Cannot request bookings.
+- **`both`** — owner and host simultaneously. Can do everything owners and
+  hosts can do. Sees the owner browse feed as their home screen by default
+  (host dashboard reached separately).
+- **`admin`** — founder vetting account. Sees the admin dashboard as their
+  home screen. Can approve/reject host applications, approve/reject
+  listings, edit any profile, edit any listing, suspend/unsuspend users.
+  Multi-admin permission levels are post-MVP — for now it's binary
+  (you're admin or you're not).
+
+Suspended users (`profiles.is_suspended = true`) can sign in but see a
+dedicated "account suspended" screen instead of their normal home. They
+cannot insert listings, bookings, messages, addons, condition reports,
+daily updates, or reviews — enforced at the RLS layer via
+`public.is_active_user()`.
+
+Verified hosts (`profiles.is_verified = true`) display a verified badge in
+the feed. Verification is **not** gating visibility — that's controlled by
+`listings.is_active`. Admin sets both independently.
