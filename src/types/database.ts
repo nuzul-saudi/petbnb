@@ -89,6 +89,9 @@ export type Database = {
           age_months: number | null;
           vaccination_doc_url: string | null;
           behavioral_notes: string | null;
+          medical_needs: string | null;
+          dietary_restrictions: string | null;
+          medications: string | null;
           photo_url: string | null;
           created_at: string;
         };
@@ -101,6 +104,9 @@ export type Database = {
           age_months?: number | null;
           vaccination_doc_url?: string | null;
           behavioral_notes?: string | null;
+          medical_needs?: string | null;
+          dietary_restrictions?: string | null;
+          medications?: string | null;
           photo_url?: string | null;
           created_at?: string;
         };
@@ -113,6 +119,9 @@ export type Database = {
           age_months?: number | null;
           vaccination_doc_url?: string | null;
           behavioral_notes?: string | null;
+          medical_needs?: string | null;
+          dietary_restrictions?: string | null;
+          medications?: string | null;
           photo_url?: string | null;
           created_at?: string;
         };
