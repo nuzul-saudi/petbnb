@@ -7,6 +7,14 @@ import type { Tables } from '@/types/database';
 export type ListingFilter = {
   neighborhood?: string;
   femaleHostsOnly?: boolean;
+  /**
+   * When provided, the result is sorted nearest-first by haversine
+   * distance from this point. Listings without lat/lng remain in the
+   * result (we don't filter — we just sort), sorted last with
+   * `distance_km = null`. The owner feed's card hides the distance
+   * line entirely for those.
+   */
+  sortByDistance?: { lat: number; lng: number };
 };
 
 type HostSummary = Pick<Tables<'profiles'>, 'id' | 'full_name' | 'avatar_url'>;
@@ -15,7 +23,30 @@ type PhotoSummary = Pick<Tables<'listing_photos'>, 'id' | 'photo_url' | 'sort_or
 export type ListingFeedItem = Tables<'listings'> & {
   host: HostSummary | null;
   cover_photo: string | null;
+  distance_km: number | null;
 };
+
+/**
+ * Great-circle distance between two lat/lng points in kilometers.
+ * Haversine formula; accurate to <0.5% at city scale, ample for
+ * the "X.X كم" label on listing cards.
+ */
+export function distanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371; // Earth radius in km.
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 export type ListingDetail = Tables<'listings'> & {
   host: HostSummary | null;
@@ -46,8 +77,9 @@ export async function listActiveListings(
   if (error) throw error;
 
   // The nested select returns a typed shape but with `listing_photos` as the
-  // raw rows. Pick the lowest sort_order as the cover.
-  return (data ?? []).map((row) => {
+  // raw rows. Pick the lowest sort_order as the cover; compute distance
+  // from the caller's location if provided.
+  const items: ListingFeedItem[] = (data ?? []).map((row) => {
     const photos = (row.listing_photos ?? []) as PhotoSummary[];
     const cover = photos.length
       ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
@@ -55,12 +87,37 @@ export async function listActiveListings(
     const { listing_photos: _drop, ...rest } = row as typeof row & {
       listing_photos?: PhotoSummary[];
     };
+    const typedRest = rest as Tables<'listings'>;
+    const distance =
+      filter.sortByDistance &&
+      typedRest.lat != null &&
+      typedRest.lng != null
+        ? distanceKm(
+            filter.sortByDistance.lat,
+            filter.sortByDistance.lng,
+            typedRest.lat,
+            typedRest.lng,
+          )
+        : null;
     return {
-      ...(rest as Tables<'listings'>),
+      ...typedRest,
       host: (row.host ?? null) as HostSummary | null,
       cover_photo: cover,
+      distance_km: distance,
     };
   });
+
+  if (filter.sortByDistance) {
+    // Nearest first; nulls (listings without coordinates) sorted last.
+    items.sort((a, b) => {
+      if (a.distance_km == null && b.distance_km == null) return 0;
+      if (a.distance_km == null) return 1;
+      if (b.distance_km == null) return -1;
+      return a.distance_km - b.distance_km;
+    });
+  }
+
+  return items;
 }
 
 export async function getListingWithPhotos(id: string): Promise<ListingDetail | null> {
