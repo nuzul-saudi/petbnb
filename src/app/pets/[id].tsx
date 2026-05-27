@@ -8,16 +8,21 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { BreedPicker } from '@/components/BreedPicker';
 import { useAuth } from '@/lib/auth';
+import { findBreed, type BreedKey } from '@/lib/breeds';
 import { useTranslation } from '@/lib/i18n';
 import {
   createPet,
   deletePet,
   getPet,
+  pickPetPhoto,
   updatePet,
+  uploadPetPhoto,
   type UpdatePetPatch,
 } from '@/lib/pets';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
@@ -33,16 +38,18 @@ export default function PetDetailScreen() {
   const isNew = id === 'new';
 
   const [name, setName] = useState('');
-  const [breed, setBreed] = useState('');
+  const [breedKey, setBreedKey] = useState<BreedKey | null>(null);
   const [ageMonths, setAgeMonths] = useState('');
   const [behavioralNotes, setBehavioralNotes] = useState('');
   const [medicalNeeds, setMedicalNeeds] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState('');
   const [medications, setMedications] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,12 +63,17 @@ export default function PetDetailScreen() {
           return;
         }
         setName(pet.name);
-        setBreed(pet.breed ?? '');
+        // pet.breed is a free-text string in the DB. If it matches a known
+        // BreedKey, use it. Otherwise leave breedKey null and the user can
+        // pick a fresh one (the old free-text value is discarded).
+        const matched = findBreed(pet.breed);
+        setBreedKey(matched ? matched.key : null);
         setAgeMonths(pet.age_months != null ? String(pet.age_months) : '');
         setBehavioralNotes(pet.behavioral_notes ?? '');
         setMedicalNeeds(pet.medical_needs ?? '');
         setDietaryRestrictions(pet.dietary_restrictions ?? '');
         setMedications(pet.medications ?? '');
+        setPhotoUrl(pet.photo_url);
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -94,12 +106,13 @@ export default function PetDetailScreen() {
       }
       const patch: UpdatePetPatch = {
         name: name.trim(),
-        breed: breed.trim() || null,
+        breed: breedKey,
         age_months: ageNum,
         behavioral_notes: behavioralNotes.trim() || null,
         medical_needs: medicalNeeds.trim() || null,
         dietary_restrictions: dietaryRestrictions.trim() || null,
         medications: medications.trim() || null,
+        photo_url: photoUrl,
       };
       if (isNew) {
         await createPet({
@@ -111,6 +124,7 @@ export default function PetDetailScreen() {
           medical_needs: patch.medical_needs,
           dietary_restrictions: patch.dietary_restrictions,
           medications: patch.medications,
+          photo_url: patch.photo_url,
         });
       } else {
         await updatePet(id, patch);
@@ -147,6 +161,33 @@ export default function PetDetailScreen() {
     }
   };
 
+  // Photo upload is only available on existing pets (we need a petId to
+  // build the storage path). For brand-new pets the user is prompted to
+  // save first, then return to add a photo.
+  const onChangePhoto = async () => {
+    if (isNew || !user) return;
+    setError(null);
+    const source = await pickPetPhoto();
+    if (!source) return;
+    setUploadingPhoto(true);
+    try {
+      const url = await uploadPetPhoto({
+        petId: id,
+        ownerId: user.id,
+        source,
+      });
+      // Save the new URL onto the pet row immediately so it survives a
+      // back navigation without hitting Save.
+      await updatePet(id, { photo_url: url });
+      setPhotoUrl(url);
+    } catch (e) {
+      console.warn('[pets.photo_upload_failed]', e);
+      setError(t('pets.photo_upload_failed'));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -175,6 +216,44 @@ export default function PetDetailScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+        {/* Photo section */}
+        <View style={styles.field}>
+          <Text style={styles.label}>{t('pets.photo_label')}</Text>
+          <View style={styles.photoRow}>
+            {photoUrl ? (
+              <Image
+                source={{ uri: photoUrl }}
+                style={styles.photoThumb}
+                contentFit="cover"
+                transition={150}
+              />
+            ) : (
+              <View style={[styles.photoThumb, styles.photoPlaceholder]}>
+                <Text style={styles.photoPlaceholderEmoji}>🐈</Text>
+              </View>
+            )}
+            <Pressable
+              onPress={onChangePhoto}
+              disabled={isNew || uploadingPhoto}
+              style={[
+                styles.photoButton,
+                (isNew || uploadingPhoto) && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.photoButtonText}>
+                {uploadingPhoto
+                  ? t('pets.photo_uploading')
+                  : photoUrl
+                    ? t('pets.photo_change')
+                    : t('pets.photo_add')}
+              </Text>
+            </Pressable>
+          </View>
+          {isNew ? (
+            <Text style={styles.photoHint}>{t('pets.photo_save_first')}</Text>
+          ) : null}
+        </View>
+
         <Field label={t('pets.name_label')} required>
           <TextInput
             value={name}
@@ -185,15 +264,11 @@ export default function PetDetailScreen() {
           />
         </Field>
 
-        <Field label={t('pets.breed_label')}>
-          <TextInput
-            value={breed}
-            onChangeText={setBreed}
-            placeholder={t('pets.breed_placeholder')}
-            placeholderTextColor={colors.inkSoft}
-            style={styles.input}
-          />
-        </Field>
+        {/* Breed picker replaces the Step 5.5 free-text input */}
+        <View style={styles.field}>
+          <Text style={styles.label}>{t('pets.breed_label')}</Text>
+          <BreedPicker value={breedKey} onChange={setBreedKey} />
+        </View>
 
         <Field label={t('pets.age_months_label')}>
           <TextInput
@@ -243,8 +318,11 @@ export default function PetDetailScreen() {
 
         <Pressable
           onPress={onSave}
-          disabled={saving || deleting}
-          style={[styles.saveButton, (saving || deleting) && styles.buttonDisabled]}
+          disabled={saving || deleting || uploadingPhoto}
+          style={[
+            styles.saveButton,
+            (saving || deleting || uploadingPhoto) && styles.buttonDisabled,
+          ]}
         >
           <Text style={styles.saveText}>
             {saving ? t('pets.saving') : t('pets.save')}
@@ -254,10 +332,10 @@ export default function PetDetailScreen() {
         {!isNew ? (
           <Pressable
             onPress={onDelete}
-            disabled={saving || deleting}
+            disabled={saving || deleting || uploadingPhoto}
             style={[
               styles.deleteButton,
-              (saving || deleting) && styles.buttonDisabled,
+              (saving || deleting || uploadingPhoto) && styles.buttonDisabled,
             ]}
           >
             <Text style={styles.deleteText}>
@@ -361,6 +439,42 @@ const styles = StyleSheet.create({
   multiline: {
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  photoThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: radii.lg,
+    backgroundColor: colors.whisper,
+  },
+  photoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPlaceholderEmoji: {
+    fontSize: 36,
+  },
+  photoButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.moss,
+  },
+  photoButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.moss,
+  },
+  photoHint: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.inkSoft,
+    textAlign: 'right',
   },
   saveButton: {
     backgroundColor: colors.moss,

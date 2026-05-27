@@ -240,7 +240,13 @@
     "delete": "حذف القطة",
     "deleting": "جارٍ الحذف…",
     "delete_confirm": "هل أنت متأكد من حذف هذه القطة؟",
-    "delete_failed": "تعذّر الحذف"
+    "delete_failed": "تعذّر الحذف",
+    "photo_label": "الصورة",
+    "photo_add": "إضافة صورة",
+    "photo_change": "تغيير الصورة",
+    "photo_uploading": "جارٍ الرفع…",
+    "photo_upload_failed": "تعذّر رفع الصورة",
+    "photo_save_first": "احفظ القطة أولاً لإضافة صورة"
   },
   "profile": {
     "title": "حسابي",
