@@ -304,3 +304,72 @@ each deferred item names where it lands and why it's safe to skip for now.
 | k | Photo requirements for listings — mandatory categories (sleeping area, etc.). | Step 7 | Quality lever for host listings; lives where listing creation lives. |
 | l | Pet temperament tagging. | Parked indefinitely | Nice-to-have; not MVP. |
 | m | Family / household considerations — multi-occupant Saudi homes, who counts as "verified". | Open — investigate during first 5 host interviews | Unresolved spec question; can't write code against an unknown answer. |
+
+### Test round 2 — 2026-05-27 evening
+
+Surfaced when the founder smoke-tested Step 5.5 (sitter-first cards,
+customer profile, pet management, My Bookings). Items grouped by size:
+route/UI bugs land in the next session's opening batch; product features
+go to Step 5.6 (small fixes), with one item promoted to Step 5.7 because
+of its breadth.
+
+**Route / UI bugs — fix in next session's opening batch:**
+
+1. **Booking flow has no back button.** Browser back is brittle. Add a
+   header back chevron or `← العودة إلى الإعلان` link on each step of
+   the request flow.
+2. **Sweep for raw English error keys in catch blocks.** The
+   `load_failed` symptom on `/bookings` was partially fixed in the
+   route-bug patch; other screens may have the same pattern (catch
+   blocks displaying `e.message` instead of a translated user-facing
+   message). One-pass audit of every screen's error rendering.
+3. **Booking confirmation shows only `addons[0]` instead of all addons.**
+   Self-flagged in the Phase 5.5C report; promote to actual fix — map
+   across `booking.addons` in the summary card.
+
+**Product features — Step 5.6 (small fixes batch):**
+
+4. **Pet selection in booking flow uses existing pets, not inline
+   create.** Booking screen shows a pet picker with thumbnails; a
+   `+ add new pet` button routes to `/pets/new` when none exists.
+5. **Multi-pet booking.** Allow selecting multiple pets per booking.
+   **Schema change required:** drop `bookings.pet_id` (single FK), add
+   junction table `booking_pets(booking_id, pet_id)`. Migration +
+   `createBookingRequest` helper update + UI multi-select.
+6. **Cat breed picker with thumbnails.** Curated hardcoded list of
+   ~10 common breeds (Persian / British Shorthair / Saudi Local /
+   Maine Coon / Sphynx / Siamese / Mixed / Unknown). Bundle thumbnails
+   in the app (no upload pipeline needed for breed images).
+7. **Pet photo upload in "My Cats".** DB column `pets.photo_url` and the
+   `pet-photos` storage bucket already exist with RLS — just need image
+   picker integration + upload helper + display.
+8. **Calendar UX polish.** After picking arrival date in the booking
+   request, auto-advance focus to the departure-date picker.
+9. **Location / proximity / map view.**
+   - Add `latitude` + `longitude` columns to `listings` (migration).
+   - Browser geolocation on web; `react-native-location` (or
+     `expo-location`) on native.
+   - Show `X.X كم` distance on each listing card.
+   - Default sort: nearest first.
+   - Optional: toggle between list view and map pin view.
+
+**Product feature — Step 5.7 (Pet-hosting / multi-species expansion):**
+
+10. **Broaden from cat-only to multi-species (dogs at MVP).** Founder
+    decided to launch with both cats and dogs. This is a meaningful
+    expansion — larger than the Step 5.6 items, hence its own step
+    number. Scope:
+    - Tagline change: `رعاية القطط في الرياض` →
+      `رعاية الحيوانات الأليفة في الرياض`.
+    - Full i18n sweep for cat-only language; phrases made species-aware.
+    - Species selector in pet creation (cat / dog, default cat). The
+      `pets.species` column already exists with `default 'cat'`.
+    - Breed picker becomes species-aware — separate cat-breed and
+      dog-breed lists with separate thumbnail sets.
+    - Listings: hosts choose which species they accept. Add either
+      `accepts_species text[]` or two boolean columns
+      (`accepts_cats` / `accepts_dogs`) to `listings`.
+    - Owner feed filter by species.
+    - Listing detail / card icons updated per species.
+    - Section 11 cross-check: "تأمين" addon copy and insurance partner
+      requirements may differ by species — flag during launch prep.
