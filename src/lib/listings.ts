@@ -94,3 +94,45 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
     photos,
   };
 }
+
+/**
+ * Count of completed bookings across all of a host's listings. Used by
+ * the listing card + detail to decide whether to show real stats or the
+ * "جديد" badge per the no-fake-numbers rule from test round 1.
+ *
+ * RLS NOTE (deferred): the bookings SELECT policy only lets the booking
+ * owner, the listing host, or an admin read a row. From an *owner*
+ * browsing the feed, this query against another host's bookings always
+ * returns 0 — even if real completions exist. In MVP this is fine
+ * because we have zero completions yet, so every host shows "جديد".
+ * Before real completions can roll in (post-Step 10), swap to a
+ * SECURITY DEFINER RPC or denormalize a `completed_bookings_count`
+ * counter cache onto profiles. Tracked in CLAUDE.md Section 11 as a
+ * launch-blocker once reviews/completions go live.
+ */
+export async function countCompletedBookingsForHost(
+  hostId: string,
+): Promise<number> {
+  if (!supabase) return 0;
+
+  // Step 1: which listings belong to this host? Short-circuit if none.
+  const { data: hostListings, error: lErr } = await supabase
+    .from('listings')
+    .select('id')
+    .eq('host_id', hostId);
+  if (lErr) throw lErr;
+  if (!hostListings || hostListings.length === 0) return 0;
+
+  // Step 2: count completed bookings against those listing IDs.
+  // `head: true` skips returning the rows themselves — we only want the count.
+  const { count, error } = await supabase
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'completed')
+    .in(
+      'listing_id',
+      hostListings.map((l) => l.id),
+    );
+  if (error) throw error;
+  return count ?? 0;
+}
