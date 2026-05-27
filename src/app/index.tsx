@@ -1,41 +1,59 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 
+import { ListingCard } from '@/components/ListingCard';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
+import { listActiveListings, type ListingFeedItem } from '@/lib/listings';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function HomeScreen() {
-  const { t } = useTranslation();
-  const { initializing, session, profile, signOut } = useAuth();
+  const { initializing, session, profile } = useAuth();
 
-  // Initial boot — Auth context is reading the persisted session.
   if (initializing) return <SafeAreaView style={styles.safe} />;
-
-  // Not signed in → sign-in flow.
   if (!session) return <Redirect href="/sign-in" />;
-
-  // Signed in but profile row hasn't loaded yet (one round-trip).
   if (!profile) return <SafeAreaView style={styles.safe} />;
-
-  // Signed in, profile loaded, but onboarding never completed
-  // (full_name empty = "fresh profile" signal, agreed in Phase 4 plan).
   if (profile.full_name.trim() === '') return <Redirect href="/role" />;
+
+  if (profile.role === 'host') return <HostPlaceholderHome />;
+  return <OwnerFeedHome />;
+}
+
+// ---------------------------------------------------------------------------
+// Host-only home (placeholder until Step 7 ships the host dashboard).
+// ---------------------------------------------------------------------------
+
+function HostPlaceholderHome() {
+  const { t } = useTranslation();
+  const { profile, signOut } = useAuth();
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+      <View style={styles.placeholderContainer}>
         <Text style={styles.greeting}>
-          {t('home.signed_in_greeting', { name: profile.full_name })}
+          {t('home.signed_in_greeting', { name: profile!.full_name })}
         </Text>
 
         <View style={styles.metaRow}>
           <Text style={styles.metaLabel}>{t('home.your_role')}:</Text>
-          <Text style={styles.metaValue}>{t(`role.${profile.role}`)}</Text>
+          <Text style={styles.metaValue}>{t(`role.${profile!.role}`)}</Text>
         </View>
 
-        <Text style={styles.placeholder}>{t('home.step5_placeholder')}</Text>
+        <Text style={styles.placeholderTitle}>
+          {t('home.host_placeholder_title')}
+        </Text>
+        <Text style={styles.placeholderBody}>
+          {t('home.host_placeholder_body')}
+        </Text>
 
         <Pressable onPress={signOut} style={styles.signOut}>
           <Text style={styles.signOutText}>{t('home.sign_out')}</Text>
@@ -45,17 +63,120 @@ export default function HomeScreen() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Owner / both home — the listings feed.
+// ---------------------------------------------------------------------------
+
+function OwnerFeedHome() {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const { profile, signOut } = useAuth();
+
+  const [items, setItems] = useState<ListingFeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [femaleOnly, setFemaleOnly] = useState(false);
+
+  const load = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!opts.silent) setLoading(true);
+      setError(null);
+      try {
+        const rows = await listActiveListings({ femaleHostsOnly: femaleOnly });
+        setItems(rows);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : t('feed.load_failed'));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [femaleOnly, t],
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load({ silent: true });
+  }, [load]);
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.feedTitle}>{t('feed.title')}</Text>
+          <Text style={styles.greetingSmall}>
+            {t('home.signed_in_greeting', { name: profile!.full_name })}
+          </Text>
+        </View>
+        <Pressable onPress={signOut} style={styles.signOutSmall}>
+          <Text style={styles.signOutSmallText}>{t('home.sign_out')}</Text>
+        </Pressable>
+      </View>
+
+      <Pressable
+        onPress={() => setFemaleOnly((v) => !v)}
+        style={[styles.filterChip, femaleOnly && styles.filterChipActive]}
+      >
+        <Text
+          style={[
+            styles.filterChipText,
+            femaleOnly && styles.filterChipTextActive,
+          ]}
+        >
+          {femaleOnly ? '✓ ' : ''}
+          {t('feed.female_filter')}
+        </Text>
+      </Pressable>
+
+      {loading ? (
+        <View style={styles.centered}>
+          <Text style={styles.centeredText}>{t('feed.loading')}</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : items.length === 0 ? (
+        <View style={styles.centered}>
+          <Text style={styles.centeredText}>{t('feed.empty')}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(it) => it.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <ListingCard
+              listing={item}
+              onPress={() => router.push(`/listings/${item.id}`)}
+            />
+          )}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
+      )}
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.cream,
   },
-  container: {
+  // --- placeholder (host) ---
+  placeholderContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   greeting: {
     fontFamily: fonts.headingBold,
@@ -78,13 +199,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.moss,
   },
-  placeholder: {
+  placeholderTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 18,
+    color: colors.ink,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
+  placeholderBody: {
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.inkSoft,
     textAlign: 'center',
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.xl,
   },
   signOut: {
     marginTop: spacing.xl,
@@ -98,5 +224,90 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.terracotta,
+  },
+  // --- feed ---
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    gap: spacing.md,
+  },
+  headerLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  feedTitle: {
+    fontFamily: fonts.headingBold,
+    fontSize: 24,
+    color: colors.mossDeep,
+    textAlign: 'right',
+  },
+  greetingSmall: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    textAlign: 'right',
+  },
+  signOutSmall: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.terracotta,
+  },
+  signOutSmallText: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.terracotta,
+  },
+  filterChip: {
+    alignSelf: 'flex-start',
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    backgroundColor: colors.paper,
+  },
+  filterChipActive: {
+    backgroundColor: colors.moss,
+    borderColor: colors.moss,
+  },
+  filterChipText: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+  },
+  filterChipTextActive: {
+    color: colors.cream,
+    fontFamily: fonts.bodyBold,
+  },
+  list: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  centeredText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.inkSoft,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.terracotta,
+    textAlign: 'center',
   },
 });
