@@ -48,7 +48,8 @@ export default function AdminUserDetailScreen() {
       setData(u);
       setNameDraft(u?.full_name ?? '');
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.load_failed'));
+      console.warn('[admin.user.load_failed]', e);
+      setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -65,7 +66,8 @@ export default function AdminUserDetailScreen() {
       await fn();
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.save_failed'));
+      console.warn('[admin.user.save_failed]', e);
+      setError(t('admin.save_failed'));
     } finally {
       setBusyAction(null);
     }

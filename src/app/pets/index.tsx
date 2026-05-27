@@ -26,7 +26,8 @@ export default function PetsListScreen() {
     try {
       setPets(await listPetsForOwner(user.id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('pets.load_failed'));
+      console.warn('[pets.load_failed]', e);
+      setError(t('pets.load_failed'));
     } finally {
       setLoading(false);
     }

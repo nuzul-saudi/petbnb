@@ -98,7 +98,8 @@ export default function AdminListingDetailScreen() {
       setPhotos(((lp ?? []) as PhotoRow[]).sort((a, b) => a.sort_order - b.sort_order));
       hydrateForm(row);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.load_failed'));
+      console.warn('[admin.listing.load_failed]', e);
+      setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -137,7 +138,8 @@ export default function AdminListingDetailScreen() {
       if (e) throw e;
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.save_failed'));
+      console.warn('[admin.listing.save_failed]', e);
+      setError(t('admin.save_failed'));
     } finally {
       setSaving(false);
     }
@@ -151,7 +153,8 @@ export default function AdminListingDetailScreen() {
       await setListingActive(listing.id, !listing.is_active);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.save_failed'));
+      console.warn('[admin.listing.toggle_active_failed]', e);
+      setError(t('admin.save_failed'));
     } finally {
       setTogglingActive(false);
     }

@@ -71,7 +71,8 @@ export default function BookingRequestScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : 'load_failed');
+        console.warn('[listing.load_failed]', e);
+        setError(t('listing.load_failed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -172,7 +173,8 @@ export default function BookingRequestScreen() {
 
       router.replace({ pathname: '/bookings/[id]', params: { id: booking.id } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('booking.submit_failed'));
+      console.warn('[booking.submit_failed]', e);
+      setError(t('booking.submit_failed'));
     } finally {
       setSubmitting(false);
       setSubmitStage('idle');
@@ -189,6 +191,18 @@ export default function BookingRequestScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <Pressable
+          onPress={() =>
+            router.replace({
+              pathname: '/listings/[id]',
+              params: { id: listing.id },
+            })
+          }
+          style={styles.backLink}
+        >
+          <Text style={styles.backLinkText}>{t('booking.back_to_listing')}</Text>
+        </Pressable>
+
         <Text style={styles.heading}>{t('booking.request_title')}</Text>
         <Text style={styles.subheading}>{listing.title_ar}</Text>
 
@@ -399,6 +413,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   muted: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.inkSoft,
+  },
+  backLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  backLinkText: {
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.inkSoft,

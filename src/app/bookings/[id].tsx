@@ -30,7 +30,8 @@ export default function BookingDetailScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : 'load_failed');
+        console.warn('[booking.load_failed]', e);
+        setError(t('booking.load_failed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -102,11 +103,11 @@ export default function BookingDetailScreen() {
             })}
           </Text>
 
-          {booking.addons.length > 0 ? (
-            <Text style={styles.summaryLine}>
-              + {t(`booking.addon_${booking.addons[0].type}`)} ({formatSAR(booking.addons[0].price_sar)})
+          {booking.addons.map((a) => (
+            <Text key={a.id} style={styles.summaryLine}>
+              + {t(`booking.addon_${a.type}`)} ({formatSAR(a.price_sar)})
             </Text>
-          ) : null}
+          ))}
 
           <View style={styles.summaryDivider} />
 

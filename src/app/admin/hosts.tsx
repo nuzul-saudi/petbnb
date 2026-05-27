@@ -29,7 +29,8 @@ export default function PendingHostsScreen() {
       );
       setUsers(pending);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.load_failed'));
+      console.warn('[admin.hosts.load_failed]', e);
+      setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -50,7 +51,8 @@ export default function PendingHostsScreen() {
       // queue feels responsive.
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.save_failed'));
+      console.warn('[admin.hosts.approve_failed]', e);
+      setError(t('admin.save_failed'));
     } finally {
       setApprovingId(null);
     }

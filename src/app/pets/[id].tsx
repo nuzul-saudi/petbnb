@@ -64,9 +64,9 @@ export default function PetDetailScreen() {
         setMedications(pet.medications ?? '');
       })
       .catch((e: unknown) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : t('pets.load_failed'));
-        }
+        if (cancelled) return;
+        console.warn('[pets.load_failed]', e);
+        setError(t('pets.load_failed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -117,7 +117,8 @@ export default function PetDetailScreen() {
       }
       router.back();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('pets.save_failed'));
+      console.warn('[pets.save_failed]', e);
+      setError(t('pets.save_failed'));
     } finally {
       setSaving(false);
     }
@@ -137,7 +138,8 @@ export default function PetDetailScreen() {
       await deletePet(id);
       router.back();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('pets.delete_failed'));
+      console.warn('[pets.delete_failed]', e);
+      setError(t('pets.delete_failed'));
     } finally {
       setDeleting(false);
     }

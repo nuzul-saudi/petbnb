@@ -41,7 +41,8 @@ export default function MyBookingsScreen() {
       if (e) throw e;
       setBookings((data ?? []) as MyBooking[]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('mybookings.load_failed'));
+      console.warn('[mybookings.load_failed]', e);
+      setError(t('mybookings.load_failed'));
     } finally {
       setLoading(false);
     }

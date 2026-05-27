@@ -39,7 +39,8 @@ export default function AdminHome() {
       setPendingHostsCount(pendingHosts);
       setPendingListingsCount(pendingListings);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.load_failed'));
+      console.warn('[admin.load_failed]', e);
+      setError(t('admin.load_failed'));
     }
   }, [t]);
 

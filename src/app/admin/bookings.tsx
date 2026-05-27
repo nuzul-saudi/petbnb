@@ -24,7 +24,9 @@ export default function AdminBookingsScreen() {
         if (!cancelled) setBookings(rows);
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : t('admin.load_failed'));
+        if (cancelled) return;
+        console.warn('[admin.bookings.load_failed]', e);
+        setError(t('admin.load_failed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

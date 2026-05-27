@@ -36,7 +36,8 @@ export default function RoleScreen() {
       await refreshProfile();
       router.replace('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.save_failed'));
+      console.warn('[auth.save_failed]', err);
+      setError(t('auth.save_failed'));
     } finally {
       setSaving(false);
     }

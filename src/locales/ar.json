@@ -22,6 +22,7 @@
   "listing": {
     "host_new_badge": "جديد",
     "loading": "جارٍ تحميل الإعلان…",
+    "load_failed": "تعذّر تحميل الإعلان",
     "not_found": "الإعلان غير موجود",
     "nightly_suffix": "/ ليلة",
     "tier_bronze": "برونزي",
@@ -39,6 +40,8 @@
   },
   "booking": {
     "request_title": "طلب حجز",
+    "back_to_listing": "← العودة إلى الإعلان",
+    "load_failed": "تعذّر تحميل الحجز",
     "start_date_label": "تاريخ الوصول",
     "end_date_label": "تاريخ المغادرة",
     "date_placeholder": "YYYY-MM-DD",

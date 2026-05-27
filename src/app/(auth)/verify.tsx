@@ -60,7 +60,8 @@ export default function VerifyScreen() {
       // it from here (routes to /role if profile is fresh, else stays at /).
       router.replace('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.verify_failed'));
+      console.warn('[auth.verify_failed]', err);
+      setError(t('auth.verify_failed'));
       submittedRef.current = false; // allow retry
     } finally {
       setSubmitting(false);
@@ -77,7 +78,8 @@ export default function VerifyScreen() {
       setToken('');
       submittedRef.current = false;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.send_failed'));
+      console.warn('[auth.resend_failed]', err);
+      setError(t('auth.send_failed'));
     }
   };
 

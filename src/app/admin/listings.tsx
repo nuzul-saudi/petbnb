@@ -43,7 +43,8 @@ export default function AdminListingsScreen() {
     try {
       setListings(await listAllListings());
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('admin.load_failed'));
+      console.warn('[admin.listings.load_failed]', e);
+      setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
     }

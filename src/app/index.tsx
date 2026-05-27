@@ -89,7 +89,8 @@ function OwnerFeedHome() {
         const rows = await listActiveListings({ femaleHostsOnly: femaleOnly });
         setItems(rows);
       } catch (e) {
-        setError(e instanceof Error ? e.message : t('feed.load_failed'));
+        console.warn('[feed.load_failed]', e);
+        setError(t('feed.load_failed'));
       } finally {
         setLoading(false);
         setRefreshing(false);

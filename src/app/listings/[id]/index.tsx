@@ -34,7 +34,8 @@ export default function ListingDetailScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : t('listing.not_found'));
+        console.warn('[listing.load_failed]', e);
+        setError(t('listing.load_failed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

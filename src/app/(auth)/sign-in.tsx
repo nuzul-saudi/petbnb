@@ -41,7 +41,8 @@ export default function SignInScreen() {
       if (e) throw e;
       router.push({ pathname: '/verify', params: { email: cleanEmail } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.send_failed'));
+      console.warn('[auth.send_failed]', err);
+      setError(t('auth.send_failed'));
     } finally {
       setSubmitting(false);
     }

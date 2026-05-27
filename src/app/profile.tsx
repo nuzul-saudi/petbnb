@@ -65,7 +65,8 @@ export default function ProfileScreen() {
       if (e) throw e;
       await refreshProfile();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('profile.save_failed'));
+      console.warn('[profile.save_failed]', e);
+      setError(t('profile.save_failed'));
     } finally {
       setSaving(false);
     }
