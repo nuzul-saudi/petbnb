@@ -155,6 +155,7 @@ export type Database = {
           tier: Database['public']['Enums']['listing_tier'];
           offers_grooming: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
+          additional_pet_discount: number;
           lat: number | null;
           lng: number | null;
           created_at: string;
@@ -173,6 +174,7 @@ export type Database = {
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
+          additional_pet_discount?: number;
           lat?: number | null;
           lng?: number | null;
           created_at?: string;
@@ -191,6 +193,7 @@ export type Database = {
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender?: Database['public']['Enums']['host_gender'];
+          additional_pet_discount?: number;
           lat?: number | null;
           lng?: number | null;
           created_at?: string;
@@ -251,6 +254,8 @@ export type Database = {
           end_date: string;
           nights: number; // GENERATED — never written
           base_price_sar: number;
+          base_subtotal_sar: number | null;
+          additional_pet_discount: number | null;
           addons_total_sar: number;
           total_sar: number;
           status: Database['public']['Enums']['booking_status'];
@@ -265,6 +270,8 @@ export type Database = {
           end_date: string;
           // nights is GENERATED ALWAYS — must NOT appear in Insert
           base_price_sar: number;
+          base_subtotal_sar?: number | null;
+          additional_pet_discount?: number | null;
           addons_total_sar?: number;
           total_sar: number;
           status?: Database['public']['Enums']['booking_status'];
@@ -279,6 +286,8 @@ export type Database = {
           end_date?: string;
           // nights is GENERATED ALWAYS — must NOT appear in Update
           base_price_sar?: number;
+          base_subtotal_sar?: number | null;
+          additional_pet_discount?: number | null;
           addons_total_sar?: number;
           total_sar?: number;
           status?: Database['public']['Enums']['booking_status'];
@@ -355,6 +364,7 @@ export type Database = {
           type: Database['public']['Enums']['booking_addon_type'];
           provider_label: string | null;
           price_sar: number;
+          pet_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -363,6 +373,7 @@ export type Database = {
           type: Database['public']['Enums']['booking_addon_type'];
           provider_label?: string | null;
           price_sar: number;
+          pet_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -371,6 +382,7 @@ export type Database = {
           type?: Database['public']['Enums']['booking_addon_type'];
           provider_label?: string | null;
           price_sar?: number;
+          pet_id?: string | null;
           created_at?: string;
         };
         Relationships: [
