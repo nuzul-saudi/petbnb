@@ -1,10 +1,11 @@
 // Horizontal scrollable breed picker. Each tile shows the breed photo +
-// Arabic name. Two tiles double as free-text triggers:
-//   - 'unknown' (BREEDS entry, labelled 'لا أعرف') — stays a structured
-//     breed key for legacy data, but also reveals the inline text input
-//     so users can refine if they want.
-//   - 'other' (sentinel, NOT a BreedKey, labelled 'أخرى') — puts the
-//     picker fully into free-text mode (breed=null, breedOther=<text>).
+// Arabic name.
+//   - 'unknown' (BREEDS entry, labelled 'لا أعرف') — a plain breed
+//     selection: emits { breed: 'unknown', breedOther: null }. No text
+//     input. For users who simply don't know the breed.
+//   - 'other' (sentinel, NOT a BreedKey, labelled 'أخرى') — the ONLY
+//     tile that reveals the inline free-text input. Selecting it emits
+//     { breed: null, breedOther: '' }; typing updates breedOther.
 //
 // Fully controlled: parents own both `breed` and `breedOther` via a single
 // BreedSelection object. The picker emits one onChange with the next state
@@ -35,11 +36,9 @@ export function BreedPicker({ value, onChange }: Props) {
   const otherTileSelected =
     value.breed === null && value.breedOther !== null;
 
-  // The inline free-text input shows when either of the two free-text
-  // triggers is active.
-  const showInput =
-    value.breed === 'unknown' ||
-    (value.breed === null && value.breedOther !== null);
+  // The inline free-text input shows only when the 'other' tile is
+  // active. The 'unknown' tile is a plain breed selection — no text box.
+  const showInput = value.breed === null && value.breedOther !== null;
 
   return (
     <View style={styles.wrap}>
@@ -109,11 +108,10 @@ export function BreedPicker({ value, onChange }: Props) {
           </Text>
           <TextInput
             value={value.breedOther ?? ''}
-            // Preserve the current `breed` while typing — keeps the
-            // 'unknown' tile (or null for the 'other' tile) selected
-            // without forcing a tile change.
+            // showInput is only true while the 'other' tile is active, so
+            // breed is always null here. Keep it null while typing.
             onChangeText={(text) =>
-              onChange({ breed: value.breed, breedOther: text })
+              onChange({ breed: null, breedOther: text })
             }
             placeholder={t('breed.other_placeholder')}
             placeholderTextColor={colors.inkSoft}
