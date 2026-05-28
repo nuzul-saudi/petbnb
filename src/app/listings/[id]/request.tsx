@@ -8,10 +8,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import { createBookingRequest, type AddonInput } from '@/lib/bookings';
 import { formatSAR, nightsBetween, toArabicDigits, todayIso } from '@/lib/format';
@@ -290,18 +290,7 @@ export default function BookingRequestScreen() {
                   >
                     {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
                   </View>
-                  {p.photo_url ? (
-                    <Image
-                      source={{ uri: p.photo_url }}
-                      style={styles.petThumb}
-                      contentFit="cover"
-                      transition={120}
-                    />
-                  ) : (
-                    <View style={[styles.petThumb, styles.petThumbPlaceholder]}>
-                      <Text style={styles.petThumbEmoji}>🐈</Text>
-                    </View>
-                  )}
+                  <PetAvatar photoUrl={p.photo_url} breed={p.breed} size={44} />
                   <Text style={styles.petName}>{p.name}</Text>
                 </Pressable>
               );
@@ -567,19 +556,6 @@ const styles = StyleSheet.create({
   petRowSelected: {
     borderColor: colors.moss,
     backgroundColor: colors.whisper,
-  },
-  petThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.whisper,
-  },
-  petThumbPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  petThumbEmoji: {
-    fontSize: 22,
   },
   petName: {
     flex: 1,

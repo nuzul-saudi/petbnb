@@ -3,7 +3,9 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
+import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
+import { findBreed } from '@/lib/breeds';
 import { useTranslation } from '@/lib/i18n';
 import { listPetsForOwner } from '@/lib/pets';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -69,29 +71,37 @@ export default function PetsListScreen() {
           data={pets}
           keyExtractor={(p) => p.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/pets/[id]',
-                  params: { id: item.id },
-                })
-              }
-              style={styles.row}
-            >
-              <Text style={styles.rowIcon}>🐈</Text>
-              <View style={styles.rowMain}>
-                <Text style={styles.rowName}>{item.name}</Text>
-                <Text style={styles.rowMeta}>
-                  {item.breed ? item.breed : t('pets.species_cat')}
-                  {item.age_months != null
-                    ? ` • ${t('pets.age_months', { count: toArabicDigits(item.age_months) })}`
-                    : ''}
-                </Text>
-              </View>
-              <Text style={styles.rowArrow}>‹</Text>
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const matched = findBreed(item.breed);
+            const breedLabel = matched
+              ? matched.name_ar
+              : item.breed_other
+                ? item.breed_other
+                : t('pets.species_cat');
+            return (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/pets/[id]',
+                    params: { id: item.id },
+                  })
+                }
+                style={styles.row}
+              >
+                <PetAvatar photoUrl={item.photo_url} breed={item.breed} size={48} />
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowName}>{item.name}</Text>
+                  <Text style={styles.rowMeta}>
+                    {breedLabel}
+                    {item.age_months != null
+                      ? ` • ${t('pets.age_months', { count: toArabicDigits(item.age_months) })}`
+                      : ''}
+                  </Text>
+                </View>
+                <Text style={styles.rowArrow}>‹</Text>
+              </Pressable>
+            );
+          }}
         />
       )}
 
@@ -180,9 +190,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md,
     ...shadows.card,
-  },
-  rowIcon: {
-    fontSize: 28,
   },
   rowMain: {
     flex: 1,
