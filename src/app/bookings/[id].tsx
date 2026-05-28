@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import { getBooking, type BookingDetail } from '@/lib/bookings';
 import { formatSAR, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import {
+  computePriceBreakdown,
+  type AddonSelection,
+  type AddonType,
+} from '@/lib/pricing';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function BookingDetailScreen() {
@@ -40,6 +46,70 @@ export default function BookingDetailScreen() {
       cancelled = true;
     };
   }, [id]);
+
+  // Reconstruct AddonSelection[] from the persisted booking_addons rows
+  // so we can re-run the same breakdown function the request screen used.
+  // Rows of the same type are grouped by their pet_ids; booking-wide rows
+  // (pet_id null) contribute one entry with petIds=[].
+  const addonSelections = useMemo<AddonSelection[]>(() => {
+    if (!booking) return [];
+    const byType = new Map<
+      AddonType,
+      { petIds: string[]; hasBookingWide: boolean }
+    >();
+    for (const row of booking.addons) {
+      const type = row.type as AddonType;
+      const entry = byType.get(type) ?? { petIds: [], hasBookingWide: false };
+      if (row.pet_id === null) {
+        entry.hasBookingWide = true;
+      } else {
+        entry.petIds.push(row.pet_id);
+      }
+      byType.set(type, entry);
+    }
+    const out: AddonSelection[] = [];
+    for (const [type, entry] of byType) {
+      // A type might have both per-pet rows AND a booking-wide row in
+      // pathological data; in normal flow it's one or the other. Emit
+      // per-pet first.
+      if (entry.petIds.length > 0) {
+        out.push({ type, petIds: entry.petIds });
+      }
+      if (entry.hasBookingWide) {
+        out.push({ type, petIds: [] });
+      }
+    }
+    return out;
+  }, [booking]);
+
+  // Recompute the breakdown from the SNAPSHOTTED discount (not the
+  // listing's current discount — that would drift if the host edited
+  // their per-pet discount after the booking). Legacy bookings (pre-0009)
+  // have null snapshots; discount=0 there means base is computed flat.
+  const breakdown = useMemo(() => {
+    if (!booking) return null;
+    return computePriceBreakdown({
+      nightlyPriceSAR: booking.base_price_sar,
+      nights: booking.nights,
+      petCount: booking.pets.length,
+      additionalPetDiscount: booking.additional_pet_discount ?? 0,
+      addons: addonSelections,
+    });
+  }, [booking, addonSelections]);
+
+  // Map pet_id → list of add-on types attached to it, for the per-pet
+  // section's "services for this pet" line.
+  const servicesByPet = useMemo(() => {
+    const m = new Map<string, AddonType[]>();
+    if (!booking) return m;
+    for (const row of booking.addons) {
+      if (row.pet_id === null) continue;
+      const list = m.get(row.pet_id) ?? [];
+      list.push(row.type as AddonType);
+      m.set(row.pet_id, list);
+    }
+    return m;
+  }, [booking]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session) return <Redirect href="/sign-in" />;
@@ -91,12 +161,6 @@ export default function BookingDetailScreen() {
 
           <View style={styles.summaryDivider} />
 
-          {booking.pets.length > 0 ? (
-            <Text style={styles.summaryLine}>
-              🐈 {booking.pets.map((p) => p.name).join('، ')}
-            </Text>
-          ) : null}
-
           <Text style={styles.summaryLine}>
             {t('booking.dates_range', {
               start: toArabicDigits(booking.start_date),
@@ -109,16 +173,90 @@ export default function BookingDetailScreen() {
             })}
           </Text>
 
-          {booking.addons.map((a) => (
-            <Text key={a.id} style={styles.summaryLine}>
-              + {t(`booking.addon_${a.type}`)} ({formatSAR(a.price_sar)})
-            </Text>
-          ))}
+          <View style={styles.summaryDivider} />
+
+          {/* Per-pet block — one row per pet with avatar + services */}
+          {booking.pets.map((p) => {
+            const services = servicesByPet.get(p.id) ?? [];
+            return (
+              <View key={p.id} style={styles.petBlock}>
+                <View style={styles.petBlockHeader}>
+                  <PetAvatar
+                    photoUrl={p.photo_url}
+                    breed={p.breed}
+                    size={32}
+                  />
+                  <Text style={styles.petBlockName}>{p.name}</Text>
+                </View>
+                {services.length > 0 ? (
+                  <Text style={styles.petBlockServices}>
+                    {services.map((s) => t(`booking.addon_${s}`)).join('، ')}
+                  </Text>
+                ) : (
+                  <Text style={styles.petBlockNoServices}>
+                    {t('booking.no_per_pet_services')}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+
+          <View style={styles.summaryDivider} />
+
+          {/* Breakdown — same math/labels as the request screen */}
+          {breakdown && booking.pets.length > 0 ? (
+            <View style={styles.breakdownBox}>
+              <View style={styles.breakdownLine}>
+                <Text style={styles.breakdownLabel}>
+                  {t('booking.breakdown_base', {
+                    pets: toArabicDigits(booking.pets.length),
+                    nights: toArabicDigits(booking.nights),
+                  })}
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  {formatSAR(breakdown.baseSubtotalSAR)}
+                </Text>
+              </View>
+              {breakdown.addonLines.map((line, i) => {
+                const suffix =
+                  line.scope === 'per_pet' && line.cadence === 'one_time'
+                    ? t('booking.per_pet_suffix_one_time', {
+                        pets: toArabicDigits(line.petCount),
+                      })
+                    : line.scope === 'per_pet' && line.cadence === 'per_night'
+                      ? t('booking.per_pet_suffix_per_night', {
+                          pets: toArabicDigits(line.petCount),
+                          nights: toArabicDigits(line.nights),
+                        })
+                      : line.scope === 'booking' && line.cadence === 'per_night'
+                        ? t('booking.booking_suffix_per_night', {
+                            nights: toArabicDigits(line.nights),
+                          })
+                        : '';
+                return (
+                  <View
+                    key={`${line.type}-${i}`}
+                    style={styles.breakdownLine}
+                  >
+                    <Text style={styles.breakdownLabel}>
+                      {t(`booking.addon_${line.type}`)}
+                      {suffix ? ` ${suffix}` : ''}
+                    </Text>
+                    <Text style={styles.breakdownValue}>
+                      {formatSAR(line.lineSAR)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
 
           <View style={styles.summaryDivider} />
 
           <Text style={styles.totalLine}>
-            {t('booking.total_paid', { total: formatSAR(booking.total_sar) })}
+            {t('booking.total_paid', {
+              total: formatSAR(breakdown?.totalSAR ?? booking.total_sar),
+            })}
           </Text>
         </View>
 
@@ -215,6 +353,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
     textAlign: 'right',
+  },
+  petBlock: {
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  petBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  petBlockName: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
+    textAlign: 'right',
+  },
+  petBlockServices: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    textAlign: 'right',
+    paddingLeft: spacing.xl + 32,
+  },
+  petBlockNoServices: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    fontStyle: 'italic',
+    textAlign: 'right',
+    paddingLeft: spacing.xl + 32,
+  },
+  breakdownBox: {
+    gap: spacing.xs,
+  },
+  breakdownLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  breakdownLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    flex: 1,
+    textAlign: 'right',
+  },
+  breakdownValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+    marginLeft: spacing.sm,
   },
   totalLine: {
     fontFamily: fonts.headingBold,

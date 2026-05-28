@@ -67,6 +67,7 @@
     "booking_suffix_per_night": "× {nights} ليلة",
     "price_hint_per_night": "+{price} × {nights} ليلة",
     "price_hint_per_night_unit": "+{price} / ليلة",
+    "no_per_pet_services": "بدون خدمات خاصة",
     "total_label": "المجموع",
     "submit_button": "إرسال الطلب",
     "submitting": "جارٍ الإرسال…",
