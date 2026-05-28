@@ -13,7 +13,12 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
-import { createBookingRequest, type AddonInput } from '@/lib/bookings';
+import {
+  createBookingRequest,
+  getBookingForEdit,
+  updateBookingRequest,
+  type AddonInput,
+} from '@/lib/bookings';
 import { formatSAR, nightsBetween, toArabicDigits, todayIso } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
@@ -46,8 +51,13 @@ export default function BookingRequestScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session, user } = useAuth();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; editBooking?: string }>();
   const listingId = typeof params.id === 'string' ? params.id : '';
+  const editBookingId =
+    typeof params.editBooking === 'string' && params.editBooking.length > 0
+      ? params.editBooking
+      : null;
+  const isEditMode = editBookingId !== null;
 
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [pets, setPets] = useState<Tables<'pets'>[]>([]);
@@ -81,8 +91,10 @@ export default function BookingRequestScreen() {
         if (cancelled) return;
         setListing(l);
         setPets(p);
-        // Pre-select the only pet if they have exactly one.
-        if (p.length === 1) setSelectedPetIds(new Set([p[0].id]));
+        // Only auto-select in create mode — edit mode hydrates pets from
+        // the existing booking via the dedicated effect below.
+        if (!editBookingId && p.length === 1)
+          setSelectedPetIds(new Set([p[0].id]));
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -95,7 +107,39 @@ export default function BookingRequestScreen() {
     return () => {
       cancelled = true;
     };
-  }, [listingId, user]);
+  }, [listingId, user, editBookingId]);
+
+  // Edit mode: hydrate dates, pet selection, per-pet add-ons, and booking-
+  // wide add-ons from the existing booking. Runs once on mount when an
+  // editBooking id is present. Mismatched listing → error.
+  useEffect(() => {
+    if (!editBookingId) return;
+    let cancelled = false;
+    getBookingForEdit(editBookingId)
+      .then((edit) => {
+        if (cancelled) return;
+        // Defensive: confirm the editBooking actually belongs to this
+        // listing. If a stale URL lands on the wrong route, fail loudly
+        // instead of silently editing the wrong listing's booking.
+        if (edit.booking.listing_id !== listingId) {
+          setError(t('booking.edit_listing_mismatch'));
+          return;
+        }
+        setStartDate(edit.booking.start_date);
+        setEndDate(edit.booking.end_date);
+        setSelectedPetIds(new Set(edit.petIds));
+        setPerPetAddons(edit.perPetAddons);
+        setBookingAddons(edit.bookingAddons);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        console.warn('[booking.edit_load_failed]', e);
+        setError(t('booking.edit_load_failed'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editBookingId, listingId, t]);
 
   // Calendar UX: when user picks arrival, focus the departure field so
   // they can continue without an extra tap. Web-only; native picker
@@ -271,9 +315,7 @@ export default function BookingRequestScreen() {
         ];
       });
 
-      const booking = await createBookingRequest({
-        listingId: listing.id,
-        ownerId: user.id,
+      const sharedPayload = {
         petIds: Array.from(selectedPetIds),
         startDate,
         endDate,
@@ -282,9 +324,25 @@ export default function BookingRequestScreen() {
         additionalPetDiscount: listing.additional_pet_discount,
         totalSAR: breakdown.totalSAR,
         addons: addonsForDb,
-      });
+      };
 
-      router.replace({ pathname: '/bookings/[id]', params: { id: booking.id } });
+      let bookingId: string;
+      if (isEditMode && editBookingId) {
+        const updated = await updateBookingRequest({
+          bookingId: editBookingId,
+          ...sharedPayload,
+        });
+        bookingId = updated.id;
+      } else {
+        const booking = await createBookingRequest({
+          listingId: listing.id,
+          ownerId: user.id,
+          ...sharedPayload,
+        });
+        bookingId = booking.id;
+      }
+
+      router.replace({ pathname: '/bookings/[id]', params: { id: bookingId } });
     } catch (e) {
       console.warn('[booking.submit_failed]', e);
       setError(t('booking.submit_failed'));
@@ -298,25 +356,42 @@ export default function BookingRequestScreen() {
     submitStage === 'paying'
       ? t('booking.processing_payment')
       : submitStage === 'saving'
-        ? t('booking.submitting')
-        : t('booking.submit_button');
+        ? isEditMode
+          ? t('booking.edit_saving')
+          : t('booking.submitting')
+        : isEditMode
+          ? t('booking.edit_save_button')
+          : t('booking.submit_button');
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Pressable
-          onPress={() =>
-            router.replace({
-              pathname: '/listings/[id]',
-              params: { id: listing.id },
-            })
-          }
+          onPress={() => {
+            if (isEditMode && editBookingId) {
+              router.replace({
+                pathname: '/bookings/[id]',
+                params: { id: editBookingId },
+              });
+            } else {
+              router.replace({
+                pathname: '/listings/[id]',
+                params: { id: listing.id },
+              });
+            }
+          }}
           style={styles.backLink}
         >
-          <Text style={styles.backLinkText}>{t('booking.back_to_listing')}</Text>
+          <Text style={styles.backLinkText}>
+            {isEditMode
+              ? t('booking.edit_back_to_booking')
+              : t('booking.back_to_listing')}
+          </Text>
         </Pressable>
 
-        <Text style={styles.heading}>{t('booking.request_title')}</Text>
+        <Text style={styles.heading}>
+          {isEditMode ? t('booking.edit_title') : t('booking.request_title')}
+        </Text>
         <Text style={styles.subheading}>{listing.title_ar}</Text>
 
         {/* Dates — DateField branches on platform */}

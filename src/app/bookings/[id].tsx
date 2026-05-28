@@ -132,6 +132,34 @@ export default function BookingDetailScreen() {
     booking.owner_id === user.id &&
     booking.status === 'requested';
 
+  // Same gating as cancel: owner + status='requested'. The two
+  // capabilities open and close together.
+  const canEdit = canCancel;
+
+  // Bookings created before migration 0009 have a null additional_pet_discount
+  // and booking_addons rows with pet_id=null even for what's now per-pet.
+  // We can't safely round-trip them through the new model.
+  const isLegacyBooking =
+    !!booking && booking.additional_pet_discount === null;
+
+  const onEdit = () => {
+    if (!booking) return;
+    if (isLegacyBooking) {
+      const confirmed =
+        Platform.OS === 'web' && typeof window !== 'undefined'
+          ? window.confirm(t('booking.edit_legacy_warning'))
+          : true;
+      if (!confirmed) return;
+    }
+    router.push({
+      pathname: '/listings/[id]/request',
+      params: {
+        id: booking.listing_id,
+        editBooking: booking.id,
+      },
+    });
+  };
+
   const onCancel = async () => {
     if (!booking) return;
     const confirmed =
@@ -223,7 +251,9 @@ export default function BookingDetailScreen() {
 
           {/* Per-pet block — one row per pet with avatar + services */}
           {booking.pets.map((p) => {
-            const services = servicesByPet.get(p.id) ?? [];
+            const services = isLegacyBooking
+              ? []
+              : (servicesByPet.get(p.id) ?? []);
             return (
               <View key={p.id} style={styles.petBlock}>
                 <View style={styles.petBlockHeader}>
@@ -234,77 +264,112 @@ export default function BookingDetailScreen() {
                   />
                   <Text style={styles.petBlockName}>{p.name}</Text>
                 </View>
-                {services.length > 0 ? (
-                  <Text style={styles.petBlockServices}>
-                    {services.map((s) => t(`booking.addon_${s}`)).join('، ')}
-                  </Text>
-                ) : (
-                  <Text style={styles.petBlockNoServices}>
-                    {t('booking.no_per_pet_services')}
-                  </Text>
-                )}
+                {!isLegacyBooking ? (
+                  services.length > 0 ? (
+                    <Text style={styles.petBlockServices}>
+                      {services.map((s) => t(`booking.addon_${s}`)).join('، ')}
+                    </Text>
+                  ) : (
+                    <Text style={styles.petBlockNoServices}>
+                      {t('booking.no_per_pet_services')}
+                    </Text>
+                  )
+                ) : null}
               </View>
             );
           })}
 
           <View style={styles.summaryDivider} />
 
-          {/* Breakdown — same math/labels as the request screen */}
-          {breakdown && booking.pets.length > 0 ? (
-            <View style={styles.breakdownBox}>
-              <View style={styles.breakdownLine}>
-                <Text style={styles.breakdownLabel}>
-                  {t('booking.breakdown_base', {
-                    pets: toArabicDigits(booking.pets.length),
-                    nights: toArabicDigits(booking.nights),
-                  })}
-                </Text>
-                <Text style={styles.breakdownValue}>
-                  {formatSAR(breakdown.baseSubtotalSAR)}
-                </Text>
-              </View>
-              {breakdown.addonLines.map((line, i) => {
-                const suffix =
-                  line.scope === 'per_pet' && line.cadence === 'one_time'
-                    ? t('booking.per_pet_suffix_one_time', {
-                        pets: toArabicDigits(line.petCount),
-                      })
-                    : line.scope === 'per_pet' && line.cadence === 'per_night'
-                      ? t('booking.per_pet_suffix_per_night', {
-                          pets: toArabicDigits(line.petCount),
-                          nights: toArabicDigits(line.nights),
-                        })
-                      : line.scope === 'booking' && line.cadence === 'per_night'
-                        ? t('booking.booking_suffix_per_night', {
-                            nights: toArabicDigits(line.nights),
-                          })
-                        : '';
-                return (
-                  <View
-                    key={`${line.type}-${i}`}
-                    style={styles.breakdownLine}
-                  >
+          {/* Breakdown — legacy bookings (pre-0009) get raw rows; modern
+              bookings get the recomputed per-pet breakdown. */}
+          {booking.nights > 0 && booking.pets.length > 0 ? (
+            isLegacyBooking ? (
+              // Legacy: show raw booking_addons rows as-is, no recomputation.
+              <View style={styles.breakdownBox}>
+                {booking.addons.map((row) => (
+                  <View key={row.id} style={styles.breakdownLine}>
                     <Text style={styles.breakdownLabel}>
-                      {t(`booking.addon_${line.type}`)}
-                      {suffix ? ` ${suffix}` : ''}
+                      {t(`booking.addon_${row.type}`)}
                     </Text>
                     <Text style={styles.breakdownValue}>
-                      {formatSAR(line.lineSAR)}
+                      {formatSAR(row.price_sar)}
                     </Text>
                   </View>
-                );
-              })}
-            </View>
+                ))}
+              </View>
+            ) : breakdown ? (
+              <View style={styles.breakdownBox}>
+                <View style={styles.breakdownLine}>
+                  <Text style={styles.breakdownLabel}>
+                    {t('booking.breakdown_base', {
+                      pets: toArabicDigits(booking.pets.length),
+                      nights: toArabicDigits(booking.nights),
+                    })}
+                  </Text>
+                  <Text style={styles.breakdownValue}>
+                    {formatSAR(breakdown.baseSubtotalSAR)}
+                  </Text>
+                </View>
+                {breakdown.addonLines
+                  .filter((line) => line.lineSAR > 0)
+                  .map((line, i) => {
+                    const suffix =
+                      line.scope === 'per_pet' && line.cadence === 'one_time'
+                        ? t('booking.per_pet_suffix_one_time', {
+                            pets: toArabicDigits(line.petCount),
+                          })
+                        : line.scope === 'per_pet' &&
+                            line.cadence === 'per_night'
+                          ? t('booking.per_pet_suffix_per_night', {
+                              pets: toArabicDigits(line.petCount),
+                              nights: toArabicDigits(line.nights),
+                            })
+                          : line.scope === 'booking' &&
+                              line.cadence === 'per_night'
+                            ? t('booking.booking_suffix_per_night', {
+                                nights: toArabicDigits(line.nights),
+                              })
+                            : '';
+                    return (
+                      <View
+                        key={`${line.type}-${i}`}
+                        style={styles.breakdownLine}
+                      >
+                        <Text style={styles.breakdownLabel}>
+                          {t(`booking.addon_${line.type}`)}
+                          {suffix ? ` ${suffix}` : ''}
+                        </Text>
+                        <Text style={styles.breakdownValue}>
+                          {formatSAR(line.lineSAR)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+              </View>
+            ) : null
           ) : null}
 
           <View style={styles.summaryDivider} />
 
           <Text style={styles.totalLine}>
             {t('booking.total_paid', {
-              total: formatSAR(breakdown?.totalSAR ?? booking.total_sar),
+              total: formatSAR(
+                isLegacyBooking
+                  ? booking.total_sar
+                  : (breakdown?.totalSAR ?? booking.total_sar),
+              ),
             })}
           </Text>
         </View>
+
+        {canEdit ? (
+          <Pressable onPress={onEdit} style={styles.editButton}>
+            <Text style={styles.editText}>
+              {t('booking.edit_request_button')}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {canCancel ? (
           <>
@@ -492,6 +557,20 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     color: colors.cream,
+  },
+  editButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.moss,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  editText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.moss,
   },
   cancelButton: {
     paddingVertical: spacing.md,
