@@ -182,3 +182,41 @@ export async function listBookingsForOwner(
     };
   });
 }
+
+/**
+ * Cancel a booking. MVP: owners only, only while status === 'requested'.
+ * Once a host has accepted, cancellation requires manual handling
+ * (no UI exposes it today — admin / host accept-decline flow is Step 7).
+ *
+ * Updates only bookings.status. Child rows (booking_pets, booking_addons)
+ * are intentionally untouched — they're an audit trail and have no
+ * UPDATE/DELETE policies anyway.
+ */
+export async function cancelBookingAsOwner(
+  bookingId: string,
+): Promise<Tables<'bookings'>> {
+  if (!supabase) throw new Error('No Supabase client');
+
+  // App-layer guard: re-fetch and check status is still 'requested'.
+  // Prevents a stale UI from cancelling an already-accepted booking
+  // (a host could accept while the user has the screen open).
+  const { data: current, error: rErr } = await supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (rErr) throw rErr;
+  if (!current) throw new Error('Booking not found');
+  if (current.status !== 'requested') {
+    throw new Error(`Cannot cancel a booking in status: ${current.status}`);
+  }
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ status: 'cancelled' })
+    .eq('id', bookingId)
+    .select()
+    .single();
+  if (error || !data) throw error ?? new Error('Failed to cancel booking');
+  return data;
+}

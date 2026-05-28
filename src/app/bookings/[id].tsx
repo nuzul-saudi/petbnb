@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
-import { getBooking, type BookingDetail } from '@/lib/bookings';
+import {
+  cancelBookingAsOwner,
+  getBooking,
+  type BookingDetail,
+} from '@/lib/bookings';
 import { formatSAR, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import {
@@ -18,13 +29,15 @@ import { colors, fonts, radii, spacing } from '@/theme/tokens';
 export default function BookingDetailScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { initializing, session } = useAuth();
+  const { initializing, session, user } = useAuth();
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -110,6 +123,39 @@ export default function BookingDetailScreen() {
     }
     return m;
   }, [booking]);
+
+  // Only owners can cancel, and only while the booking is still pending
+  // host acceptance. Once accepted, cancellation is out-of-band (Step 7).
+  const canCancel =
+    !!booking &&
+    !!user &&
+    booking.owner_id === user.id &&
+    booking.status === 'requested';
+
+  const onCancel = async () => {
+    if (!booking) return;
+    const confirmed =
+      Platform.OS === 'web' && typeof window !== 'undefined'
+        ? window.confirm(t('booking.cancel_confirm'))
+        : true;
+    if (!confirmed) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await cancelBookingAsOwner(booking.id);
+      // Send the user back to their bookings list — a cancelled-booking
+      // detail screen is a dead end. Using replace (not push) so the back
+      // button doesn't bring them right back to it.
+      // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
+      router.replace('/bookings');
+      return;
+    } catch (e) {
+      console.warn('[booking.cancel_failed]', e);
+      setCancelError(t('booking.cancel_failed'));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session) return <Redirect href="/sign-in" />;
@@ -259,6 +305,28 @@ export default function BookingDetailScreen() {
             })}
           </Text>
         </View>
+
+        {canCancel ? (
+          <>
+            {cancelError ? (
+              <Text style={styles.errorText}>{cancelError}</Text>
+            ) : null}
+            <Pressable
+              onPress={onCancel}
+              disabled={cancelling}
+              style={[
+                styles.cancelButton,
+                cancelling && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.cancelText}>
+                {cancelling
+                  ? t('booking.cancelling')
+                  : t('booking.cancel_button')}
+              </Text>
+            </Pressable>
+          </>
+        ) : null}
 
         <Pressable
           onPress={() => router.replace('/')}
@@ -424,6 +492,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     color: colors.cream,
+  },
+  cancelButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.terracotta,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  cancelText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.terracotta,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   errorText: {
     fontFamily: fonts.body,

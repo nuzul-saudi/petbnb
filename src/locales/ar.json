@@ -91,7 +91,11 @@
     "status_active": "نشط",
     "status_completed": "مكتمل",
     "status_cancelled": "ملغى",
-    "status_disputed": "متنازع عليه"
+    "status_disputed": "متنازع عليه",
+    "cancel_button": "إلغاء الطلب",
+    "cancel_confirm": "هل أنتِ متأكدة من إلغاء هذا الطلب؟",
+    "cancel_failed": "تعذر إلغاء الطلب، حاولي مرة أخرى.",
+    "cancelling": "جاري الإلغاء..."
   },
   "supabase": {
     "checking": "جارٍ التحقق من الاتصال بـ Supabase…",
