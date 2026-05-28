@@ -86,6 +86,7 @@ export type Database = {
           name: string;
           species: string;
           breed: string | null;
+          breed_other: string | null;
           age_months: number | null;
           vaccination_doc_url: string | null;
           behavioral_notes: string | null;
@@ -101,6 +102,7 @@ export type Database = {
           name: string;
           species?: string;
           breed?: string | null;
+          breed_other?: string | null;
           age_months?: number | null;
           vaccination_doc_url?: string | null;
           behavioral_notes?: string | null;
@@ -116,6 +118,7 @@ export type Database = {
           name?: string;
           species?: string;
           breed?: string | null;
+          breed_other?: string | null;
           age_months?: number | null;
           vaccination_doc_url?: string | null;
           behavioral_notes?: string | null;

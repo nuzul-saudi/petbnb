@@ -253,6 +253,11 @@
     "photo_upload_failed": "تعذّر رفع الصورة",
     "photo_save_first": "احفظ القطة أولاً لإضافة صورة"
   },
+  "breed": {
+    "other": "أخرى",
+    "other_input_label": "اكتبي اسم السلالة",
+    "other_placeholder": "مثال: شيرازي مختلط"
+  },
   "profile": {
     "title": "حسابي",
     "back": "← رجوع",

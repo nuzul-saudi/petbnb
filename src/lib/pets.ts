@@ -37,6 +37,7 @@ export type CreatePetInput = {
   ownerId: string;
   name: string;
   breed?: string | null;
+  breed_other?: string | null;
   age_months?: number | null;
   vaccination_doc_url?: string | null;
   behavioral_notes?: string | null;
@@ -55,6 +56,7 @@ export async function createPet(input: CreatePetInput): Promise<Tables<'pets'>> 
       name: input.name.trim(),
       species: 'cat',
       breed: input.breed ?? null,
+      breed_other: input.breed_other ?? null,
       age_months: input.age_months ?? null,
       vaccination_doc_url: input.vaccination_doc_url ?? null,
       behavioral_notes: input.behavioral_notes ?? null,
@@ -77,6 +79,7 @@ export type UpdatePetPatch = Pick<
   TablesUpdate<'pets'>,
   | 'name'
   | 'breed'
+  | 'breed_other'
   | 'age_months'
   | 'vaccination_doc_url'
   | 'behavioral_notes'

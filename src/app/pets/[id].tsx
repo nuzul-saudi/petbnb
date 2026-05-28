@@ -12,9 +12,9 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { BreedPicker } from '@/components/BreedPicker';
+import { BreedPicker, type BreedSelection } from '@/components/BreedPicker';
 import { useAuth } from '@/lib/auth';
-import { findBreed, type BreedKey } from '@/lib/breeds';
+import { findBreed } from '@/lib/breeds';
 import { useTranslation } from '@/lib/i18n';
 import {
   createPet,
@@ -38,7 +38,10 @@ export default function PetDetailScreen() {
   const isNew = id === 'new';
 
   const [name, setName] = useState('');
-  const [breedKey, setBreedKey] = useState<BreedKey | null>(null);
+  const [breedSelection, setBreedSelection] = useState<BreedSelection>({
+    breed: null,
+    breedOther: null,
+  });
   const [ageMonths, setAgeMonths] = useState('');
   const [behavioralNotes, setBehavioralNotes] = useState('');
   const [medicalNeeds, setMedicalNeeds] = useState('');
@@ -63,11 +66,17 @@ export default function PetDetailScreen() {
           return;
         }
         setName(pet.name);
-        // pet.breed is a free-text string in the DB. If it matches a known
-        // BreedKey, use it. Otherwise leave breedKey null and the user can
-        // pick a fresh one (the old free-text value is discarded).
+        // pet.breed is a free-text string in the DB. findBreed validates it
+        // against the curated BREEDS list. Combined with pet.breed_other,
+        // this rehydrates whichever tile state the user previously saved:
+        //   structured key match → that tile selected, no free-text input
+        //   breed='unknown' + breed_other text → unknown tile + input
+        //   breed=null + breed_other text → 'other' tile + input
         const matched = findBreed(pet.breed);
-        setBreedKey(matched ? matched.key : null);
+        setBreedSelection({
+          breed: matched ? matched.key : null,
+          breedOther: pet.breed_other,
+        });
         setAgeMonths(pet.age_months != null ? String(pet.age_months) : '');
         setBehavioralNotes(pet.behavioral_notes ?? '');
         setMedicalNeeds(pet.medical_needs ?? '');
@@ -104,9 +113,16 @@ export default function PetDetailScreen() {
       if (ageNum !== null && (!Number.isInteger(ageNum) || ageNum < 0)) {
         throw new Error(t('pets.invalid_age'));
       }
+      // Normalize breedOther: trim, then null-out empty string. The picker
+      // keeps breedOther as '' when the "other" tile is selected but not
+      // yet typed; we don't want empty strings in the DB.
+      const trimmedOther = breedSelection.breedOther?.trim();
+      const breedOtherToSave = trimmedOther ? trimmedOther : null;
+
       const patch: UpdatePetPatch = {
         name: name.trim(),
-        breed: breedKey,
+        breed: breedSelection.breed,
+        breed_other: breedOtherToSave,
         age_months: ageNum,
         behavioral_notes: behavioralNotes.trim() || null,
         medical_needs: medicalNeeds.trim() || null,
@@ -119,6 +135,7 @@ export default function PetDetailScreen() {
           ownerId: user.id,
           name: patch.name!,
           breed: patch.breed,
+          breed_other: patch.breed_other,
           age_months: patch.age_months,
           behavioral_notes: patch.behavioral_notes,
           medical_needs: patch.medical_needs,
@@ -267,7 +284,7 @@ export default function PetDetailScreen() {
         {/* Breed picker replaces the Step 5.5 free-text input */}
         <View style={styles.field}>
           <Text style={styles.label}>{t('pets.breed_label')}</Text>
-          <BreedPicker value={breedKey} onChange={setBreedKey} />
+          <BreedPicker value={breedSelection} onChange={setBreedSelection} />
         </View>
 
         <Field label={t('pets.age_months_label')}>
