@@ -13,8 +13,14 @@ import type { Enums, Tables } from '@/types/database';
 
 export type AddonInput = {
   type: Enums<'booking_addon_type'>;
-  providerLabel?: string;
+  /** null = booking-wide (e.g. transport). set = scoped to that pet. */
+  petId: string | null;
+  /**
+   * Final line price for this row as it will land on booking_addons.price_sar.
+   * The caller computes it via lib/pricing.ts so this layer stays pure DB I/O.
+   */
   priceSAR: number;
+  providerLabel?: string;
 };
 
 export type CreateBookingInput = {
@@ -22,7 +28,9 @@ export type CreateBookingInput = {
   ownerId: string;
   startDate: string; // yyyy-mm-dd
   endDate: string; // yyyy-mm-dd
-  basePriceSAR: number;
+  basePriceSAR: number; // nightly rate snapshot (unchanged)
+  baseSubtotalSAR: number; // full base hosting cost across all pets/nights
+  additionalPetDiscount: number; // 0..1 fraction OFF, snapshotted at booking time
   totalSAR: number;
   /** Preferred: list of pet ids to attach to the booking. At least one required. */
   petIds?: string[];
@@ -60,6 +68,8 @@ export async function createBookingRequest(
       start_date: input.startDate,
       end_date: input.endDate,
       base_price_sar: input.basePriceSAR,
+      base_subtotal_sar: input.baseSubtotalSAR,
+      additional_pet_discount: input.additionalPetDiscount,
       total_sar: input.totalSAR,
       addons_total_sar: addons.reduce((sum, a) => sum + a.priceSAR, 0),
       status: 'requested',
@@ -85,6 +95,7 @@ export async function createBookingRequest(
       addons.map((a) => ({
         booking_id: booking.id,
         type: a.type,
+        pet_id: a.petId,
         provider_label: a.providerLabel ?? null,
         price_sar: a.priceSAR,
       })),

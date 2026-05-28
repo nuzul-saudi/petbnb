@@ -19,22 +19,28 @@ import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
 import { listPetsForOwner } from '@/lib/pets';
+import {
+  ADDON_CONFIG,
+  computePriceBreakdown,
+  type AddonSelection,
+  type AddonType,
+} from '@/lib/pricing';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
-import type { Enums, Tables } from '@/types/database';
+import type { Tables } from '@/types/database';
 
-type AddonOption = {
-  type: Enums<'booking_addon_type'>;
-  i18nKey: string;
-  priceSAR: number;
-  available: (listing: ListingDetail) => boolean;
+// Listing-level availability gate. Pricing (scope/cadence/price) comes from
+// ADDON_CONFIG in @/lib/pricing; this map only says whether the listing
+// supports a given add-on. Missing key = always available.
+const ADDON_AVAILABILITY: Partial<
+  Record<AddonType, (l: ListingDetail) => boolean>
+> = {
+  grooming: (l) => l.offers_grooming,
 };
 
-const ADDON_OPTIONS: AddonOption[] = [
-  { type: 'grooming', i18nKey: 'booking.addon_grooming', priceSAR: 50, available: (l) => l.offers_grooming },
-  { type: 'vet', i18nKey: 'booking.addon_vet', priceSAR: 100, available: () => true },
-  { type: 'transport', i18nKey: 'booking.addon_transport', priceSAR: 30, available: () => true },
-  { type: 'insurance', i18nKey: 'booking.addon_insurance', priceSAR: 25, available: () => true },
-];
+function isAddonAvailable(type: AddonType, listing: ListingDetail): boolean {
+  const check = ADDON_AVAILABILITY[type];
+  return check ? check(listing) : true;
+}
 
 export default function BookingRequestScreen() {
   const router = useRouter();
@@ -50,9 +56,12 @@ export default function BookingRequestScreen() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedPetIds, setSelectedPetIds] = useState<Set<string>>(new Set());
-  const [selectedAddons, setSelectedAddons] = useState<Set<Enums<'booking_addon_type'>>>(
-    new Set(),
+  // Per-pet add-ons: keyed by petId → set of services for THAT pet.
+  const [perPetAddons, setPerPetAddons] = useState<Map<string, Set<AddonType>>>(
+    new Map(),
   );
+  // Booking-wide add-ons (e.g. transport).
+  const [bookingAddons, setBookingAddons] = useState<Set<AddonType>>(new Set());
 
   const [submitting, setSubmitting] = useState(false);
   const [submitStage, setSubmitStage] = useState<'idle' | 'paying' | 'saving'>('idle');
@@ -98,18 +107,62 @@ export default function BookingRequestScreen() {
     }
   }, [startDate, endDate]);
 
+  // Drop per-pet entries whose pet is no longer selected.
+  useEffect(() => {
+    setPerPetAddons((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const id of next.keys()) {
+        if (!selectedPetIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [selectedPetIds]);
+
   const nights = nightsBetween(startDate, endDate);
-  const baseCost = listing ? nights * listing.nightly_price_sar : 0;
-  const addonsList = useMemo<AddonInput[]>(
-    () =>
-      ADDON_OPTIONS.filter((opt) => selectedAddons.has(opt.type)).map((opt) => ({
-        type: opt.type,
-        priceSAR: opt.priceSAR,
-      })),
-    [selectedAddons],
-  );
-  const addonCost = addonsList.reduce((sum, a) => sum + a.priceSAR, 0);
-  const total = baseCost + addonCost;
+
+  const addonSelections = useMemo<AddonSelection[]>(() => {
+    const out: AddonSelection[] = [];
+    // Group per-pet selections by add-on type so each type emits one
+    // AddonSelection with all attached pet ids.
+    const byType = new Map<AddonType, string[]>();
+    for (const [petId, types] of perPetAddons) {
+      for (const t of types) {
+        const arr = byType.get(t) ?? [];
+        arr.push(petId);
+        byType.set(t, arr);
+      }
+    }
+    for (const [type, petIds] of byType) {
+      out.push({ type, petIds });
+    }
+    // Booking-wide selections — presence in array = selected, petIds=[].
+    for (const type of bookingAddons) {
+      out.push({ type, petIds: [] });
+    }
+    return out;
+  }, [perPetAddons, bookingAddons]);
+
+  const breakdown = useMemo(() => {
+    if (!listing || nights <= 0) {
+      return {
+        baseSubtotalSAR: 0,
+        addonLines: [] as ReturnType<typeof computePriceBreakdown>['addonLines'],
+        addonsTotalSAR: 0,
+        totalSAR: 0,
+      };
+    }
+    return computePriceBreakdown({
+      nightlyPriceSAR: listing.nightly_price_sar,
+      nights,
+      petCount: selectedPetIds.size,
+      additionalPetDiscount: listing.additional_pet_discount,
+      addons: addonSelections,
+    });
+  }, [listing, nights, selectedPetIds, addonSelections]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
@@ -143,8 +196,20 @@ export default function BookingRequestScreen() {
     });
   };
 
-  const toggleAddon = (type: Enums<'booking_addon_type'>) => {
-    setSelectedAddons((prev) => {
+  const togglePerPetAddon = (petId: string, type: AddonType) => {
+    setPerPetAddons((prev) => {
+      const next = new Map(prev);
+      const set = new Set(next.get(petId) ?? []);
+      if (set.has(type)) set.delete(type);
+      else set.add(type);
+      if (set.size === 0) next.delete(petId);
+      else next.set(petId, set);
+      return next;
+    });
+  };
+
+  const toggleBookingAddon = (type: AddonType) => {
+    setBookingAddons((prev) => {
       const next = new Set(prev);
       if (next.has(type)) next.delete(type);
       else next.add(type);
@@ -171,7 +236,7 @@ export default function BookingRequestScreen() {
       setSubmitStage('paying');
       const result = await MockPaymentProvider.authorize({
         bookingId: 'pending',
-        amountSAR: total,
+        amountSAR: breakdown.totalSAR,
         description: listing.title_ar,
       });
       if (result.status !== 'authorized') {
@@ -179,6 +244,33 @@ export default function BookingRequestScreen() {
       }
 
       setSubmitStage('saving');
+
+      // Map breakdown lines back into one booking_addons row per (pet,
+      // service) for per-pet add-ons, and one row with petId=null for
+      // booking-wide.
+      const addonsForDb: AddonInput[] = breakdown.addonLines.flatMap((line) => {
+        const cfg = ADDON_CONFIG[line.type];
+        if (cfg.scope === 'per_pet') {
+          const ids =
+            addonSelections.find((s) => s.type === line.type)?.petIds ?? [];
+          // Each row's price is the per-pet, cadence-aware unit price.
+          const unitPrice =
+            cfg.cadence === 'per_night' ? cfg.priceSAR * nights : cfg.priceSAR;
+          return ids.map<AddonInput>((petId) => ({
+            type: line.type,
+            petId,
+            priceSAR: unitPrice,
+          }));
+        }
+        return [
+          {
+            type: line.type,
+            petId: null,
+            priceSAR: line.lineSAR,
+          },
+        ];
+      });
+
       const booking = await createBookingRequest({
         listingId: listing.id,
         ownerId: user.id,
@@ -186,8 +278,10 @@ export default function BookingRequestScreen() {
         startDate,
         endDate,
         basePriceSAR: listing.nightly_price_sar,
-        totalSAR: total,
-        addons: addonsList,
+        baseSubtotalSAR: breakdown.baseSubtotalSAR,
+        additionalPetDiscount: listing.additional_pet_discount,
+        totalSAR: breakdown.totalSAR,
+        addons: addonsForDb,
       });
 
       router.replace({ pathname: '/bookings/[id]', params: { id: booking.id } });
@@ -245,7 +339,7 @@ export default function BookingRequestScreen() {
             {t('booking.nights_summary', {
               nights: toArabicDigits(nights),
               price: formatSAR(listing.nightly_price_sar),
-              total: formatSAR(baseCost),
+              total: formatSAR(breakdown.baseSubtotalSAR),
             })}
           </Text>
         ) : null}
@@ -298,56 +392,145 @@ export default function BookingRequestScreen() {
           </View>
         )}
 
-        {/* Addons — multi-select checkboxes */}
-        <Text style={styles.sectionLabel}>{t('booking.addon_section_label')}</Text>
-        <View style={styles.addonList}>
-          {ADDON_OPTIONS.map((opt) => {
-            const available = opt.available(listing);
-            const checked = selectedAddons.has(opt.type);
+        {/* Per-pet services — one card per selected pet */}
+        {selectedPetIds.size > 0 ? (
+          <>
+            <Text style={styles.sectionLabel}>
+              {t('booking.per_pet_services_label')}
+            </Text>
+            {pets
+              .filter((p) => selectedPetIds.has(p.id))
+              .map((p) => {
+                const petServices =
+                  perPetAddons.get(p.id) ?? new Set<AddonType>();
+                return (
+                  <View key={p.id} style={styles.petCard}>
+                    <View style={styles.petCardHeader}>
+                      <PetAvatar
+                        photoUrl={p.photo_url}
+                        breed={p.breed}
+                        size={36}
+                      />
+                      <Text style={styles.petCardName}>{p.name}</Text>
+                    </View>
+                    {(['grooming', 'vet', 'insurance'] as AddonType[])
+                      .filter((type) => isAddonAvailable(type, listing))
+                      .map((type) => {
+                        const checked = petServices.has(type);
+                        return (
+                          <Pressable
+                            key={type}
+                            onPress={() => togglePerPetAddon(p.id, type)}
+                            style={[
+                              styles.perPetServiceRow,
+                              checked && styles.addonRowSelected,
+                            ]}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked }}
+                          >
+                            <View
+                              style={[
+                                styles.checkbox,
+                                checked && styles.checkboxChecked,
+                              ]}
+                            >
+                              {checked ? (
+                                <Text style={styles.checkboxMark}>✓</Text>
+                              ) : null}
+                            </View>
+                            <Text style={styles.addonLabel}>
+                              {t(`booking.addon_${type}`)}
+                            </Text>
+                            <View style={{ flex: 1 }} />
+                            <PriceHint type={type} nights={nights} />
+                          </Pressable>
+                        );
+                      })}
+                  </View>
+                );
+              })}
+          </>
+        ) : null}
+
+        {/* Booking-wide services — currently just transport */}
+        <Text style={styles.sectionLabel}>
+          {t('booking.booking_services_label')}
+        </Text>
+        {(Object.keys(ADDON_CONFIG) as AddonType[])
+          .filter((type) => ADDON_CONFIG[type].scope === 'booking')
+          .filter((type) => isAddonAvailable(type, listing))
+          .map((type) => {
+            const checked = bookingAddons.has(type);
             return (
               <Pressable
-                key={opt.type}
-                onPress={() => available && toggleAddon(opt.type)}
-                disabled={!available}
-                style={[
-                  styles.addonRow,
-                  checked && styles.addonRowSelected,
-                  !available && styles.addonRowDisabled,
-                ]}
+                key={type}
+                onPress={() => toggleBookingAddon(type)}
+                style={[styles.addonRow, checked && styles.addonRowSelected]}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
               >
                 <View
-                  style={[
-                    styles.checkbox,
-                    checked && styles.checkboxChecked,
-                    !available && styles.checkboxDisabled,
-                  ]}
+                  style={[styles.checkbox, checked && styles.checkboxChecked]}
                 >
                   {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
                 </View>
-                <View style={styles.addonLeft}>
-                  <Text
-                    style={[
-                      styles.addonLabel,
-                      !available && styles.addonLabelDisabled,
-                    ]}
-                  >
-                    {t(opt.i18nKey)}
-                  </Text>
-                  {!available ? (
-                    <Text style={styles.unavailableNote}>
-                      {t('booking.addon_unavailable')}
-                    </Text>
-                  ) : null}
-                </View>
-                <Text style={styles.addonPrice}>+{formatSAR(opt.priceSAR)}</Text>
+                <Text style={styles.addonLabel}>
+                  {t(`booking.addon_${type}`)}
+                </Text>
+                <View style={{ flex: 1 }} />
+                <PriceHint type={type} nights={nights} />
               </Pressable>
             );
           })}
-        </View>
+
+        {/* Per-line breakdown of base + add-ons */}
+        {nights > 0 && selectedPetIds.size > 0 ? (
+          <View style={styles.breakdownBox}>
+            <View style={styles.breakdownLine}>
+              <Text style={styles.breakdownLabel}>
+                {t('booking.breakdown_base', {
+                  pets: toArabicDigits(selectedPetIds.size),
+                  nights: toArabicDigits(nights),
+                })}
+              </Text>
+              <Text style={styles.breakdownValue}>
+                {formatSAR(breakdown.baseSubtotalSAR)}
+              </Text>
+            </View>
+            {breakdown.addonLines.map((line, i) => {
+              const suffix =
+                line.scope === 'per_pet' && line.cadence === 'one_time'
+                  ? t('booking.per_pet_suffix_one_time', {
+                      pets: toArabicDigits(line.petCount),
+                    })
+                  : line.scope === 'per_pet' && line.cadence === 'per_night'
+                    ? t('booking.per_pet_suffix_per_night', {
+                        pets: toArabicDigits(line.petCount),
+                        nights: toArabicDigits(line.nights),
+                      })
+                    : line.scope === 'booking' && line.cadence === 'per_night'
+                      ? t('booking.booking_suffix_per_night', {
+                          nights: toArabicDigits(line.nights),
+                        })
+                      : '';
+              return (
+                <View key={`${line.type}-${i}`} style={styles.breakdownLine}>
+                  <Text style={styles.breakdownLabel}>
+                    {t(`booking.addon_${line.type}`)}
+                    {suffix ? ` ${suffix}` : ''}
+                  </Text>
+                  <Text style={styles.breakdownValue}>
+                    {formatSAR(line.lineSAR)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
 
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>{t('booking.total_label')}</Text>
-          <Text style={styles.totalValue}>{formatSAR(total)}</Text>
+          <Text style={styles.totalValue}>{formatSAR(breakdown.totalSAR)}</Text>
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -365,6 +548,40 @@ export default function BookingRequestScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+// ---------------------------------------------------------------------------
+// PriceHint — small "+50 ر.س" / "+100 × 3 ليلة" suffix used in each
+// add-on row. Reads cadence from ADDON_CONFIG.
+// ---------------------------------------------------------------------------
+function PriceHint({
+  type,
+  nights,
+}: {
+  type: AddonType;
+  nights: number;
+}) {
+  const { t } = useTranslation();
+  const cfg = ADDON_CONFIG[type];
+  const priceStr = formatSAR(cfg.priceSAR);
+  if (cfg.cadence === 'per_night') {
+    if (nights > 0) {
+      return (
+        <Text style={styles.addonPrice}>
+          {t('booking.price_hint_per_night', {
+            price: priceStr,
+            nights: toArabicDigits(nights),
+          })}
+        </Text>
+      );
+    }
+    return (
+      <Text style={styles.addonPrice}>
+        {t('booking.price_hint_per_night_unit', { price: priceStr })}
+      </Text>
+    );
+  }
+  return <Text style={styles.addonPrice}>+{priceStr}</Text>;
 }
 
 // ---------------------------------------------------------------------------
@@ -564,8 +781,58 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: 'right',
   },
-  addonList: {
+  petCard: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    borderColor: colors.whisper,
+    borderWidth: 1,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  petCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  petCardName: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
+    textAlign: 'right',
+  },
+  perPetServiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    gap: spacing.sm,
+  },
+  breakdownBox: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.xs,
+  },
+  breakdownLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  breakdownLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    flex: 1,
+    textAlign: 'right',
+  },
+  breakdownValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+    marginLeft: spacing.sm,
   },
   addonRow: {
     flexDirection: 'row',
@@ -582,9 +849,6 @@ const styles = StyleSheet.create({
     borderColor: colors.moss,
     backgroundColor: colors.whisper,
   },
-  addonRowDisabled: {
-    opacity: 0.45,
-  },
   checkbox: {
     width: 22,
     height: 22,
@@ -599,35 +863,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.moss,
     borderColor: colors.moss,
   },
-  checkboxDisabled: {
-    borderColor: colors.whisper,
-  },
   checkboxMark: {
     color: colors.cream,
     fontFamily: fonts.bodyBold,
     fontSize: 14,
-  },
-  addonLeft: {
-    flex: 1,
-    gap: 2,
   },
   addonLabel: {
     fontFamily: fonts.body,
     fontSize: 15,
     color: colors.ink,
   },
-  addonLabelDisabled: {
-    color: colors.inkSoft,
-  },
   addonPrice: {
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.moss,
-  },
-  unavailableNote: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.terracotta,
   },
   totalRow: {
     flexDirection: 'row',
