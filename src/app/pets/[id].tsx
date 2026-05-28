@@ -23,6 +23,7 @@ import {
   pickPetPhoto,
   updatePet,
   uploadPetPhoto,
+  type PetPhotoSource,
   type UpdatePetPatch,
 } from '@/lib/pets';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
@@ -47,12 +48,22 @@ export default function PetDetailScreen() {
   const [medicalNeeds, setMedicalNeeds] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState('');
   const [medications, setMedications] = useState('');
+
+  // photoUrl is the signed URL stored on pets.photo_url for an already-
+  // saved photo. pendingPhoto + previewUri are the just-picked photo
+  // source and the URI we render before the actual upload on Save.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<PetPhotoSource | null>(null);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+
+  // For the new-pet path: if createPet succeeds but the subsequent photo
+  // upload fails, we remember the just-created id so a Save retry skips
+  // the create and just retries the upload (no duplicate inserts).
+  const [pendingCreatedId, setPendingCreatedId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,6 +111,22 @@ export default function PetDetailScreen() {
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
 
+  // Image picker — only picks + previews, never uploads. The actual
+  // upload happens on Save, once we know we have a pet id.
+  const onChangePhoto = async () => {
+    setError(null);
+    const source = await pickPetPhoto();
+    if (!source) return;
+    setPendingPhoto(source);
+    // Build a preview URI to render immediately. For web that's an object
+    // URL minted from the picked File. For native, the asset uri.
+    const preview =
+      source.kind === 'web-file'
+        ? URL.createObjectURL(source.file)
+        : source.uri;
+    setPreviewUri(preview);
+  };
+
   const onSave = async () => {
     if (!name.trim()) {
       setError(t('pets.name_required'));
@@ -119,33 +146,79 @@ export default function PetDetailScreen() {
       const trimmedOther = breedSelection.breedOther?.trim();
       const breedOtherToSave = trimmedOther ? trimmedOther : null;
 
-      const patch: UpdatePetPatch = {
-        name: name.trim(),
-        breed: breedSelection.breed,
-        breed_other: breedOtherToSave,
-        age_months: ageNum,
-        behavioral_notes: behavioralNotes.trim() || null,
-        medical_needs: medicalNeeds.trim() || null,
-        dietary_restrictions: dietaryRestrictions.trim() || null,
-        medications: medications.trim() || null,
-        photo_url: photoUrl,
-      };
       if (isNew) {
-        await createPet({
-          ownerId: user.id,
-          name: patch.name!,
-          breed: patch.breed,
-          breed_other: patch.breed_other,
-          age_months: patch.age_months,
-          behavioral_notes: patch.behavioral_notes,
-          medical_needs: patch.medical_needs,
-          dietary_restrictions: patch.dietary_restrictions,
-          medications: patch.medications,
-          photo_url: patch.photo_url,
-        });
+        // 1. Create the pet WITHOUT photo_url so we have an id to scope
+        //    the storage path against. If a previous Save attempt got as
+        //    far as createPet but the photo upload failed, pendingCreatedId
+        //    is set and we skip the create to avoid a duplicate insert.
+        let createdId = pendingCreatedId;
+        if (!createdId) {
+          const created = await createPet({
+            ownerId: user.id,
+            name: name.trim(),
+            breed: breedSelection.breed,
+            breed_other: breedOtherToSave,
+            age_months: ageNum,
+            behavioral_notes: behavioralNotes.trim() || null,
+            medical_needs: medicalNeeds.trim() || null,
+            dietary_restrictions: dietaryRestrictions.trim() || null,
+            medications: medications.trim() || null,
+            photo_url: null,
+          });
+          createdId = created.id;
+          setPendingCreatedId(created.id);
+        }
+        // 2. Upload the picked photo (if any) and write the signed URL
+        //    onto the new row. If the upload fails the pet still exists
+        //    without a photo — surface a specific error, don't roll back.
+        if (pendingPhoto) {
+          try {
+            const url = await uploadPetPhoto({
+              petId: createdId,
+              ownerId: user.id,
+              source: pendingPhoto,
+            });
+            await updatePet(createdId, { photo_url: url });
+          } catch (photoErr) {
+            console.warn('[pets.photo_upload_failed]', photoErr);
+            setError(t('pets.photo_upload_failed'));
+            return;
+          }
+        }
       } else {
+        // Existing pet. Upload first (if a photo was picked) so we have
+        // a URL to include in the single updatePet call. A photo upload
+        // failure here surfaces the specific error and bails before the
+        // updatePet — the other field changes will not be written yet.
+        let photoUrlForPatch = photoUrl;
+        if (pendingPhoto) {
+          try {
+            const url = await uploadPetPhoto({
+              petId: id,
+              ownerId: user.id,
+              source: pendingPhoto,
+            });
+            photoUrlForPatch = url;
+          } catch (photoErr) {
+            console.warn('[pets.photo_upload_failed]', photoErr);
+            setError(t('pets.photo_upload_failed'));
+            return;
+          }
+        }
+        const patch: UpdatePetPatch = {
+          name: name.trim(),
+          breed: breedSelection.breed,
+          breed_other: breedOtherToSave,
+          age_months: ageNum,
+          behavioral_notes: behavioralNotes.trim() || null,
+          medical_needs: medicalNeeds.trim() || null,
+          dietary_restrictions: dietaryRestrictions.trim() || null,
+          medications: medications.trim() || null,
+          photo_url: photoUrlForPatch,
+        };
         await updatePet(id, patch);
       }
+
       // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
       router.replace('/pets');
     } catch (e) {
@@ -178,33 +251,6 @@ export default function PetDetailScreen() {
     }
   };
 
-  // Photo upload is only available on existing pets (we need a petId to
-  // build the storage path). For brand-new pets the user is prompted to
-  // save first, then return to add a photo.
-  const onChangePhoto = async () => {
-    if (isNew || !user) return;
-    setError(null);
-    const source = await pickPetPhoto();
-    if (!source) return;
-    setUploadingPhoto(true);
-    try {
-      const url = await uploadPetPhoto({
-        petId: id,
-        ownerId: user.id,
-        source,
-      });
-      // Save the new URL onto the pet row immediately so it survives a
-      // back navigation without hitting Save.
-      await updatePet(id, { photo_url: url });
-      setPhotoUrl(url);
-    } catch (e) {
-      console.warn('[pets.photo_upload_failed]', e);
-      setError(t('pets.photo_upload_failed'));
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -214,6 +260,10 @@ export default function PetDetailScreen() {
       </SafeAreaView>
     );
   }
+
+  // Display priority: the just-picked preview wins, then the saved URL,
+  // then the 🐈 placeholder.
+  const displayUri = previewUri ?? photoUrl;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -233,13 +283,13 @@ export default function PetDetailScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {/* Photo section */}
+        {/* Photo section. Picking only previews; the upload happens on Save. */}
         <View style={styles.field}>
           <Text style={styles.label}>{t('pets.photo_label')}</Text>
           <View style={styles.photoRow}>
-            {photoUrl ? (
+            {displayUri ? (
               <Image
-                source={{ uri: photoUrl }}
+                source={{ uri: displayUri }}
                 style={styles.photoThumb}
                 contentFit="cover"
                 transition={150}
@@ -251,24 +301,17 @@ export default function PetDetailScreen() {
             )}
             <Pressable
               onPress={onChangePhoto}
-              disabled={isNew || uploadingPhoto}
+              disabled={saving || deleting}
               style={[
                 styles.photoButton,
-                (isNew || uploadingPhoto) && styles.buttonDisabled,
+                (saving || deleting) && styles.buttonDisabled,
               ]}
             >
               <Text style={styles.photoButtonText}>
-                {uploadingPhoto
-                  ? t('pets.photo_uploading')
-                  : photoUrl
-                    ? t('pets.photo_change')
-                    : t('pets.photo_add')}
+                {displayUri ? t('pets.photo_change') : t('pets.photo_add')}
               </Text>
             </Pressable>
           </View>
-          {isNew ? (
-            <Text style={styles.photoHint}>{t('pets.photo_save_first')}</Text>
-          ) : null}
         </View>
 
         <Field label={t('pets.name_label')} required>
@@ -335,10 +378,10 @@ export default function PetDetailScreen() {
 
         <Pressable
           onPress={onSave}
-          disabled={saving || deleting || uploadingPhoto}
+          disabled={saving || deleting}
           style={[
             styles.saveButton,
-            (saving || deleting || uploadingPhoto) && styles.buttonDisabled,
+            (saving || deleting) && styles.buttonDisabled,
           ]}
         >
           <Text style={styles.saveText}>
@@ -349,10 +392,10 @@ export default function PetDetailScreen() {
         {!isNew ? (
           <Pressable
             onPress={onDelete}
-            disabled={saving || deleting || uploadingPhoto}
+            disabled={saving || deleting}
             style={[
               styles.deleteButton,
-              (saving || deleting || uploadingPhoto) && styles.buttonDisabled,
+              (saving || deleting) && styles.buttonDisabled,
             ]}
           >
             <Text style={styles.deleteText}>
@@ -486,12 +529,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     color: colors.moss,
-  },
-  photoHint: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.inkSoft,
-    textAlign: 'right',
   },
   saveButton: {
     backgroundColor: colors.moss,
