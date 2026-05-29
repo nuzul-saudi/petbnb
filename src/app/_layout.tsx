@@ -14,6 +14,7 @@ import { I18nManager, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/lib/auth';
+import { LocaleProvider } from '@/lib/i18n';
 import { colors } from '@/theme/tokens';
 
 // Force RTL once, at startup. On native this normally requires an app reload
@@ -57,12 +58,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.cream },
-          }}
-        />
+        <LocaleProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.cream },
+            }}
+          />
+        </LocaleProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
