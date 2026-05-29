@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { useAuth } from '@/lib/auth';
 import { listBookingsForOwner, type MyBookingListItem } from '@/lib/bookings';
 import { formatSAR, toArabicDigits } from '@/lib/format';
@@ -12,8 +13,9 @@ import type { Enums } from '@/types/database';
 
 export default function MyBookingsScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [bookings, setBookings] = useState<MyBookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,7 @@ export default function MyBookingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <View style={styles.header}>
         <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
           <Text style={styles.backText}>{t('mybookings.back')}</Text>
@@ -144,7 +147,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 22,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   error: {
     fontFamily: fonts.body,
@@ -196,19 +198,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 15,
     color: colors.ink,
-    textAlign: 'right',
   },
   rowMeta: {
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    textAlign: 'right',
   },
   rowTotal: {
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.mossDeep,
-    textAlign: 'right',
     marginTop: spacing.xs,
   },
   pill: {

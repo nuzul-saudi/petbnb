@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { ListingCard } from '@/components/ListingCard';
 import { useAuth } from '@/lib/auth';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
@@ -37,11 +38,13 @@ export default function HomeScreen() {
 // ---------------------------------------------------------------------------
 
 function HostPlaceholderHome() {
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { profile, signOut } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <View style={styles.placeholderContainer}>
         <Text style={styles.greeting}>
           {t('home.signed_in_greeting', { name: profile!.full_name })}
@@ -73,8 +76,9 @@ function HostPlaceholderHome() {
 
 function OwnerFeedHome() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { profile, signOut } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +136,7 @@ function OwnerFeedHome() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.feedTitle}>{t('feed.title')}</Text>
@@ -293,13 +298,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 24,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   greetingSmall: {
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    textAlign: 'right',
   },
   headerActions: {
     flexDirection: 'row',
@@ -338,7 +341,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    textAlign: 'right',
   },
   filterChip: {
     alignSelf: 'flex-start',

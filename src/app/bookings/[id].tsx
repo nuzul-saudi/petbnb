@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import {
@@ -28,8 +29,9 @@ import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function BookingDetailScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
 
@@ -213,6 +215,7 @@ export default function BookingDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.successCircle}>
           <Text style={styles.successCheck}>✓</Text>
@@ -468,13 +471,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 18,
     color: colors.ink,
-    textAlign: 'right',
   },
   summaryMeta: {
     fontFamily: fonts.body,
     fontSize: 13,
     color: colors.inkSoft,
-    textAlign: 'right',
   },
   summaryDivider: {
     height: 1,
@@ -485,7 +486,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.ink,
-    textAlign: 'right',
   },
   petBlock: {
     gap: spacing.xs,
@@ -500,13 +500,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.ink,
-    textAlign: 'right',
   },
   petBlockServices: {
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    textAlign: 'right',
     paddingLeft: spacing.xl + 32,
   },
   petBlockNoServices: {
@@ -514,7 +512,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkSoft,
     fontStyle: 'italic',
-    textAlign: 'right',
     paddingLeft: spacing.xl + 32,
   },
   breakdownBox: {
@@ -530,7 +527,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkSoft,
     flex: 1,
-    textAlign: 'right',
   },
   breakdownValue: {
     fontFamily: fonts.bodyBold,
@@ -542,7 +538,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 18,
     color: colors.mossDeep,
-    textAlign: 'right',
     marginTop: spacing.xs,
   },
   cta: {

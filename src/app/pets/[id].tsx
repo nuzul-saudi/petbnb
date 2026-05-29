@@ -12,6 +12,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { BreedPicker, type BreedSelection } from '@/components/BreedPicker';
 import { useAuth } from '@/lib/auth';
 import { findBreed } from '@/lib/breeds';
@@ -32,8 +33,9 @@ import { colors, fonts, radii, spacing } from '@/theme/tokens';
 // UUIDs are 36 chars with hyphens, so "new" can never collide.
 export default function PetDetailScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const isNew = id === 'new';
@@ -267,6 +269,7 @@ export default function PetDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <Pressable
@@ -457,7 +460,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 22,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   centered: {
     flex: 1,
@@ -482,7 +484,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     color: colors.ink,
-    textAlign: 'right',
   },
   input: {
     backgroundColor: colors.paper,
@@ -494,7 +495,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     color: colors.ink,
-    textAlign: 'right',
   },
   multiline: {
     minHeight: 70,

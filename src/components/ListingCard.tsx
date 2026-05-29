@@ -166,7 +166,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 16,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   verifiedMark: {
     fontFamily: fonts.bodyBold,
@@ -184,7 +183,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    textAlign: 'right',
   },
   newBadge: {
     alignSelf: 'flex-start',
@@ -220,19 +218,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.ink,
-    textAlign: 'right',
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    // RTL: justifyContent flips appropriately for Arabic layout.
+    gap: spacing.sm,
   },
   price: {
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   priceSuffix: {
     fontFamily: fonts.body,

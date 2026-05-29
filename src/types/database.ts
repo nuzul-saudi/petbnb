@@ -41,6 +41,7 @@ export type Database = {
           id_document_url: string | null;
           is_verified: boolean;
           is_suspended: boolean;
+          locale: string;
           created_at: string;
         };
         Insert: {
@@ -53,6 +54,7 @@ export type Database = {
           id_document_url?: string | null;
           is_verified?: boolean;
           is_suspended?: boolean;
+          locale?: string;
           created_at?: string;
         };
         Update: {
@@ -65,6 +67,7 @@ export type Database = {
           id_document_url?: string | null;
           is_verified?: boolean;
           is_suspended?: boolean;
+          locale?: string;
           created_at?: string;
         };
         Relationships: [

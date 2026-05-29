@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import {
@@ -58,8 +59,9 @@ function nextDayIso(iso: string): string {
 
 export default function BookingRequestScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
   const params = useLocalSearchParams<{ id?: string; editBooking?: string }>();
   const listingId = typeof params.id === 'string' ? params.id : '';
   const editBookingId =
@@ -407,6 +409,7 @@ export default function BookingRequestScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Pressable
           onPress={() => {
@@ -839,13 +842,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 24,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   subheading: {
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.inkSoft,
-    textAlign: 'right',
     marginBottom: spacing.md,
   },
   field: {
@@ -855,7 +856,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     color: colors.ink,
-    textAlign: 'right',
   },
   input: {
     backgroundColor: colors.paper,
@@ -873,7 +873,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.moss,
-    textAlign: 'right',
     marginTop: spacing.xs,
   },
   sectionLabel: {
@@ -881,13 +880,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.ink,
     marginTop: spacing.lg,
-    textAlign: 'right',
   },
   sectionSubtitle: {
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    textAlign: 'right',
     marginTop: -spacing.xs,
     marginBottom: spacing.xs,
   },
@@ -950,7 +947,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 15,
     color: colors.ink,
-    textAlign: 'right',
   },
   petCard: {
     backgroundColor: colors.paper,
@@ -970,7 +966,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.ink,
-    textAlign: 'right',
   },
   perPetServiceRow: {
     flexDirection: 'row',
@@ -997,7 +992,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkSoft,
     flex: 1,
-    textAlign: 'right',
   },
   breakdownValue: {
     fontFamily: fonts.bodyBold,

@@ -314,5 +314,12 @@
     "loading": "جارٍ التحميل…",
     "error": "حدث خطأ، يرجى المحاولة لاحقاً",
     "retry": "إعادة المحاولة"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "bookings": "حجوزاتي",
+    "account": "حسابي",
+    "lang_toggle_to_en": "EN",
+    "lang_toggle_to_ar": "ع"
   }
 }

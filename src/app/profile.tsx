@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { RoleEditor, type SelectableRole } from '@/components/RoleEditor';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
@@ -18,8 +19,9 @@ import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user, profile, refreshProfile, signOut } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [name, setName] = useState('');
   const [role, setRole] = useState<SelectableRole | null>(null);
@@ -74,6 +76,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
@@ -180,7 +183,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 22,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   card: {
     backgroundColor: colors.paper,
@@ -213,7 +215,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     color: colors.ink,
-    textAlign: 'right',
   },
   input: {
     backgroundColor: colors.paper,
@@ -225,7 +226,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     color: colors.ink,
-    textAlign: 'right',
   },
   adminNote: {
     backgroundColor: colors.whisper,
@@ -238,7 +238,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13,
     color: colors.ink,
-    textAlign: 'right',
   },
   navRow: {
     flexDirection: 'row',

@@ -1,4 +1,17 @@
 {
+  "permissions": {
+    "allow": [
+      "PowerShell(\"---\")",
+      "Bash(grep -oE \"pathname: \\\\`/\\(bookings|pets\\)[^\\\\`]*\\\\`\" .expo/types/router.d.ts)",
+      "PowerShell(npx expo install expo-location 2>&1)",
+      "Bash(curl -s -L -H \"User-Agent: Petbnb-MVP/0.1\" \"https://en.wikipedia.org/api/rest_v1/page/summary/Persian_cat\")",
+      "Bash(curl -s -L -H 'User-Agent: Petbnb-MVP/0.1' https://en.wikipedia.org/api/rest_v1/page/summary/Persian_cat)",
+      "Bash(python -c \"import sys, json; d = json.load\\(sys.stdin\\); print\\(d.get\\('originalimage', {}\\).get\\('source', 'NO_KEY'\\)\\)\")",
+      "PowerShell(npx expo install expo-image-picker 2>&1)",
+      "Bash(npx tsc *)",
+      "Bash(dir \"C:\\\\Users\\\\Administrator\\\\.claude\\\\projects\\\\c--Users-Administrator-Petbnb\\\\memory\")"
+    ]
+  },
   "enabledPlugins": {
     "expo@claude-plugins-official": true
   }

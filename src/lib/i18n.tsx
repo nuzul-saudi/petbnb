@@ -8,6 +8,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -15,6 +16,8 @@ import {
 
 import ar from '@/locales/ar.json';
 import en from '@/locales/en.json';
+import { cacheLocale, loadCachedLocale } from '@/lib/locale-storage';
+import { supabase } from '@/lib/supabase';
 
 export type Locale = 'ar' | 'en';
 
@@ -173,9 +176,74 @@ export function LocaleProvider({
     moduleLocale = locale;
   }
 
+  // On mount: resolve the user's locale in priority order:
+  //   1. profiles.locale (if signed in)
+  //   2. AsyncStorage cache
+  //   3. default 'ar' (already in state)
+  // Don't gate render on this — UI starts in the default and re-renders
+  // when the resolved value comes back (typically <100ms).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // 1. Try profiles.locale if we have a session.
+        const sb = supabase;
+        if (sb) {
+          const { data: sess } = await sb.auth.getSession();
+          const uid = sess.session?.user?.id;
+          if (uid) {
+            const { data: prof } = await sb
+              .from('profiles')
+              .select('locale')
+              .eq('id', uid)
+              .maybeSingle();
+            const v = prof?.locale;
+            if (!cancelled && (v === 'ar' || v === 'en')) {
+              setLocaleState(v);
+              moduleLocale = v;
+              return;
+            }
+          }
+        }
+        // 2. AsyncStorage fallback.
+        const cached = await loadCachedLocale();
+        if (!cancelled && cached) {
+          setLocaleState(cached);
+          moduleLocale = cached;
+        }
+      } catch {
+        /* defaults stay; never block the app */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     moduleLocale = next;
+    // Persist to both layers, fire-and-forget. AsyncStorage covers
+    // signed-out users + future cold starts; Supabase write covers
+    // signed-in cross-device sync.
+    void cacheLocale(next);
+    const sb = supabase;
+    if (sb) {
+      void sb.auth.getSession().then(({ data: sess }) => {
+        const uid = sess.session?.user?.id;
+        if (!uid) return;
+        void sb
+          .from('profiles')
+          .update({ locale: next })
+          .eq('id', uid)
+          .then((res) => {
+            if (res.error && __DEV__) {
+              // eslint-disable-next-line no-console
+              console.warn('[i18n.persist_failed]', res.error.message);
+            }
+          });
+      });
+    }
   }, []);
 
   const value = useMemo<LocaleContextValue>(

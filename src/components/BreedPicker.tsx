@@ -187,7 +187,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     color: colors.ink,
-    textAlign: 'right',
   },
   input: {
     backgroundColor: colors.paper,
@@ -199,6 +198,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     color: colors.ink,
-    textAlign: 'right',
   },
 });

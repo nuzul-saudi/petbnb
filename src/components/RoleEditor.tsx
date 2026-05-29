@@ -96,13 +96,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     color: colors.ink,
-    textAlign: 'right',
   },
   desc: {
     fontFamily: fonts.body,
     fontSize: 13,
     color: colors.inkSoft,
-    textAlign: 'right',
     marginTop: 2,
   },
   check: {

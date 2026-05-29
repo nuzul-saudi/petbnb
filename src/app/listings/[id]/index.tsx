@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { formatSAR, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
@@ -13,8 +14,9 @@ import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function ListingDetailScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const { initializing, session } = useAuth();
+  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
 
@@ -75,6 +77,7 @@ export default function ListingDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Sitter-first header — hero of the detail screen. */}
         <View style={styles.sitterHeader}>
@@ -229,7 +232,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 24,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   priceRow: {
     flexDirection: 'row',
@@ -274,7 +276,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.ink,
-    textAlign: 'right',
   },
   sitterHeader: {
     flexDirection: 'row',
@@ -316,7 +317,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 18,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   verifiedMark: {
     fontFamily: fonts.bodyBold,
@@ -327,7 +327,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13,
     color: colors.inkSoft,
-    textAlign: 'right',
   },
   badgeRow: {
     flexDirection: 'row',
@@ -351,7 +350,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     color: colors.ink,
-    textAlign: 'right',
     lineHeight: 24,
     marginTop: spacing.md,
   },
@@ -377,13 +375,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.ink,
-    textAlign: 'right',
   },
   amenityNote: {
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    textAlign: 'right',
     marginTop: 2,
   },
   cta: {

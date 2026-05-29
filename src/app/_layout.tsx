@@ -14,28 +14,25 @@ import { I18nManager, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/lib/auth';
-import { LocaleProvider } from '@/lib/i18n';
+import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
 import { colors } from '@/theme/tokens';
 
-// Force RTL once, at startup. On native this normally requires an app reload
-// the first time; in development that's a no-op cost. On web we also set
-// document.dir so the page itself flows right-to-left.
-function configureRTL() {
+// Locale-aware layout direction. On web we drive flow via document.dir;
+// on native, forceRTL() applies on next cold start (this session may
+// need an explicit Updates.reloadAsync() to relayout fully).
+function configureRTL(locale: Locale) {
+  const rtl = locale === 'ar';
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
-    document.documentElement.dir = 'rtl';
-    document.documentElement.lang = 'ar';
+    document.documentElement.dir = rtl ? 'rtl' : 'ltr';
+    document.documentElement.lang = locale;
   }
-  if (!I18nManager.isRTL) {
-    try {
-      I18nManager.allowRTL(true);
-      I18nManager.forceRTL(true);
-    } catch {
-      // Some platforms throw when called more than once — safe to ignore.
-    }
+  try {
+    I18nManager.allowRTL(rtl);
+    I18nManager.forceRTL(rtl);
+  } catch {
+    /* swallow re-init errors — some platforms throw on repeat calls */
   }
 }
-
-configureRTL();
 
 export default function RootLayout() {
   // Kick off font loading but never gate render on it. System fonts show
@@ -49,24 +46,33 @@ export default function RootLayout() {
     ReemKufi_700Bold,
   });
 
-  useEffect(() => {
-    // Belt-and-suspenders: re-assert RTL after the first render in case
-    // a hot reload reset the document direction.
-    configureRTL();
-  }, []);
-
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <LocaleProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.cream },
-            }}
-          />
+          <AppShell />
         </LocaleProvider>
       </AuthProvider>
     </SafeAreaProvider>
+  );
+}
+
+// AppShell sits INSIDE LocaleProvider so it can read the resolved locale
+// via the hook and feed it to configureRTL. RootLayout itself can't use
+// useTranslation because it's the component that mounts the provider.
+function AppShell() {
+  const { locale } = useTranslation();
+
+  useEffect(() => {
+    configureRTL(locale);
+  }, [locale]);
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.cream },
+      }}
+    />
   );
 }

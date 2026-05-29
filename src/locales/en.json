@@ -305,5 +305,12 @@
     "loading": "Loading…",
     "error": "Something went wrong, please try again later",
     "retry": "Try again"
+  },
+  "nav": {
+    "home": "Home",
+    "bookings": "My Bookings",
+    "account": "My Account",
+    "lang_toggle_to_en": "EN",
+    "lang_toggle_to_ar": "ع"
   }
 }
