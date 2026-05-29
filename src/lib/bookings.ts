@@ -53,6 +53,22 @@ export async function createBookingRequest(
     throw new Error('At least one pet is required for a booking');
   }
 
+  // Server-side enforcement of listings.max_concurrent_pets. Belt-and-
+  // braces against UI bugs or direct API misuse. UI gates this too;
+  // this check is the source of truth.
+  const { data: listingForCheck, error: lErr } = await supabase
+    .from('listings')
+    .select('max_concurrent_pets')
+    .eq('id', input.listingId)
+    .maybeSingle();
+  if (lErr) throw lErr;
+  if (!listingForCheck) throw new Error('Listing not found');
+  if (petIds.length > listingForCheck.max_concurrent_pets) {
+    throw new Error(
+      `Exceeds listing max of ${listingForCheck.max_concurrent_pets} pets`,
+    );
+  }
+
   const addons: AddonInput[] = input.addons ?? [];
 
   // 1. Insert the booking row. Until the post-5.6 cleanup migration
@@ -285,13 +301,28 @@ export async function updateBookingRequest(
   // 1. Status guard.
   const { data: current, error: rErr } = await supabase
     .from('bookings')
-    .select('id, status')
+    .select('id, status, listing_id')
     .eq('id', input.bookingId)
     .maybeSingle();
   if (rErr) throw rErr;
   if (!current) throw new Error('Booking not found');
   if (current.status !== 'requested') {
     throw new Error(`Cannot edit a booking in status: ${current.status}`);
+  }
+
+  // Server-side enforcement of listings.max_concurrent_pets, same as
+  // createBookingRequest. UI gates this too; this is the source of truth.
+  const { data: listingForCheck, error: lErr } = await supabase
+    .from('listings')
+    .select('max_concurrent_pets')
+    .eq('id', current.listing_id)
+    .maybeSingle();
+  if (lErr) throw lErr;
+  if (!listingForCheck) throw new Error('Listing not found');
+  if (input.petIds.length > listingForCheck.max_concurrent_pets) {
+    throw new Error(
+      `Exceeds listing max of ${listingForCheck.max_concurrent_pets} pets`,
+    );
   }
 
   // 2. Delete old child rows. Order matters slightly — addons reference

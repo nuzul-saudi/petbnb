@@ -66,8 +66,19 @@ function findCount(
   for (const key of COUNT_PARAM_PRIORITY) {
     const v = params[key];
     if (typeof v === 'number') return v;
-    if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v)) {
-      return Number(v);
+    if (typeof v === 'string') {
+      // Accept ASCII digits AND Arabic-Indic digits (U+0660–U+0669).
+      // Callsites that pre-format via toArabicDigits() shouldn't lose
+      // plural detection just because the digit glyphs changed.
+      if (/^-?[\d٠-٩]+(\.[\d٠-٩]+)?$/.test(v)) {
+        // Normalize to ASCII before Number() — JS doesn't parse
+        // "١" as 1, despite visual identity.
+        const ascii = v.replace(/[٠-٩]/g, (d) =>
+          String(d.charCodeAt(0) - 0x0660),
+        );
+        const n = Number(ascii);
+        if (!Number.isNaN(n)) return n;
+      }
     }
   }
   return undefined;

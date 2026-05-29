@@ -89,6 +89,8 @@
     "invalid_start_date": "Arrival must be today or later",
     "invalid_end_date": "Departure must be after arrival",
     "pet_required": "Please select one or more cats",
+    "max_pets_exceeded": "This sitter accepts up to {count} cats",
+    "max_pets_exceeded_one": "This sitter accepts up to {count} cat",
     "no_pets_title": "You don't have any cats yet",
     "no_pets_body": "Add a cat from 'My cats' to create bookings",
     "no_pets_button": "+ Add a cat",

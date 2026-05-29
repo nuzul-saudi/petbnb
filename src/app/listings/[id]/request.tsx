@@ -47,6 +47,15 @@ function isAddonAvailable(type: AddonType, listing: ListingDetail): boolean {
   return check ? check(listing) : true;
 }
 
+// ISO-date 'YYYY-MM-DD' arithmetic: returns the date one day after the
+// given ISO date. Used to force endDate strictly > startDate. Sub-night
+// bookings (hourly) would change this rule.
+function nextDayIso(iso: string): string {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function BookingRequestScreen() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -147,7 +156,20 @@ export default function BookingRequestScreen() {
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (startDate && !endDate) {
-      endDateRef.current?.focus();
+      const el = endDateRef.current;
+      if (!el) return;
+      el.focus();
+      // showPicker() opens the native date picker on Chrome/Safari. Firefox
+      // got it in 101+. Optional-chain it so unsupported browsers just keep
+      // the focus behavior they had before.
+      try {
+        el.showPicker?.();
+      } catch {
+        // Some browsers throw NotAllowedError if called outside a user
+        // gesture. The setState that triggered this effect is itself a
+        // user gesture, but Safari has been picky. Swallow silently —
+        // focus alone still works.
+      }
     }
   }, [startDate, endDate]);
 
@@ -208,6 +230,23 @@ export default function BookingRequestScreen() {
     });
   }, [listing, nights, selectedPetIds, addonSelections]);
 
+  // Listing-defined cap. Selection beyond this is blocked at submit and
+  // surfaces an inline error. Read directly off the loaded ListingDetail.
+  const maxPets = listing?.max_concurrent_pets ?? 1;
+  const tooManyPets = selectedPetIds.size > maxPets;
+
+  // Same logic as the relevant branches of validate(), but available to
+  // render so we can show an inline error while the user is still typing.
+  // Returns the i18n string when invalid; null when ok or empty.
+  const endDateError: string | null = (() => {
+    if (!endDate) return null;
+    // endDate set but startDate missing — treat as invalid; pushes user to
+    // fix the start first.
+    if (!startDate) return t('booking.invalid_end_date');
+    if (endDate <= startDate) return t('booking.invalid_end_date');
+    return null;
+  })();
+
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
 
@@ -264,6 +303,9 @@ export default function BookingRequestScreen() {
   const validate = (): string | null => {
     if (!startDate || startDate < todayIso()) return t('booking.invalid_start_date');
     if (!endDate || nights <= 0) return t('booking.invalid_end_date');
+    if (selectedPetIds.size > maxPets) {
+      return t('booking.max_pets_exceeded', { count: maxPets });
+    }
     if (selectedPetIds.size === 0) return t('booking.pet_required');
     return null;
   };
@@ -397,16 +439,26 @@ export default function BookingRequestScreen() {
         {/* Dates — DateField branches on platform */}
         <View style={styles.field}>
           <Text style={styles.label}>{t('booking.start_date_label')}</Text>
-          <DateField value={startDate} onChange={setStartDate} min={todayIso()} />
+          <DateField
+            value={startDate}
+            onChange={(v) => {
+              setStartDate(v);
+              if (endDate && endDate <= v) setEndDate('');
+            }}
+            min={todayIso()}
+          />
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>{t('booking.end_date_label')}</Text>
           <DateField
             value={endDate}
             onChange={setEndDate}
-            min={startDate || todayIso()}
+            min={startDate ? nextDayIso(startDate) : todayIso()}
             inputRef={endDateRef}
           />
+          {endDateError ? (
+            <Text style={styles.errorText}>{endDateError}</Text>
+          ) : null}
         </View>
 
         {nights > 0 ? (
@@ -420,7 +472,14 @@ export default function BookingRequestScreen() {
         ) : null}
 
         {/* Pet picker — multi-select from existing pets, or empty-state CTA */}
-        <Text style={styles.sectionLabel}>{t('booking.pet_section_label')}</Text>
+        <Text style={styles.sectionLabel}>
+          {t('booking.pet_section_label')}
+        </Text>
+        {listing ? (
+          <Text style={styles.sectionSubtitle}>
+            {t('listing.max_pets', { count: maxPets })}
+          </Text>
+        ) : null}
         {pets.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>{t('booking.no_pets_title')}</Text>
@@ -443,13 +502,24 @@ export default function BookingRequestScreen() {
           <View style={styles.petList}>
             {pets.map((p) => {
               const checked = selectedPetIds.has(p.id);
+              // At-cap: checked cats stay tappable (so user can uncheck to
+              // swap); unchecked cats are hard-blocked + visually disabled.
+              const atCap = selectedPetIds.size >= maxPets;
+              const blocked = atCap && !checked;
               return (
                 <Pressable
                   key={p.id}
-                  onPress={() => togglePet(p.id)}
-                  style={[styles.petRow, checked && styles.petRowSelected]}
+                  onPress={() => {
+                    if (!blocked) togglePet(p.id);
+                  }}
+                  disabled={blocked}
+                  style={[
+                    styles.petRow,
+                    checked && styles.petRowSelected,
+                    blocked && styles.petRowBlocked,
+                  ]}
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked }}
+                  accessibilityState={{ checked, disabled: blocked }}
                 >
                   <View
                     style={[
@@ -466,6 +536,12 @@ export default function BookingRequestScreen() {
             })}
           </View>
         )}
+
+        {tooManyPets ? (
+          <Text style={styles.errorText}>
+            {t('booking.max_pets_exceeded', { count: maxPets })}
+          </Text>
+        ) : null}
 
         {/* Per-pet services — one card per selected pet */}
         {selectedPetIds.size > 0 ? (
@@ -612,10 +688,19 @@ export default function BookingRequestScreen() {
 
         <Pressable
           onPress={onSubmit}
-          disabled={submitting || pets.length === 0}
+          disabled={
+            submitting ||
+            pets.length === 0 ||
+            tooManyPets ||
+            !!endDateError
+          }
           style={[
             styles.cta,
-            (submitting || pets.length === 0) && styles.ctaDisabled,
+            (submitting ||
+              pets.length === 0 ||
+              tooManyPets ||
+              !!endDateError) &&
+              styles.ctaDisabled,
           ]}
         >
           <Text style={styles.ctaText}>{submitLabel}</Text>
@@ -798,6 +883,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     textAlign: 'right',
   },
+  sectionSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    textAlign: 'right',
+    marginTop: -spacing.xs,
+    marginBottom: spacing.xs,
+  },
   emptyCard: {
     backgroundColor: colors.paper,
     borderRadius: radii.lg,
@@ -848,6 +941,9 @@ const styles = StyleSheet.create({
   petRowSelected: {
     borderColor: colors.moss,
     backgroundColor: colors.whisper,
+  },
+  petRowBlocked: {
+    opacity: 0.4,
   },
   petName: {
     flex: 1,

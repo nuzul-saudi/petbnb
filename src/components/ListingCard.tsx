@@ -86,15 +86,23 @@ export function ListingCard({ listing, onPress }: Props) {
         </View>
       )}
 
-      {/* Footer with title + price */}
+      {/* Footer with title + price + cap */}
       <View style={styles.footer}>
         <Text style={styles.title} numberOfLines={2}>
           {listing.title_ar}
         </Text>
-        <Text style={styles.price}>
-          {formatSAR(listing.nightly_price_sar)}{' '}
-          <Text style={styles.priceSuffix}>{t('listing.nightly_suffix')}</Text>
-        </Text>
+        <View style={styles.priceRow}>
+          <Text style={styles.price}>
+            {formatSAR(listing.nightly_price_sar)}{' '}
+            <Text style={styles.priceSuffix}>{t('listing.nightly_suffix')}</Text>
+          </Text>
+          <View style={styles.capBadge}>
+            <Text style={styles.capEmoji}>🐈</Text>
+            <Text style={styles.capCount}>
+              {toArabicDigits(listing.max_concurrent_pets)}
+            </Text>
+          </View>
+        </View>
       </View>
     </Pressable>
   );
@@ -214,6 +222,12 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: 'right',
   },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    // RTL: justifyContent flips appropriately for Arabic layout.
+  },
   price: {
     fontFamily: fonts.bodyBold,
     fontSize: 16,
@@ -223,6 +237,19 @@ const styles = StyleSheet.create({
   priceSuffix: {
     fontFamily: fonts.body,
     fontSize: 12,
+    color: colors.inkSoft,
+  },
+  capBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  capEmoji: {
+    fontSize: 16,
+  },
+  capCount: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
     color: colors.inkSoft,
   },
   tier: {
