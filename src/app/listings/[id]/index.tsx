@@ -6,7 +6,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { PhotoGallery } from '@/components/PhotoGallery';
-import { formatSAR, toArabicDigits } from '@/lib/format';
+import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { useAuth } from '@/lib/auth';
@@ -17,6 +17,9 @@ export default function ListingDetailScreen() {
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+
+  // Bilingual content fallback — _en field if present in current locale,
+  // else the Arabic primary. listing/host may be null on first render.
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
 
@@ -91,14 +94,29 @@ export default function ListingDetailScreen() {
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
               <Text style={styles.avatarInitial}>
-                {listing.host?.full_name?.trim().charAt(0) ?? '?'}
+                {(listing.host
+                  ? pickLocalized(
+                      listing.host.full_name,
+                      listing.host.full_name_en,
+                      locale,
+                    )
+                  : null
+                )
+                  ?.trim()
+                  .charAt(0) ?? '?'}
               </Text>
             </View>
           )}
           <View style={styles.sitterText}>
             <View style={styles.sitterNameRow}>
               <Text style={styles.sitterName} numberOfLines={1}>
-                {listing.host?.full_name ?? '—'}
+                {listing.host
+                  ? pickLocalized(
+                      listing.host.full_name,
+                      listing.host.full_name_en,
+                      locale,
+                    )
+                  : '—'}
               </Text>
               <Text style={styles.verifiedMark}>✓</Text>
             </View>
@@ -138,7 +156,9 @@ export default function ListingDetailScreen() {
         <PhotoGallery photos={listing.photos} />
 
         <View style={styles.body}>
-          <Text style={styles.title}>{listing.title_ar}</Text>
+          <Text style={styles.title}>
+            {pickLocalized(listing.title_ar, listing.title_en, locale)}
+          </Text>
 
           <View style={styles.priceRow}>
             <Text style={styles.price}>
@@ -149,8 +169,14 @@ export default function ListingDetailScreen() {
             </Text>
           </View>
 
-          {listing.description_ar ? (
-            <Text style={styles.description}>{listing.description_ar}</Text>
+          {listing.description_ar || listing.description_en ? (
+            <Text style={styles.description}>
+              {pickLocalized(
+                listing.description_ar ?? '',
+                listing.description_en,
+                locale,
+              )}
+            </Text>
           ) : null}
 
           <View style={styles.amenities}>

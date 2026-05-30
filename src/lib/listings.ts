@@ -17,7 +17,10 @@ export type ListingFilter = {
   sortByDistance?: { lat: number; lng: number };
 };
 
-type HostSummary = Pick<Tables<'profiles'>, 'id' | 'full_name' | 'avatar_url'>;
+type HostSummary = Pick<
+  Tables<'profiles'>,
+  'id' | 'full_name' | 'full_name_en' | 'avatar_url'
+>;
 type PhotoSummary = Pick<Tables<'listing_photos'>, 'id' | 'photo_url' | 'sort_order'>;
 
 export type ListingFeedItem = Tables<'listings'> & {
@@ -63,7 +66,7 @@ export async function listActiveListings(
     .select(
       `
       *,
-      host:profiles(id, full_name, avatar_url),
+      host:profiles(id, full_name, full_name_en, avatar_url),
       listing_photos(id, photo_url, sort_order)
     `,
     )
@@ -128,7 +131,7 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
     .select(
       `
       *,
-      host:profiles(id, full_name, avatar_url),
+      host:profiles(id, full_name, full_name_en, avatar_url),
       listing_photos(id, photo_url, sort_order)
     `,
     )

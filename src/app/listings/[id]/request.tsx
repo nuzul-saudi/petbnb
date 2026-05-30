@@ -20,7 +20,13 @@ import {
   updateBookingRequest,
   type AddonInput,
 } from '@/lib/bookings';
-import { formatSAR, nightsBetween, toArabicDigits, todayIso } from '@/lib/format';
+import {
+  formatSAR,
+  nightsBetween,
+  pickLocalized,
+  toArabicDigits,
+  todayIso,
+} from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
@@ -325,7 +331,7 @@ export default function BookingRequestScreen() {
       const result = await MockPaymentProvider.authorize({
         bookingId: 'pending',
         amountSAR: breakdown.totalSAR,
-        description: listing.title_ar,
+        description: pickLocalized(listing.title_ar, listing.title_en, locale),
       });
       if (result.status !== 'authorized') {
         throw new Error(result.reason);
@@ -437,7 +443,9 @@ export default function BookingRequestScreen() {
         <Text style={styles.heading}>
           {isEditMode ? t('booking.edit_title') : t('booking.request_title')}
         </Text>
-        <Text style={styles.subheading}>{listing.title_ar}</Text>
+        <Text style={styles.subheading}>
+          {pickLocalized(listing.title_ar, listing.title_en, locale)}
+        </Text>
 
         {/* Dates — DateField branches on platform */}
         <View style={styles.field}>

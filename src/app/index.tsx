@@ -77,7 +77,7 @@ function HostPlaceholderHome() {
 function OwnerFeedHome() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
@@ -143,29 +143,6 @@ function OwnerFeedHome() {
           <Text style={styles.greetingSmall}>
             {t('home.signed_in_greeting', { name: profile!.full_name })}
           </Text>
-        </View>
-        <View style={styles.headerActions}>
-          <Pressable
-            // Runtime URL is /bookings (resolves to bookings/index.tsx).
-            // Using the file-path form /bookings/index would be matched
-            // by the dynamic /bookings/[id] route with id="index" and
-            // 400 against /rest/v1/bookings?id=eq.index. The typed-routes
-            // union doesn't list /bookings, hence the directive.
-            // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
-            onPress={() => router.push('/bookings')}
-            style={styles.navChip}
-          >
-            <Text style={styles.navChipText}>{t('mybookings.title')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/profile')}
-            style={styles.navChip}
-          >
-            <Text style={styles.navChipText}>{t('profile.title')}</Text>
-          </Pressable>
-          <Pressable onPress={signOut} style={styles.signOutSmall}>
-            <Text style={styles.signOutSmallText}>{t('home.sign_out')}</Text>
-          </Pressable>
         </View>
       </View>
 
@@ -303,37 +280,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-  },
-  navChip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.moss,
-  },
-  navChipText: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.moss,
-  },
-  signOutSmall: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.terracotta,
-  },
-  signOutSmallText: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.terracotta,
   },
   geoHint: {
     marginHorizontal: spacing.xl,

@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
-import { formatSAR, toArabicDigits } from '@/lib/format';
+import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import type { ListingFeedItem } from '@/lib/listings';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -23,10 +23,13 @@ type Props = {
 // cache lands, this card can show real "{N} إقامة • ⭐ {avg}" stats and
 // only fall back to "جديد" for genuinely-new hosts.
 export function ListingCard({ listing, onPress }: Props) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const host = listing.host;
-  const initial = host?.full_name?.trim().charAt(0) ?? '?';
+  const hostName = host
+    ? pickLocalized(host.full_name, host.full_name_en, locale)
+    : null;
+  const initial = hostName?.trim().charAt(0) ?? '?';
   const genderLabel = t(
     listing.host_gender === 'female' ? 'listing.host_female' : 'listing.host_male',
   );
@@ -51,7 +54,7 @@ export function ListingCard({ listing, onPress }: Props) {
         <View style={styles.hostText}>
           <View style={styles.nameRow}>
             <Text style={styles.hostName} numberOfLines={1}>
-              {host?.full_name ?? '—'}
+              {hostName ?? '—'}
             </Text>
             <Text style={styles.verifiedMark}>✓</Text>
           </View>
@@ -89,7 +92,7 @@ export function ListingCard({ listing, onPress }: Props) {
       {/* Footer with title + price + cap */}
       <View style={styles.footer}>
         <Text style={styles.title} numberOfLines={2}>
-          {listing.title_ar}
+          {pickLocalized(listing.title_ar, listing.title_en, locale)}
         </Text>
         <View style={styles.priceRow}>
           <Text style={styles.price}>

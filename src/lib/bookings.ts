@@ -127,7 +127,10 @@ export async function createBookingRequest(
 }
 
 export type BookingDetail = Tables<'bookings'> & {
-  listing: Pick<Tables<'listings'>, 'id' | 'title_ar' | 'neighborhood'> | null;
+  listing: Pick<
+    Tables<'listings'>,
+    'id' | 'title_ar' | 'title_en' | 'neighborhood'
+  > | null;
   addons: Tables<'booking_addons'>[];
   pets: Tables<'pets'>[];
 };
@@ -139,7 +142,7 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
     .select(
       `
       *,
-      listing:listings(id, title_ar, neighborhood),
+      listing:listings(id, title_ar, title_en, neighborhood),
       booking_addons(*),
       booking_pets(pet:pets(*))
     `,
@@ -179,6 +182,7 @@ export type BookingForEdit = {
     Tables<'listings'>,
     | 'id'
     | 'title_ar'
+    | 'title_en'
     | 'neighborhood'
     | 'nightly_price_sar'
     | 'additional_pet_discount'
@@ -198,7 +202,7 @@ export async function getBookingForEdit(
     .select(
       `
       *,
-      listing:listings(id, title_ar, neighborhood, nightly_price_sar, additional_pet_discount, offers_grooming),
+      listing:listings(id, title_ar, title_en, neighborhood, nightly_price_sar, additional_pet_discount, offers_grooming),
       booking_addons(*),
       booking_pets(pet_id)
     `,
@@ -398,7 +402,10 @@ export async function updateBookingRequest(
 // Owner-facing list. Used by the /bookings screen. Each row includes
 // the listing summary + the multi-pet array.
 export type MyBookingListItem = Tables<'bookings'> & {
-  listing: Pick<Tables<'listings'>, 'id' | 'title_ar' | 'neighborhood'> | null;
+  listing: Pick<
+    Tables<'listings'>,
+    'id' | 'title_ar' | 'title_en' | 'neighborhood'
+  > | null;
   pets: Tables<'pets'>[];
 };
 
@@ -411,7 +418,7 @@ export async function listBookingsForOwner(
     .select(
       `
       *,
-      listing:listings(id, title_ar, neighborhood),
+      listing:listings(id, title_ar, title_en, neighborhood),
       booking_pets(pet:pets(*))
     `,
     )

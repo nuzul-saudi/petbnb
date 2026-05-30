@@ -6,7 +6,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { useAuth } from '@/lib/auth';
 import { listBookingsForOwner, type MyBookingListItem } from '@/lib/bookings';
-import { formatSAR, toArabicDigits } from '@/lib/format';
+import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
@@ -81,7 +81,13 @@ export default function MyBookingsScreen() {
             >
               <View style={styles.rowHeader}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
-                  {item.listing?.title_ar ?? '—'}
+                  {item.listing
+                    ? pickLocalized(
+                        item.listing.title_ar,
+                        item.listing.title_en,
+                        locale,
+                      )
+                    : '—'}
                 </Text>
                 <StatusPill status={item.status} />
               </View>

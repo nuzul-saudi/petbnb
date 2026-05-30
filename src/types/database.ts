@@ -34,6 +34,7 @@ export type Database = {
         Row: {
           id: string; // uuid, FK -> auth.users(id)
           full_name: string;
+          full_name_en: string | null;
           phone: string | null;
           role: Database['public']['Enums']['user_role'];
           avatar_url: string | null;
@@ -47,6 +48,7 @@ export type Database = {
         Insert: {
           id: string; // required — must equal auth.uid()
           full_name?: string;
+          full_name_en?: string | null;
           phone?: string | null;
           role?: Database['public']['Enums']['user_role'];
           avatar_url?: string | null;
@@ -60,6 +62,7 @@ export type Database = {
         Update: {
           id?: string;
           full_name?: string;
+          full_name_en?: string | null;
           phone?: string | null;
           role?: Database['public']['Enums']['user_role'];
           avatar_url?: string | null;
@@ -148,7 +151,9 @@ export type Database = {
           id: string;
           host_id: string;
           title_ar: string;
+          title_en: string | null;
           description_ar: string | null;
+          description_en: string | null;
           neighborhood: string;
           nightly_price_sar: number;
           max_concurrent_pets: number;
@@ -167,7 +172,9 @@ export type Database = {
           id?: string;
           host_id: string;
           title_ar: string;
+          title_en?: string | null;
           description_ar?: string | null;
+          description_en?: string | null;
           neighborhood: string;
           nightly_price_sar: number;
           max_concurrent_pets?: number;
@@ -186,7 +193,9 @@ export type Database = {
           id?: string;
           host_id?: string;
           title_ar?: string;
+          title_en?: string | null;
           description_ar?: string | null;
+          description_en?: string | null;
           neighborhood?: string;
           nightly_price_sar?: number;
           max_concurrent_pets?: number;

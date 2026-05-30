@@ -2,6 +2,8 @@
 // the ر.س currency mark — both centralized here so every screen renders the
 // same way and we never accidentally write "$".
 
+import type { Locale } from '@/lib/i18n';
+
 const ARABIC_INDIC = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
 export function toArabicDigits(value: number | string): string {
@@ -28,4 +30,24 @@ export function todayIso(): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Pick the locale-appropriate version of a bilingual field with
+ *  fallback to the Arabic primary. Used for listing titles, descriptions,
+ *  and host display names that may have optional _en versions.
+ *
+ *  - locale 'en' && enField truthy → enField
+ *  - locale 'en' && enField empty/null → arField (the fallback)
+ *  - locale 'ar' → arField always
+ *
+ *  Treats whitespace-only strings as empty. */
+export function pickLocalized(
+  arField: string,
+  enField: string | null | undefined,
+  locale: Locale,
+): string {
+  if (locale === 'en' && enField && enField.trim() !== '') {
+    return enField;
+  }
+  return arField;
 }

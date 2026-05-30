@@ -18,7 +18,7 @@ import {
   getBooking,
   type BookingDetail,
 } from '@/lib/bookings';
-import { formatSAR, toArabicDigits } from '@/lib/format';
+import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import {
   computePriceBreakdown,
@@ -228,7 +228,13 @@ export default function BookingDetailScreen() {
         <View style={styles.summaryCard}>
           {booking.listing ? (
             <>
-              <Text style={styles.summaryTitle}>{booking.listing.title_ar}</Text>
+              <Text style={styles.summaryTitle}>
+                {pickLocalized(
+                  booking.listing.title_ar,
+                  booking.listing.title_en,
+                  locale,
+                )}
+              </Text>
               <Text style={styles.summaryMeta}>
                 📍 {booking.listing.neighborhood}
               </Text>
