@@ -129,7 +129,7 @@ export async function createBookingRequest(
 export type BookingDetail = Tables<'bookings'> & {
   listing: Pick<
     Tables<'listings'>,
-    'id' | 'title_ar' | 'title_en' | 'neighborhood'
+    'id' | 'title_ar' | 'title_en' | 'neighborhood' | 'host_id'
   > | null;
   addons: Tables<'booking_addons'>[];
   pets: Tables<'pets'>[];
@@ -142,7 +142,7 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
     .select(
       `
       *,
-      listing:listings(id, title_ar, title_en, neighborhood),
+      listing:listings(id, title_ar, title_en, neighborhood, host_id),
       booking_addons(*),
       booking_pets(pet:pets(*))
     `,
@@ -473,4 +473,71 @@ export async function cancelBookingAsOwner(
     .single();
   if (error || !data) throw error ?? new Error('Failed to cancel booking');
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Host-side status transitions (Step 6.1 / Phase 7).
+//
+// Each function mirrors cancelBookingAsOwner's shape: re-fetch current
+// status, throw if the transition isn't legal from the current state,
+// then update. RLS already restricts which user can touch which booking;
+// the app-layer guard exists to (a) catch race conditions where the
+// status moved out from under a stale UI, and (b) give a clearer error
+// than a generic RLS rejection.
+// ---------------------------------------------------------------------------
+
+async function transitionBookingStatus(
+  bookingId: string,
+  expectedStatus: Enums<'booking_status'>,
+  nextStatus: Enums<'booking_status'>,
+): Promise<Tables<'bookings'>> {
+  if (!supabase) throw new Error('No Supabase client');
+
+  const { data: current, error: rErr } = await supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (rErr) throw rErr;
+  if (!current) throw new Error('Booking not found');
+  if (current.status !== expectedStatus) {
+    throw new Error(
+      `Cannot transition to ${nextStatus}: booking is in status ${current.status}, expected ${expectedStatus}`,
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ status: nextStatus })
+    .eq('id', bookingId)
+    .select()
+    .single();
+  if (error || !data) {
+    throw error ?? new Error(`Failed to transition booking to ${nextStatus}`);
+  }
+  return data;
+}
+
+export async function acceptBookingAsHost(
+  bookingId: string,
+): Promise<Tables<'bookings'>> {
+  return transitionBookingStatus(bookingId, 'requested', 'accepted');
+}
+
+export async function declineBookingAsHost(
+  bookingId: string,
+): Promise<Tables<'bookings'>> {
+  return transitionBookingStatus(bookingId, 'requested', 'declined');
+}
+
+export async function startBookingAsHost(
+  bookingId: string,
+): Promise<Tables<'bookings'>> {
+  return transitionBookingStatus(bookingId, 'accepted', 'active');
+}
+
+export async function completeBookingAsHost(
+  bookingId: string,
+): Promise<Tables<'bookings'>> {
+  return transitionBookingStatus(bookingId, 'active', 'completed');
 }

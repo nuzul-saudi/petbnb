@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -6,40 +7,50 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppHeader } from '@/components/AppHeader';
-import { PetAvatar } from '@/components/PetAvatar';
-import { useAuth } from '@/lib/auth';
+import { AppHeader } from "@/components/AppHeader";
+import { PetAvatar } from "@/components/PetAvatar";
+import { useAuth } from "@/lib/auth";
 import {
+  acceptBookingAsHost,
   cancelBookingAsOwner,
+  completeBookingAsHost,
+  declineBookingAsHost,
   getBooking,
+  startBookingAsHost,
   type BookingDetail,
-} from '@/lib/bookings';
-import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
-import { useTranslation } from '@/lib/i18n';
+} from "@/lib/bookings";
+import { formatSAR, pickLocalized, toArabicDigits } from "@/lib/format";
+import { useTranslation } from "@/lib/i18n";
 import {
   computePriceBreakdown,
   type AddonSelection,
   type AddonType,
-} from '@/lib/pricing';
-import { colors, fonts, radii, spacing } from '@/theme/tokens';
+} from "@/lib/pricing";
+import { colors, fonts, radii, spacing } from "@/theme/tokens";
 
 export default function BookingDetailScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
-  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+  const toggleLocale = () => setLocale(locale === "ar" ? "en" : "ar");
   const params = useLocalSearchParams<{ id?: string }>();
-  const id = typeof params.id === 'string' ? params.id : '';
+  const id = typeof params.id === "string" ? params.id : "";
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+
+  // Single in-flight indicator across all 4 host actions: at most one
+  // transition can run at a time, and the lit button tells the host which.
+  const [hostFlight, setHostFlight] = useState<
+    "accept" | "decline" | "start" | "complete" | null
+  >(null);
+  const [hostError, setHostError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -51,8 +62,8 @@ export default function BookingDetailScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[booking.load_failed]', e);
-        setError(t('booking.load_failed'));
+        console.warn("[booking.load_failed]", e);
+        setError(t("booking.load_failed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -132,7 +143,7 @@ export default function BookingDetailScreen() {
     !!booking &&
     !!user &&
     booking.owner_id === user.id &&
-    booking.status === 'requested';
+    booking.status === "requested";
 
   // Same gating as cancel: owner + status='requested'. The two
   // capabilities open and close together.
@@ -141,20 +152,19 @@ export default function BookingDetailScreen() {
   // Bookings created before migration 0009 have a null additional_pet_discount
   // and booking_addons rows with pet_id=null even for what's now per-pet.
   // We can't safely round-trip them through the new model.
-  const isLegacyBooking =
-    !!booking && booking.additional_pet_discount === null;
+  const isLegacyBooking = !!booking && booking.additional_pet_discount === null;
 
   const onEdit = () => {
     if (!booking) return;
     if (isLegacyBooking) {
       const confirmed =
-        Platform.OS === 'web' && typeof window !== 'undefined'
-          ? window.confirm(t('booking.edit_legacy_warning'))
+        Platform.OS === "web" && typeof window !== "undefined"
+          ? window.confirm(t("booking.edit_legacy_warning"))
           : true;
       if (!confirmed) return;
     }
     router.push({
-      pathname: '/listings/[id]/request',
+      pathname: "/listings/[id]/request",
       params: {
         id: booking.listing_id,
         editBooking: booking.id,
@@ -162,11 +172,76 @@ export default function BookingDetailScreen() {
     });
   };
 
+  // Viewer-is-the-host gate. Owner ≠ host on any real booking, so this is
+  // mutually exclusive with canCancel/canEdit.
+  const isHost =
+    !!booking && !!user && booking.listing?.host_id === user.id;
+
+  // Generic host transition: confirm, run the lib call, re-fetch on success
+  // so the screen reflects the new status (and the now-illegal buttons hide).
+  const runHostAction = async (
+    action: "accept" | "decline" | "start" | "complete",
+    confirmKey: string,
+    failedKey: string,
+    fn: (bookingId: string) => Promise<unknown>,
+  ) => {
+    if (!booking) return;
+    const confirmed =
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? window.confirm(t(confirmKey))
+        : true;
+    if (!confirmed) return;
+    setHostFlight(action);
+    setHostError(null);
+    try {
+      await fn(booking.id);
+      const fresh = await getBooking(booking.id);
+      if (fresh) setBooking(fresh);
+    } catch (e) {
+      console.warn(`[booking.host_${action}_failed]`, e);
+      setHostError(t(failedKey));
+    } finally {
+      setHostFlight(null);
+    }
+  };
+
+  const onHostAccept = () =>
+    runHostAction(
+      "accept",
+      "booking.host_accept_confirm",
+      "booking.host_accept_failed",
+      acceptBookingAsHost,
+    );
+
+  const onHostDecline = () =>
+    runHostAction(
+      "decline",
+      "booking.host_decline_confirm",
+      "booking.host_decline_failed",
+      declineBookingAsHost,
+    );
+
+  const onHostStart = () =>
+    runHostAction(
+      "start",
+      "booking.host_start_confirm",
+      "booking.host_start_failed",
+      startBookingAsHost,
+    );
+
+  const onHostComplete = () =>
+    runHostAction(
+      "complete",
+      "booking.host_complete_confirm",
+      "booking.host_complete_failed",
+      completeBookingAsHost,
+    );
+
   const onCancel = async () => {
     if (!booking) return;
     const confirmed =
-      Platform.OS === 'web' && typeof window !== 'undefined'
-        ? window.confirm(t('booking.cancel_confirm'))
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? window.confirm(t("booking.cancel_confirm"))
         : true;
     if (!confirmed) return;
     setCancelling(true);
@@ -176,11 +251,11 @@ export default function BookingDetailScreen() {
       // Send the user back to their bookings list — a cancelled-booking
       // detail screen is a dead end. Using replace (not push) so the back
       // button doesn't bring them right back to it.
-      router.replace('/bookings');
+      router.replace("/bookings");
       return;
     } catch (e) {
-      console.warn('[booking.cancel_failed]', e);
-      setCancelError(t('booking.cancel_failed'));
+      console.warn("[booking.cancel_failed]", e);
+      setCancelError(t("booking.cancel_failed"));
     } finally {
       setCancelling(false);
     }
@@ -193,7 +268,7 @@ export default function BookingDetailScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
-          <Text style={styles.muted}>{t('listing.loading')}</Text>
+          <Text style={styles.muted}>{t("listing.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -203,9 +278,14 @@ export default function BookingDetailScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error ?? t('listing.not_found')}</Text>
-          <Pressable onPress={() => router.replace('/')} style={styles.backButton}>
-            <Text style={styles.backText}>{t('booking.back_home')}</Text>
+          <Text style={styles.errorText}>
+            {error ?? t("listing.not_found")}
+          </Text>
+          <Pressable
+            onPress={() => router.replace("/")}
+            style={styles.backButton}
+          >
+            <Text style={styles.backText}>{t("booking.back_home")}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -213,14 +293,14 @@ export default function BookingDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.successCircle}>
           <Text style={styles.successCheck}>✓</Text>
         </View>
 
-        <Text style={styles.title}>{t('booking.confirm_title')}</Text>
+        <Text style={styles.title}>{t("booking.confirm_title")}</Text>
         <Text style={styles.subtitle}>
           {t(`booking.status_${booking.status}`)}
         </Text>
@@ -244,13 +324,13 @@ export default function BookingDetailScreen() {
           <View style={styles.summaryDivider} />
 
           <Text style={styles.summaryLine}>
-            {t('booking.dates_range', {
+            {t("booking.dates_range", {
               start: toArabicDigits(booking.start_date),
               end: toArabicDigits(booking.end_date),
             })}
           </Text>
           <Text style={styles.summaryLine}>
-            {t('booking.nights_count', {
+            {t("booking.nights_count", {
               nights: toArabicDigits(booking.nights),
             })}
           </Text>
@@ -265,21 +345,17 @@ export default function BookingDetailScreen() {
             return (
               <View key={p.id} style={styles.petBlock}>
                 <View style={styles.petBlockHeader}>
-                  <PetAvatar
-                    photoUrl={p.photo_url}
-                    breed={p.breed}
-                    size={32}
-                  />
+                  <PetAvatar photoUrl={p.photo_url} breed={p.breed} size={32} />
                   <Text style={styles.petBlockName}>{p.name}</Text>
                 </View>
                 {!isLegacyBooking ? (
                   services.length > 0 ? (
                     <Text style={styles.petBlockServices}>
-                      {services.map((s) => t(`booking.addon_${s}`)).join('، ')}
+                      {services.map((s) => t(`booking.addon_${s}`)).join("، ")}
                     </Text>
                   ) : (
                     <Text style={styles.petBlockNoServices}>
-                      {t('booking.no_per_pet_services')}
+                      {t("booking.no_per_pet_services")}
                     </Text>
                   )
                 ) : null}
@@ -290,7 +366,7 @@ export default function BookingDetailScreen() {
           <View style={styles.summaryDivider} />
 
           {/* Breakdown — legacy bookings (pre-0009) get raw rows; modern
-              bookings get the recomputed per-pet breakdown. */}
+                bookings get the recomputed per-pet breakdown. */}
           {booking.nights > 0 && booking.pets.length > 0 ? (
             isLegacyBooking ? (
               // Legacy: show raw booking_addons rows as-is, no recomputation.
@@ -310,7 +386,7 @@ export default function BookingDetailScreen() {
               <View style={styles.breakdownBox}>
                 <View style={styles.breakdownLine}>
                   <Text style={styles.breakdownLabel}>
-                    {t('booking.breakdown_base', {
+                    {t("booking.breakdown_base", {
                       pets: toArabicDigits(booking.pets.length),
                       nights: toArabicDigits(booking.nights),
                     })}
@@ -323,22 +399,22 @@ export default function BookingDetailScreen() {
                   .filter((line) => line.lineSAR > 0)
                   .map((line, i) => {
                     const suffix =
-                      line.scope === 'per_pet' && line.cadence === 'one_time'
-                        ? t('booking.per_pet_suffix_one_time', {
+                      line.scope === "per_pet" && line.cadence === "one_time"
+                        ? t("booking.per_pet_suffix_one_time", {
                             pets: toArabicDigits(line.petCount),
                           })
-                        : line.scope === 'per_pet' &&
-                            line.cadence === 'per_night'
-                          ? t('booking.per_pet_suffix_per_night', {
+                        : line.scope === "per_pet" &&
+                            line.cadence === "per_night"
+                          ? t("booking.per_pet_suffix_per_night", {
                               pets: toArabicDigits(line.petCount),
                               nights: toArabicDigits(line.nights),
                             })
-                          : line.scope === 'booking' &&
-                              line.cadence === 'per_night'
-                            ? t('booking.booking_suffix_per_night', {
+                          : line.scope === "booking" &&
+                              line.cadence === "per_night"
+                            ? t("booking.booking_suffix_per_night", {
                                 nights: toArabicDigits(line.nights),
                               })
-                            : '';
+                            : "";
                     return (
                       <View
                         key={`${line.type}-${i}`}
@@ -346,7 +422,7 @@ export default function BookingDetailScreen() {
                       >
                         <Text style={styles.breakdownLabel}>
                           {t(`booking.addon_${line.type}`)}
-                          {suffix ? ` ${suffix}` : ''}
+                          {suffix ? ` ${suffix}` : ""}
                         </Text>
                         <Text style={styles.breakdownValue}>
                           {formatSAR(line.lineSAR)}
@@ -361,7 +437,7 @@ export default function BookingDetailScreen() {
           <View style={styles.summaryDivider} />
 
           <Text style={styles.totalLine}>
-            {t('booking.total_paid', {
+            {t("booking.total_paid", {
               total: formatSAR(
                 isLegacyBooking
                   ? booking.total_sar
@@ -374,9 +450,81 @@ export default function BookingDetailScreen() {
         {canEdit ? (
           <Pressable onPress={onEdit} style={styles.editButton}>
             <Text style={styles.editText}>
-              {t('booking.edit_request_button')}
+              {t("booking.edit_request_button")}
             </Text>
           </Pressable>
+        ) : null}
+
+        {isHost ? (
+          <>
+            {hostError ? (
+              <Text style={styles.errorText}>{hostError}</Text>
+            ) : null}
+            {booking.status === "requested" ? (
+              <>
+                <Pressable
+                  onPress={onHostAccept}
+                  disabled={!!hostFlight}
+                  style={[
+                    styles.editButton,
+                    !!hostFlight && styles.buttonDisabled,
+                  ]}
+                >
+                  <Text style={styles.editText}>
+                    {hostFlight === "accept"
+                      ? t("booking.host_accepting")
+                      : t("booking.host_accept_button")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={onHostDecline}
+                  disabled={!!hostFlight}
+                  style={[
+                    styles.cancelButton,
+                    !!hostFlight && styles.buttonDisabled,
+                  ]}
+                >
+                  <Text style={styles.cancelText}>
+                    {hostFlight === "decline"
+                      ? t("booking.host_declining")
+                      : t("booking.host_decline_button")}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
+            {booking.status === "accepted" ? (
+              <Pressable
+                onPress={onHostStart}
+                disabled={!!hostFlight}
+                style={[
+                  styles.editButton,
+                  !!hostFlight && styles.buttonDisabled,
+                ]}
+              >
+                <Text style={styles.editText}>
+                  {hostFlight === "start"
+                    ? t("booking.host_starting")
+                    : t("booking.host_start_button")}
+                </Text>
+              </Pressable>
+            ) : null}
+            {booking.status === "active" ? (
+              <Pressable
+                onPress={onHostComplete}
+                disabled={!!hostFlight}
+                style={[
+                  styles.editButton,
+                  !!hostFlight && styles.buttonDisabled,
+                ]}
+              >
+                <Text style={styles.editText}>
+                  {hostFlight === "complete"
+                    ? t("booking.host_completing")
+                    : t("booking.host_complete_button")}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
         ) : null}
 
         {canCancel ? (
@@ -387,25 +535,19 @@ export default function BookingDetailScreen() {
             <Pressable
               onPress={onCancel}
               disabled={cancelling}
-              style={[
-                styles.cancelButton,
-                cancelling && styles.buttonDisabled,
-              ]}
+              style={[styles.cancelButton, cancelling && styles.buttonDisabled]}
             >
               <Text style={styles.cancelText}>
                 {cancelling
-                  ? t('booking.cancelling')
-                  : t('booking.cancel_button')}
+                  ? t("booking.cancelling")
+                  : t("booking.cancel_button")}
               </Text>
             </Pressable>
           </>
         ) : null}
 
-        <Pressable
-          onPress={() => router.replace('/')}
-          style={styles.cta}
-        >
-          <Text style={styles.ctaText}>{t('booking.back_home')}</Text>
+        <Pressable onPress={() => router.replace("/")} style={styles.cta}>
+          <Text style={styles.ctaText}>{t("booking.back_home")}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -419,15 +561,15 @@ const styles = StyleSheet.create({
   },
   scroll: {
     padding: spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.md,
     paddingBottom: spacing.xxl,
     paddingTop: spacing.xxl,
   },
   centered: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: spacing.xl,
     gap: spacing.lg,
   },
@@ -441,8 +583,8 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     backgroundColor: colors.moss,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing.md,
   },
   successCheck: {
@@ -454,17 +596,17 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 24,
     color: colors.mossDeep,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontFamily: fonts.body,
     fontSize: 15,
     color: colors.gold,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: spacing.lg,
   },
   summaryCard: {
-    width: '100%',
+    width: "100%",
     backgroundColor: colors.paper,
     borderRadius: radii.xl,
     padding: spacing.xl,
@@ -497,8 +639,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   petBlockHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   petBlockName: {
@@ -516,16 +658,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-    fontStyle: 'italic',
+    fontStyle: "italic",
     paddingLeft: spacing.xl + 32,
   },
   breakdownBox: {
     gap: spacing.xs,
   },
   breakdownLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
   },
   breakdownLabel: {
     fontFamily: fonts.body,
@@ -550,7 +692,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.xxl,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: spacing.xl,
   },
   ctaText: {
@@ -564,7 +706,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.moss,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: spacing.md,
   },
   editText: {
@@ -578,7 +720,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.terracotta,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: spacing.md,
   },
   cancelText: {
@@ -593,7 +735,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.terracotta,
-    textAlign: 'center',
+    textAlign: "center",
   },
   backButton: {
     paddingVertical: spacing.md,
