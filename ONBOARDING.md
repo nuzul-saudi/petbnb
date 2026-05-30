@@ -50,6 +50,36 @@ back-and-forth round trip to fix.
 
 ---
 
+## Working with Claude
+
+Petbnb is built using two Claude instances in parallel:
+
+- **Strategy Claude** (claude.ai chat): drafts instructions, reviews
+  code, designs smoke tests, debates product/architecture decisions
+  with the founder.
+- **Claude Code** (CLI in VS Code): executes file edits, runs `tsc`,
+  runs `git` commands, applies migrations to disk (not to Supabase),
+  reports back to the founder.
+
+The founder routes between them. Key conventions:
+
+- **File reads should be pasted directly to chat by the founder**, not
+  routed through Claude Code — this saves tokens and time.
+- **Claude Code is for writes and verification** — edit instructions,
+  tsc runs, git operations, grep searches.
+- **Smoke test in the browser between phases.** tsc catches type errors
+  but not layout regressions, math bugs, or routing weirdness.
+- **Migration pause pattern:** when a phase writes a SQL migration,
+  Claude Code pauses and prints the SQL; the founder applies it in
+  Supabase manually; the founder replies "continue" to resume.
+- **One commit per logical theme.** Don't bundle unrelated changes.
+- **Strategy Claude should push back when the founder is about to make
+  a mistake** — silently losing user data, mega-bundle scope, premature
+  features, naming inconsistencies. Pushback is welcome; default
+  deference is not.
+
+---
+
 ## 2. What we're building (MVP scope)
 
 A two-sided mobile marketplace for Saudi Arabia connecting **cat owners**
@@ -84,7 +114,7 @@ listings declare which species they accept. Not yet built; see
 | Auth (pre-launch) | Saudi phone OTP via Unifonic/Taqnyat (Send SMS Hook + Edge Function). `src/lib/phone.ts` is pre-staged with the E.164 normalizer. |
 | Payments | Mocked. `PaymentProvider` interface in `src/lib/payment.ts` → `MockPaymentProvider` charges 0%. Pre-launch swap to Moyasar/HyperPay. |
 | State | React Context (auth/session) + Supabase JS direct (server state — no TanStack yet) |
-| i18n | Hand-rolled. `src/lib/i18n.ts` + `src/locales/ar.json`. Param substitution via `{name}` style. |
+| i18n | `src/lib/i18n.tsx` (Context-aware) + `src/locales/(ar|en).json` with plural-aware translation via `Intl.PluralRules`. |
 | Styling | Single theme file `src/theme/tokens.ts`. RTL default. |
 | Location | `src/lib/geo.ts` wraps `navigator.geolocation` (web) and `expo-location` (native). |
 | Image picker | `expo-image-picker` (native) + `<input type="file">` (web), wrapped in `src/lib/pets.ts` `pickPetPhoto()`. |
@@ -145,13 +175,16 @@ Petbnb/
 │   │   ├── ListingCard.tsx     ← Sitter-first card for owner feed
 │   │   ├── PhotoGallery.tsx    ← Swipeable photos for listing detail
 │   │   ├── RoleEditor.tsx      ← Owner/host/both role-card picker
-│   │   └── BreedPicker.tsx     ← Horizontal breed tile picker
+│   │   ├── BreedPicker.tsx     ← Horizontal breed tile picker
+│   │   └── AppHeader.tsx       ← Top-nav bar on signed-in screens (home / bookings / account + language toggle)
 │   │
 │   ├── lib/                    ← Data + utility layer
 │   │   ├── supabase.ts         ← Typed Supabase client + pingSupabase()
 │   │   ├── auth.tsx            ← AuthProvider + useAuth(). Has KNOWN/TODO blocks.
-│   │   ├── i18n.ts             ← t(key, params?) returning string
-│   │   ├── format.ts           ← toArabicDigits, formatSAR, nightsBetween, todayIso
+│   │   ├── i18n.tsx            ← LocaleProvider + useTranslation() + module-scope t()
+│   │   ├── format.ts           ← Currency, dates, pickLocalized() helper (toArabicDigits, formatSAR, nightsBetween, todayIso)
+│   │   ├── locale-storage.ts   ← AsyncStorage cache for the user's locale
+│   │   ├── pricing.ts          ← Pure pricing engine (base + add-ons)
 │   │   ├── geo.ts              ← Cross-platform getCurrentLocation()
 │   │   ├── phone.ts            ← Saudi E.164 normalizer (pre-staged, no callers yet)
 │   │   ├── payment.ts          ← PaymentProvider interface + MockPaymentProvider
@@ -165,10 +198,12 @@ Petbnb/
 │   │   └── database.ts         ← Hand-maintained Database type. See §5.
 │   │
 │   ├── theme/
-│   │   └── tokens.ts           ← Single source of truth for colors/fonts/spacing
+│   │   ├── tokens.ts           ← Single source of truth for colors/fonts/spacing
+│   │   └── rtl.ts              ← useReadingTextAlign() hook (mostly unused after the audit)
 │   │
 │   ├── locales/
-│   │   └── ar.json             ← All Arabic strings. Hierarchical keys.
+│   │   ├── ar.json             ← Arabic strings. Hierarchical keys.
+│   │   └── en.json             ← English strings. Mirror structure of ar.json.
 │   │
 │   └── assets/
 │       └── breeds/             ← 10 cat-breed JPGs from Wikimedia
@@ -181,7 +216,13 @@ Petbnb/
         ├── 0004_admin_role.sql          ← admin role + is_verified + is_suspended (Step 4.5)
         ├── 0005_admin_rpc.sql           ← admin_list_users SECURITY DEFINER (Step 4.5)
         ├── 0006_pet_health_fields.sql   ← medical/dietary/medications (Step 5.5)
-        └── 0007_step_56_schema.sql      ← booking_pets junction + listings.lat/lng (Step 5.6)
+        ├── 0007_step_56_schema.sql      ← booking_pets junction + listings.lat/lng (Step 5.6)
+        ├── 0008_pet_breed_other.sql     ← pets.breed_other nullable text for free-text breed entry (5.6C)
+        ├── 0009_per_pet_pricing.sql     ← listings.additional_pet_discount + bookings snapshot fields + booking_addons.pet_id + RLS hardening (5.6D)
+        ├── 0010_edit_booking_rls.sql    ← owner UPDATE/DELETE policies on booking_pets + booking_addons, gated to status='requested' (5.6F)
+        ├── 0011_profile_locale.sql      ← profiles.locale ('ar'|'en', default 'ar') for per-user language preference (5.8.3)
+        ├── 0012_bilingual_content.sql   ← listings.title_en, listings.description_en, profiles.display_name_en (Step 7 prep)
+        └── 0013_rename_display_name_en.sql ← rename profiles.display_name_en → profiles.full_name_en (Step 7 prep)
 ```
 
 ---
@@ -193,13 +234,13 @@ Petbnb/
 
 | Table | Purpose | Notes |
 |---|---|---|
-| `profiles` | 1:1 with `auth.users`. Auto-created by trigger. | Roles: `owner`, `host`, `both`, `admin`. Plus `is_verified` (admin-set trust badge for hosts) and `is_suspended` (admin block). |
+| `profiles` | 1:1 with `auth.users`. Auto-created by trigger. | Roles: `owner`, `host`, `both`, `admin`. Plus `is_verified` (admin-set trust badge for hosts), `is_suspended` (admin block), `full_name_en` (optional English) + `locale` (`'ar'`|`'en'`). |
 | `pets` | Owner's cats. | Health fields added in 5.5. `photo_url` holds a 7-day signed URL from `pet-photos` bucket (private). |
-| `listings` | Host's home offering. | `is_active` defaults `false` for self-registered (Step 7) and `true` for admin-created (seed). `lat/lng` added in 5.6 (nullable). |
+| `listings` | Host's home offering. | `is_active` defaults `false` for self-registered (Step 7) and `true` for admin-created (seed). `lat/lng` added in 5.6 (nullable). `title_en`, `description_en` (both optional English) + `additional_pet_discount` + `max_concurrent_pets`. |
 | `listing_photos` | Airbnb-style home gallery. | `photo_url` is direct public URL (listing-photos bucket IS public). |
-| `bookings` | Owner-side requests. | Statuses: `requested → accepted → active → completed`; also `declined`, `cancelled`, `disputed`. `nights` is a generated column. `pet_id` still NOT NULL but **shadowed by `booking_pets` junction** (5.6) — a follow-up migration will drop it. |
+| `bookings` | Owner-side requests. | Statuses: `requested → accepted → active → completed`; also `declined`, `cancelled`, `disputed`. `nights` is a generated column. `pet_id` still NOT NULL but **shadowed by `booking_pets` junction** (5.6). Snapshots `base_price_sar`, `additional_pet_discount`, `base_subtotal_sar`, `total_sar` at booking creation so host edits don't retroactively reprice past bookings. Bookings created before migration 0009 are "legacy" (`additional_pet_discount IS NULL`); they display from the stored `total_sar` snapshot, and edit shows a warning that some details may not transfer. |
 | `booking_pets` | **5.6 junction.** | Composite PK `(booking_id, pet_id)`. RLS mirrors `bookings`. INSERT-only (no UPDATE/DELETE policies). |
-| `booking_addons` | Multi-select services per booking. | Multi was added in 5.5C — schema always supported it; UI used single-radio until then. |
+| `booking_addons` | Multi-select services per booking. | Multi was added in 5.5C — schema always supported it; UI used single-radio until then. `pet_id` is nullable. Null means booking-wide (e.g. transport). Per-pet add-ons (grooming/vet/insurance) have a non-null `pet_id`. Legacy bookings have `pet_id=null` for everything. |
 | `condition_reports` | Check-in / check-out evidence. | **Immutable** by RLS (no UPDATE/DELETE policies). Step 6 builds the UI. |
 | `daily_updates` | Host posts during stay. | Immutable. Step 7 builds the UI. |
 | `messages` | Booking-scoped chat. | Immutable. Step 9 builds the UI. |
@@ -295,6 +336,21 @@ history exists (deep link, refresh, post-replace). Use
 ## 7. What's been built (commit history)
 
 ```
+68deb83  Step 7 prep: optional bilingual content + cleanup duplicate feed nav
+5ecca0e  fix: AppHeader toggle position + async-storage compat + remove stale @ts-expect-error
+ad46311  Step 6 (top nav) + 5.8.3-5.8.5 (locale persistence + toggle + RTL/LTR audit)
+3e8f41a  5.7: enforce + surface listings.max_concurrent_pets end-to-end (plus same-day date prevention and date polish)
+e2f4109  5.8.2: i18n loader switch — English support, plural-aware, Context-driven
+d1a2bf4  5.8.1: English locale file (translation only; not yet wired)
+254b17d  5.6F: edit booking in place (owner, while status='requested')
+f6a7e62  5.6E: cancel booking (owner, while status='requested')
+47cf990  5.6D.4: booking confirmation — per-pet breakdown via pricing.ts
+8a37c34  5.6D.3: per-pet add-on UI + pricing wired end-to-end
+d55ae0e  5.6D.2: per-pet pricing engine + per-pet add-on schema
+e0bac9b  5.6C.4: PetAvatar with photo→breed-thumbnail→emoji fallback
+61b00b8  5.6C.3: deferred pet photo upload (commits only on Save)
+5df443e  5.6C.2a: BreedPicker — "I don't know" is a plain selection
+4668f6a  5.6C.2: custom breed free-text — "I don't know" + "Other" options
 46e58d9  5.6B.7: location-aware feed — geo prompt + distance display + nearest-first sort
 9ad3e93  5.6B.6: booking flow — pet picker from profile, multi-select, calendar auto-focus
 fdcea14  5.6B.5: BreedPicker + photo upload UI in pet edit
@@ -329,37 +385,38 @@ d871b8d  Step 2: Supabase wiring complete
 - **Step 5** — Owner browse feed, listing detail, booking request flow, mock payment, booking confirmation.
 - **Step 5.5** — Customer profile, pet management, My Bookings, multi-addon, real date picker (web), sitter-first listing cards.
 - **Step 5.6** — Pet/booking polish: multi-pet bookings (via `booking_pets` junction), pet photo upload (private bucket, 7-day signed URLs), breed picker with Wikimedia photos, location-aware feed with haversine distance sort, full Arabic error sweep, booking-flow back button.
+- **Step 5.6C** — Admin moderation: host approval, listing approval. Custom breed free-text (migration 0008), deferred pet photo upload (commits only on Save), PetAvatar with photo→breed-thumbnail→emoji fallback.
+- **Step 5.6D** — Per-pet pricing engine + add-on cadence/scope model. Migration 0009 adds `listings.additional_pet_discount`, snapshot fields on bookings, `booking_addons.pet_id` (with index) and hardened INSERT RLS. New pure pricing engine in `src/lib/pricing.ts`. Per-pet add-on UI + booking confirmation per-pet breakdown.
+- **Step 5.6E** — Cancel booking by owner while `status='requested'`.
+- **Step 5.6F** — Edit booking in place (migration 0010 adds owner UPDATE/DELETE policies on `booking_pets` and `booking_addons` gated to `status='requested'`). Delete-and-reinsert flow. Legacy bookings (pre-0009) show a warning that some details may not transfer.
+- **Step 5.7** — `max_concurrent_pets` enforcement (UI gate + server-side check), same-day date blocking, cap badge on ListingCard, cap subtitle on booking request screen. NOTE: the original 5.7 label was for multi-species expansion (dogs); that was renamed/deferred and 5.7 is now max-pets enforcement.
+- **Step 5.8.1** — English locale file (`en.json` with ~267 keys, translation only — not yet wired).
+- **Step 5.8.2** — i18n loader rewrite: `LocaleProvider`, `useTranslation()` hook, plural-aware `t()` via `Intl.PluralRules`, Arabic-Indic digit support in `findCount()`.
+- **Step 5.8.3** — Locale persistence (migration 0011 adds `profiles.locale`, AsyncStorage cache in `lib/locale-storage.ts`, load chain: `profiles.locale` → AsyncStorage → `'ar'`).
+- **Step 5.8.4** — Language toggle in `AppHeader`.
+- **Step 5.8.5** — RTL/LTR layout flip: `configureRTL` becomes locale-aware, `AppShell` wraps content inside `LocaleProvider`. ~35 hardcoded `textAlign:'right'` instances remain in `admin/*` and `(auth)/*` — deferred.
+- **Step 6** — Top nav bar (`AppHeader` on all signed-in screens; auth / suspended / admin excluded). Landed alongside 5.8.3–5.8.5 in the same commit.
+- **Step 7 prep** — Optional bilingual content fields. Migrations 0012 + 0013 add `listings.title_en`, `listings.description_en`, `profiles.full_name_en`. `pickLocalized()` helper added in `lib/format.ts`. Duplicate nav pills removed from the feed page.
 
 ---
 
 ## 8. What's next
 
-Per the build order in `CLAUDE.md` §3 + the gaps log in §13:
+**Step 7 — Host onboarding flow.** Hosts currently land on a placeholder
+screen. Step 7 builds: host profile setup (name + optional English,
+neighborhood, phone, bio), listing creation form (title + optional
+English, description + optional English, nightly price, max cats, add-on
+services offered, photos), pending-approval lifecycle (admin views
+already exist). At onboarding input time, Arabic names will auto-
+romanize as a first guess (e.g. "خالد" → "Khalid") and the host can
+override into the `_en` field.
 
-1. **Step 5.6 follow-up items still open:**
-   - Some `router.back()` may have crept back in user-submitted code —
-     audit and replace if you see any.
-   - Native date picker modal (`@react-native-community/datetimepicker`
-     is installed but not wired with a modal).
-   - Pet photo flow loses booking-request state when user navigates out
-     to add a pet.
-2. **Step 5.7 — Multi-species expansion.** Tagline update (cats → pets),
-   species selector in pet creation, species-aware breed lists with
-   separate thumbnails, listings declare `accepts_species`, owner feed
-   filter by species. Larger than typical Step 5.x; warrants its own phase.
-3. **Step 6 — Condition reports.** Check-in / check-out shared report,
-   3+ photos per phase, both parties confirm. Immutable evidence per RLS.
-   CLAUDE.md §6 — highest priority feature.
-4. **Step 7 — Host flow.** Create listing, upload home gallery, accept/decline
-   bookings, post daily updates, host availability calendar (gap c).
-   Self-registered listings default `is_active=false` and enter the admin queue.
-5. **Step 8 — Bookings list + status tracking + profile/settings expansion.**
-   Adds pickup/dropoff coordination (i), emergency vet contact (j).
-6. **Step 9 — Messaging** (owner ↔ host, booking-scoped).
-7. **Step 10 — Marketplace** display-only.
-
-Pre-launch tasks live in `CLAUDE.md §11` — none of them should land in a
-build step; they're explicitly launch-blockers.
+Post Step 7, roughly in order: reviews & ratings, messaging owner ↔
+sitter, email notifications via Resend or Supabase, payment provider
+decision (HyperPay vs Tap vs Moyasar vs Stripe; marketplace vs directory
+question), refund/cancellation policy, promo codes, advanced search/
+filters, internal financial dashboard. Merchandise/marketplace is much
+later, possibly never.
 
 ---
 
@@ -378,17 +435,51 @@ build step; they're explicitly launch-blockers.
 
 ### i18n
 
-- All user-facing strings go through `t('scope.key')`.
-- Keys are added to `src/locales/ar.json` in the same turn as the
-  component using them.
-- Param substitution: `t('home.signed_in_greeting', { name: x })` →
-  the `{name}` placeholder is replaced.
-- A missing key returns the key string and logs `[i18n] missing key: X`
-  in dev console.
+Translations live in `src/locales/ar.json` and `src/locales/en.json`
+(~275 keys each, in identical nested structure). The loader at
+`src/lib/i18n.tsx` provides a `LocaleProvider` React Context plus a
+module-scope `t()` for non-React callers.
+
+Inside a component, use:
+
+```ts
+const { t, locale, setLocale } = useTranslation();
+t('booking.confirm_subtitle');               // simple substitution
+t('booking.nights_count', { nights: 3 });    // plural-aware via count
+```
+
+Plural rules: `t()` inspects params for `count` / `nights` / `pets` (in
+that priority). When found, it computes the `Intl.PluralRules` category
+for the current locale and looks up `<key>_<category>`. Fallback chain:
+exact category → `_other` → bare key → key literal. Arabic-Indic digits
+(`'١'`, `'٢'`) are recognized in `findCount()` alongside ASCII digits.
+
+`setLocale` persists the new locale to both AsyncStorage (immediate,
+per-device) and `profiles.locale` (cross-device, fire-and-forget).
+`configureRTL(locale)` in `_layout.tsx` then flips `document.dir` and
+`I18nManager.forceRTL`.
+
+Bilingual content (user-entered text like listing titles and host
+display names) uses `pickLocalized(arField, enField, locale)` from
+`lib/format.ts`. Falls back to the Arabic primary when the English
+field is empty. Used for: `listings.title_en`, `listings.description_en`,
+`profiles.full_name_en`.
 
 ### Arabic / RTL
 
-- Layout is RTL by default (`I18nManager.forceRTL(true)` + `document.dir = 'rtl'` on web).
+- Layout direction is locale-aware. `configureRTL(locale)` in
+  `_layout.tsx` sets `document.documentElement.dir` +
+  `I18nManager.forceRTL` based on the current locale. `AppShell`
+  (inside `LocaleProvider`) reads the locale via hook and re-applies
+  `configureRTL` on every change. React Native's default `textAlign`
+  honors `I18nManager.isRTL` automatically, so most text aligns
+  correctly without per-callsite overrides. A `useReadingTextAlign()`
+  hook in `src/theme/rtl.ts` is available for any case that needs to
+  force-align against writing direction.
+- **KNOWN DEFERRED:** ~35 hardcoded `textAlign: 'right'` instances
+  still exist across `admin/*` and `(auth)/*` screens. The Step 5.8.5
+  audit covered only signed-in non-admin/auth screens. These should be
+  swept when those screens get touched.
 - **Numbers**: use `toArabicDigits(n)` from `src/lib/format.ts` for
   display. Database stores Latin digits.
 - **Currency**: always `ر.س`. Never `$`. Use `formatSAR(amount)`.
@@ -498,6 +589,32 @@ blank screen.
 - Real Saudi insurance partner for the `تأمين` addon.
 - Custom domain for Resend (e.g., `auth@petbnb.sa`).
 - Saudi alpha sender ID for SMS OTP (CITC registration, multi-day).
+
+### Branding / data-vs-display
+
+- Brand name "Petbnb" stays untranslated in both locales.
+- `profiles.role` `'host'` renders as "Sitter" in English UI. This is
+  intentional display/data separation; don't try to unify.
+
+### Legacy data
+
+- Bookings created before migration 0009 have
+  `additional_pet_discount IS NULL`. The display layer detects this
+  and falls back to the stored `total_sar`; edit shows a warning that
+  some details may not have transferred (per-pet attribution was
+  different pre-0009).
+
+### Scope discipline
+
+- Hourly / sub-night bookings are out of scope. Would require a
+  different pricing model and a re-think of the date picker (which
+  currently uses `nextDayIso()` to block same-day).
+
+### Dependency management
+
+- For RN-native packages on Expo, ALWAYS use `npx expo install <pkg>`,
+  never `npm install --save <pkg>`. Plain npm grabs the latest major
+  and frequently mismatches the SDK's compatibility matrix.
 
 ---
 
@@ -633,10 +750,11 @@ change:
 
 ## Closing note
 
-This document is a snapshot of the project as of the end of **Step 5.6
-Batch B**. When you make material changes — new phase commits, new
-deferred items, new gotchas — append to the appropriate section and
-commit the doc update separately.
+This document is intentionally session-agnostic: it covers stable
+architecture, conventions, and gotchas. Session-specific state (what
+was committed last, what's planned next) lives in chat handoff
+messages, not here. Update this file as conventions or architecture
+evolve, not as commits land.
 
 The authoritative project spec is and remains [`CLAUDE.md`](./CLAUDE.md).
 This file exists so a new Claude session can come up to speed in one
