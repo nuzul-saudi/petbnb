@@ -35,7 +35,6 @@ export function AppHeader({ locale, onLanguageToggle }: AppHeaderProps) {
       <NavItem
         label={t('nav.bookings')}
         active={isActive('/bookings')}
-        // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
         onPress={() => router.push('/bookings')}
       />
       <NavItem
@@ -96,7 +95,6 @@ const styles = StyleSheet.create({
     color: colors.moss,
   },
   langToggle: {
-    marginLeft: 'auto',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },

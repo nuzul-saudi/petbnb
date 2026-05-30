@@ -176,7 +176,6 @@ export default function BookingDetailScreen() {
       // Send the user back to their bookings list — a cancelled-booking
       // detail screen is a dead end. Using replace (not push) so the back
       // button doesn't bring them right back to it.
-      // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
       router.replace('/bookings');
       return;
     } catch (e) {

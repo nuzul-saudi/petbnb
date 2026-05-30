@@ -119,11 +119,6 @@ export default function ProfileScreen() {
 
         {/* Pets shortcut */}
         <Pressable
-          // Runtime URL is /pets (resolves to pets/index.tsx). Using the
-          // file-path form /pets/index would be matched by /pets/[id]
-          // with id="index" and break the My Cats list. The typed-routes
-          // union doesn't list /pets, hence the directive.
-          // @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes.
           onPress={() => router.push('/pets')}
           style={styles.navRow}
         >
