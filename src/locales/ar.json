@@ -130,6 +130,25 @@
     "host_complete_failed": "تعذر إنهاء الإقامة، حاولي مرة أخرى.",
     "host_completing": "جاري الإنهاء..."
   },
+  "daily_updates": {
+    "section_title": "تحديثات يومية",
+    "empty": "لا توجد تحديثات بعد",
+    "add_photo_button": "+ إضافة صور",
+    "note_placeholder": "اكتبي ملاحظة (اختياري)",
+    "submit_button": "حفظ",
+    "posting": "جاري الحفظ...",
+    "post_failed": "تعذر نشر التحديث، حاولي مرة أخرى.",
+    "photo_required": "أضيفي صورة أو اكتبي ملاحظة",
+    "leave_confirm": "لديكِ تحديث غير محفوظ. هل تريدين المغادرة بدون حفظ؟",
+    "edit_button": "تعديل",
+    "edit_save_button": "حفظ التعديل",
+    "edit_cancel_button": "إلغاء",
+    "edit_saving": "جاري الحفظ...",
+    "edit_save_failed": "تعذر حفظ التعديل، حاولي مرة أخرى.",
+    "delete_button": "حذف",
+    "deleting": "جاري الحذف...",
+    "delete_failed": "تعذر حذف التحديث، حاولي مرة أخرى."
+  },
   "supabase": {
     "checking": "جارٍ التحقق من الاتصال بـ Supabase…",
     "connected": "متصل بـ Supabase ✓",

@@ -133,6 +133,52 @@ export type PetPhotoSource =
   | { kind: 'web-file'; file: File }
   | { kind: 'native-uri'; uri: string; mimeType?: string };
 
+/**
+ * Multi-photo variant of pickPetPhoto. Same platform branching;
+ * returns an array of selected sources, possibly empty.
+ * Used by daily-updates so the host can select multiple photos at once.
+ */
+export async function pickPhotosMulti(): Promise<PetPhotoSource[]> {
+  if (Platform.OS === 'web') {
+    return new Promise((resolve) => {
+      if (typeof document === 'undefined') {
+        resolve([]);
+        return;
+      }
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true;
+      input.onchange = () => {
+        const files = input.files ? Array.from(input.files) : [];
+        resolve(files.map((file) => ({ kind: 'web-file', file })));
+      };
+      input.click();
+    });
+  }
+  try {
+    const ImagePicker = await import('expo-image-picker');
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') return [];
+    // allowsMultipleSelection requires SDK 49+; older versions degrade
+    // gracefully and return one asset.
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+    if (result.canceled || result.assets.length === 0) return [];
+    return result.assets.map((a) => ({
+      kind: 'native-uri' as const,
+      uri: a.uri,
+      mimeType: a.mimeType ?? undefined,
+    }));
+  } catch (e) {
+    if (__DEV__) console.warn('[pets.pickPhotosMulti]', e);
+    return [];
+  }
+}
+
 /** Opens the platform's image picker. Returns null on cancel or denial. */
 export async function pickPetPhoto(): Promise<PetPhotoSource | null> {
   if (Platform.OS === 'web') {

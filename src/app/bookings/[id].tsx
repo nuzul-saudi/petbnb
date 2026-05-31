@@ -6,8 +6,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -22,7 +24,20 @@ import {
   startBookingAsHost,
   type BookingDetail,
 } from "@/lib/bookings";
-import { formatSAR, pickLocalized, toArabicDigits } from "@/lib/format";
+import {
+  createDailyUpdate,
+  deleteDailyUpdate,
+  listDailyUpdates,
+  updateDailyUpdate,
+  type DailyUpdate,
+} from "@/lib/daily-updates";
+import {
+  formatRiyadhStamp,
+  formatSAR,
+  pickLocalized,
+  toArabicDigits,
+} from "@/lib/format";
+import { pickPhotosMulti, type PetPhotoSource } from "@/lib/pets";
 import { useTranslation } from "@/lib/i18n";
 import {
   computePriceBreakdown,
@@ -52,6 +67,31 @@ export default function BookingDetailScreen() {
   >(null);
   const [hostError, setHostError] = useState<string | null>(null);
 
+  // Daily updates: list (loaded alongside the booking), plus host-only
+  // post form state (pending photo list + optional note).
+  const [updates, setUpdates] = useState<DailyUpdate[]>([]);
+  const [updatesLoading, setUpdatesLoading] = useState(true);
+  const [pendingPhotos, setPendingPhotos] = useState<PetPhotoSource[]>([]);
+  const [updateNote, setUpdateNote] = useState("");
+  const [postingUpdate, setPostingUpdate] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+
+  // Per-entry inline edit (Phase 6.3). At most one entry is in edit mode
+  // at a time; editingEntryId === null means "no edit open".
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editKeep, setEditKeep] = useState<Set<string>>(new Set());
+  const [editNewSources, setEditNewSources] = useState<PetPhotoSource[]>([]);
+  const [editNote, setEditNote] = useState("");
+  const [editingFlight, setEditingFlight] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete state (sub-step c). deletingFlight names the entry currently
+  // being deleted (so its button can show "Deleting…"). deleteError is
+  // shown once globally below the updates list — the host knows which
+  // entry they just clicked so locality isn't critical.
+  const [deletingFlight, setDeletingFlight] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -72,6 +112,88 @@ export default function BookingDetailScreen() {
       cancelled = true;
     };
   }, [id]);
+
+  // Daily updates load — parallel to the booking fetch so neither blocks
+  // the other. Refetched after the host successfully posts a new update.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    listDailyUpdates(id)
+      .then((rows) => {
+        if (!cancelled) setUpdates(rows);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        console.warn("[daily_updates.load_failed]", e);
+        // Silent failure: the empty-state copy will show. Updates are
+        // a secondary surface; don't crash the whole booking page.
+      })
+      .finally(() => {
+        if (!cancelled) setUpdatesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Daily-update form dirty-tracking. The form is dirty when there's at
+  // least one pending photo OR the note has any non-whitespace content.
+  // Wired into:
+  //   • AppHeader's confirmLeave prop (in-app nav interception)
+  //   • the beforeunload listener below (browser refresh / tab close)
+  // Dirty when the compose form has content OR any entry is in edit mode.
+  // Being IN edit mode without an explicit cancel/save counts as dirty
+  // even before any change — slightly over-eager but errs on the side of
+  // protecting work-in-progress.
+  const isUpdateFormDirty =
+    pendingPhotos.length > 0 ||
+    updateNote.trim() !== "" ||
+    editingEntryId !== null;
+
+  // Auto-close any open edit form if the booking transitions out of
+  // 'active'. Migration 0015 + the lib status guard would reject the
+  // save anyway, but closing proactively avoids the surprise rejection
+  // and prevents a stale edit form from sitting on a no-longer-editable
+  // booking.
+  useEffect(() => {
+    if (
+      booking &&
+      booking.status !== "active" &&
+      editingEntryId !== null
+    ) {
+      setEditingEntryId(null);
+      setEditKeep(new Set());
+      setEditNewSources([]);
+      setEditNote("");
+      setEditError(null);
+    }
+  }, [booking?.status, editingEntryId]);
+
+  const confirmLeaveIfDirty = (): boolean => {
+    if (!isUpdateFormDirty) return true;
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      return window.confirm(t("daily_updates.leave_confirm"));
+    }
+    // Native: no synchronous confirm. Allow the nav. A native Alert.alert
+    // is async and can't gate a synchronous Pressable.onPress reliably;
+    // a proper native unsaved-work flow is its own follow-up.
+    return true;
+  };
+
+  // Web only: ask before tab close / refresh while the form is dirty.
+  // preventDefault alone triggers the browser's native "leave site?"
+  // prompt on all modern browsers (Chrome ≥119, all Firefox/Safari in
+  // common use). The legacy `event.returnValue = ''` shim is deprecated
+  // and no longer needed.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!isUpdateFormDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isUpdateFormDirty]);
 
   // Reconstruct AddonSelection[] from the persisted booking_addons rows
   // so we can re-run the same breakdown function the request screen used.
@@ -261,6 +383,143 @@ export default function BookingDetailScreen() {
     }
   };
 
+  // Daily-update post form is host-only AND only while the booking is
+  // 'active' — Step 7 / Phase 6.2. Same isHost gate as the host actions.
+  const canMutateUpdates = isHost && booking?.status === "active";
+
+  const onAddPhoto = async () => {
+    setPostError(null);
+    const sources = await pickPhotosMulti();
+    if (sources.length === 0) return;
+    setPendingPhotos((prev) => [...prev, ...sources]);
+  };
+
+  const onRemovePending = (index: number) => {
+    setPendingPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const onSubmitUpdate = async () => {
+    if (!booking || !user) return;
+    // Content rule: at least one photo OR a non-empty note.
+    if (pendingPhotos.length === 0 && updateNote.trim() === "") {
+      setPostError(t("daily_updates.photo_required"));
+      return;
+    }
+    setPostingUpdate(true);
+    setPostError(null);
+    try {
+      await createDailyUpdate({
+        bookingId: booking.id,
+        hostId: user.id,
+        sources: pendingPhotos,
+        noteAr: updateNote.trim() === "" ? null : updateNote.trim(),
+      });
+      // On success: clear the form, then refetch the list so the new
+      // update appears at the top.
+      setPendingPhotos([]);
+      setUpdateNote("");
+      const fresh = await listDailyUpdates(booking.id);
+      setUpdates(fresh);
+    } catch (e) {
+      console.warn("[daily_updates.post_failed]", e);
+      setPostError(t("daily_updates.post_failed"));
+    } finally {
+      setPostingUpdate(false);
+    }
+  };
+
+  // ---- Per-entry edit handlers (sub-step b) ----
+
+  const onEditStart = (entry: DailyUpdate) => {
+    setEditingEntryId(entry.id);
+    setEditKeep(
+      new Set(Array.isArray(entry.photos) ? (entry.photos as string[]) : []),
+    );
+    setEditNewSources([]);
+    setEditNote(entry.note_ar ?? "");
+    setEditError(null);
+  };
+
+  const onEditCancel = () => {
+    setEditingEntryId(null);
+    setEditKeep(new Set());
+    setEditNewSources([]);
+    setEditNote("");
+    setEditError(null);
+  };
+
+  const onEditAddPhotos = async () => {
+    setEditError(null);
+    const sources = await pickPhotosMulti();
+    if (sources.length === 0) return;
+    setEditNewSources((prev) => [...prev, ...sources]);
+  };
+
+  const onEditRemoveExisting = (url: string) => {
+    setEditKeep((prev) => {
+      const next = new Set(prev);
+      next.delete(url);
+      return next;
+    });
+  };
+
+  const onEditRemoveNew = (index: number) => {
+    setEditNewSources((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const onEditSave = async (entryId: string) => {
+    if (!booking || !user) return;
+    const keepArr = Array.from(editKeep);
+    // Content rule (same as compose): photo OR note required.
+    if (
+      keepArr.length === 0 &&
+      editNewSources.length === 0 &&
+      editNote.trim() === ""
+    ) {
+      setEditError(t("daily_updates.photo_required"));
+      return;
+    }
+    setEditingFlight(entryId);
+    setEditError(null);
+    try {
+      await updateDailyUpdate({
+        updateId: entryId,
+        hostId: user.id,
+        keepPhotoUrls: keepArr,
+        newSources: editNewSources,
+        noteAr: editNote.trim() === "" ? null : editNote.trim(),
+      });
+      // Exit edit mode + refetch so the row reflects the new state.
+      onEditCancel();
+      const fresh = await listDailyUpdates(booking.id);
+      setUpdates(fresh);
+    } catch (e) {
+      console.warn("[daily_updates.edit_save_failed]", e);
+      setEditError(t("daily_updates.edit_save_failed"));
+    } finally {
+      setEditingFlight(null);
+    }
+  };
+
+  // ---- Delete (sub-step c) ----
+  // No confirm dialog per the design decision. Clears any prior delete
+  // error at start (so a retry after failure doesn't show stale text).
+  const onDelete = async (entryId: string) => {
+    if (!booking || !user) return;
+    setDeletingFlight(entryId);
+    setDeleteError(null);
+    try {
+      await deleteDailyUpdate({ updateId: entryId, hostId: user.id });
+      const fresh = await listDailyUpdates(booking.id);
+      setUpdates(fresh);
+    } catch (e) {
+      console.warn("[daily_updates.delete_failed]", e);
+      setDeleteError(t("daily_updates.delete_failed"));
+    } finally {
+      setDeletingFlight(null);
+    }
+  };
+
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session) return <Redirect href="/sign-in" />;
 
@@ -294,7 +553,11 @@ export default function BookingDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
+      <AppHeader
+        locale={locale}
+        onLanguageToggle={toggleLocale}
+        confirmLeave={confirmLeaveIfDirty}
+      />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.successCircle}>
           <Text style={styles.successCheck}>✓</Text>
@@ -446,6 +709,330 @@ export default function BookingDetailScreen() {
             })}
           </Text>
         </View>
+
+        {/* Daily updates — visible to both owner and host */}
+        <Text style={styles.dailyUpdatesTitle}>
+          {t("daily_updates.section_title")}
+        </Text>
+
+        {updatesLoading ? (
+          <Text style={styles.muted}>{t("listing.loading")}</Text>
+        ) : updates.length === 0 ? (
+          <Text style={styles.muted}>{t("daily_updates.empty")}</Text>
+        ) : (
+          <View style={styles.updatesList}>
+            {updates.map((u) => {
+              const photos = Array.isArray(u.photos)
+                ? (u.photos as string[])
+                : [];
+              // Belt-and-suspenders: also gate the edit-form render on
+              // canMutateUpdates, so a stale editingEntryId during a
+              // status transition can't flash the edit form.
+              const isEditing = editingEntryId === u.id && canMutateUpdates;
+
+              if (isEditing) {
+                const inFlight = editingFlight === u.id;
+                const keptPhotos = photos.filter((url) => editKeep.has(url));
+                const hasAnyPhoto =
+                  keptPhotos.length > 0 || editNewSources.length > 0;
+                const canSave = hasAnyPhoto || editNote.trim() !== "";
+                return (
+                  <View key={u.id} style={styles.updateCard}>
+                    <Text style={styles.updateDate}>
+                      {formatRiyadhStamp(u.created_at, locale)}
+                    </Text>
+                    {hasAnyPhoto ? (
+                      <View style={styles.pendingGrid}>
+                        {keptPhotos.map((url) => (
+                          <View
+                            key={`keep-${url}`}
+                            style={styles.pendingThumbWrap}
+                          >
+                            <Image
+                              source={{ uri: url }}
+                              style={styles.editKeepThumb}
+                              contentFit="cover"
+                              transition={150}
+                            />
+                            <Pressable
+                              onPress={() => onEditRemoveExisting(url)}
+                              disabled={inFlight}
+                              style={styles.pendingRemoveButton}
+                              accessibilityLabel="Remove photo"
+                            >
+                              <Text style={styles.pendingRemoveText}>×</Text>
+                            </Pressable>
+                          </View>
+                        ))}
+                        {editNewSources.map((src, i) => {
+                          const uri =
+                            src.kind === "web-file"
+                              ? URL.createObjectURL(src.file)
+                              : src.uri;
+                          return (
+                            <View
+                              key={`edit-new-${i}`}
+                              style={styles.pendingThumbWrap}
+                            >
+                              <Image
+                                source={{ uri }}
+                                style={styles.pendingThumb}
+                                contentFit="cover"
+                              />
+                              <Pressable
+                                onPress={() => onEditRemoveNew(i)}
+                                disabled={inFlight}
+                                style={styles.pendingRemoveButton}
+                                accessibilityLabel="Remove photo"
+                              >
+                                <Text style={styles.pendingRemoveText}>×</Text>
+                              </Pressable>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+
+                    <Pressable
+                      onPress={onEditAddPhotos}
+                      disabled={inFlight}
+                      style={[
+                        styles.addPhotoButton,
+                        inFlight && styles.buttonDisabled,
+                      ]}
+                    >
+                      <Text style={styles.addPhotoText}>
+                        {t("daily_updates.add_photo_button")}
+                      </Text>
+                    </Pressable>
+
+                    <TextInput
+                      value={editNote}
+                      onChangeText={setEditNote}
+                      placeholder={t("daily_updates.note_placeholder")}
+                      placeholderTextColor={colors.inkSoft}
+                      multiline
+                      editable={!inFlight}
+                      style={styles.noteInput}
+                    />
+
+                    {editError ? (
+                      <Text style={styles.errorText}>{editError}</Text>
+                    ) : null}
+
+                    <View style={styles.entryActionRow}>
+                      <Pressable
+                        onPress={() => onEditSave(u.id)}
+                        disabled={inFlight || !canSave}
+                        style={[
+                          styles.entryButton,
+                          { borderColor: colors.moss },
+                          (inFlight || !canSave) && styles.buttonDisabled,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.entryButtonText,
+                            { color: colors.moss },
+                          ]}
+                        >
+                          {inFlight
+                            ? t("daily_updates.edit_saving")
+                            : t("daily_updates.edit_save_button")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={onEditCancel}
+                        disabled={inFlight}
+                        style={[
+                          styles.entryButton,
+                          { borderColor: colors.inkSoft },
+                          inFlight && styles.buttonDisabled,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.entryButtonText,
+                            { color: colors.inkSoft },
+                          ]}
+                        >
+                          {t("daily_updates.edit_cancel_button")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+
+              // Normal display mode
+              return (
+                <View key={u.id} style={styles.updateCard}>
+                  <Text style={styles.updateDate}>
+                    {formatRiyadhStamp(u.created_at, locale)}
+                  </Text>
+                  {photos.length > 0 ? (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.updatePhotosRow}
+                    >
+                      {photos.map((url, i) => (
+                        <Image
+                          key={`${u.id}-${i}`}
+                          source={{ uri: url }}
+                          style={styles.updatePhoto}
+                          contentFit="cover"
+                          transition={150}
+                        />
+                      ))}
+                    </ScrollView>
+                  ) : null}
+                  {u.note_ar ? (
+                    <Text style={styles.updateNote}>{u.note_ar}</Text>
+                  ) : null}
+                  {/* Edit + Delete (host + booking.status === 'active'
+                      only — same gate as canMutateUpdates). Both disable
+                      while another mutation is in flight. */}
+                  {canMutateUpdates ? (
+                    <View style={styles.entryActionRow}>
+                      <Pressable
+                        onPress={() => onEditStart(u)}
+                        disabled={
+                          editingEntryId !== null || deletingFlight !== null
+                        }
+                        style={[
+                          styles.entryButton,
+                          { borderColor: colors.moss },
+                          (editingEntryId !== null ||
+                            deletingFlight !== null) &&
+                            styles.buttonDisabled,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.entryButtonText,
+                            { color: colors.moss },
+                          ]}
+                        >
+                          {t("daily_updates.edit_button")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => onDelete(u.id)}
+                        disabled={
+                          editingEntryId !== null || deletingFlight !== null
+                        }
+                        style={[
+                          styles.entryButton,
+                          { borderColor: colors.terracotta },
+                          (editingEntryId !== null ||
+                            deletingFlight !== null) &&
+                            styles.buttonDisabled,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.entryButtonText,
+                            { color: colors.terracotta },
+                          ]}
+                        >
+                          {deletingFlight === u.id
+                            ? t("daily_updates.deleting")
+                            : t("daily_updates.delete_button")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {deleteError ? (
+          <Text style={styles.errorText}>{deleteError}</Text>
+        ) : null}
+
+        {/* Post form — host-only, active-only */}
+        {canMutateUpdates ? (
+          <View style={styles.postForm}>
+            {pendingPhotos.length > 0 ? (
+              <View style={styles.pendingGrid}>
+                {pendingPhotos.map((src, i) => {
+                  const uri =
+                    src.kind === "web-file"
+                      ? URL.createObjectURL(src.file)
+                      : src.uri;
+                  return (
+                    <View key={`pending-${i}`} style={styles.pendingThumbWrap}>
+                      <Image
+                        source={{ uri }}
+                        style={styles.pendingThumb}
+                        contentFit="cover"
+                      />
+                      <Pressable
+                        onPress={() => onRemovePending(i)}
+                        disabled={postingUpdate}
+                        style={styles.pendingRemoveButton}
+                        accessibilityLabel="Remove photo"
+                      >
+                        <Text style={styles.pendingRemoveText}>×</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={onAddPhoto}
+              disabled={postingUpdate}
+              style={[
+                styles.addPhotoButton,
+                postingUpdate && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.addPhotoText}>
+                {t("daily_updates.add_photo_button")}
+              </Text>
+            </Pressable>
+
+            <TextInput
+              value={updateNote}
+              onChangeText={setUpdateNote}
+              placeholder={t("daily_updates.note_placeholder")}
+              placeholderTextColor={colors.inkSoft}
+              multiline
+              editable={!postingUpdate}
+              style={styles.noteInput}
+            />
+
+            {postError ? (
+              <Text style={styles.errorText}>{postError}</Text>
+            ) : null}
+
+            <Pressable
+              onPress={onSubmitUpdate}
+              disabled={
+                postingUpdate ||
+                (pendingPhotos.length === 0 && updateNote.trim() === "")
+              }
+              style={[
+                styles.editButton,
+                (postingUpdate ||
+                  (pendingPhotos.length === 0 &&
+                    updateNote.trim() === "")) &&
+                  styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.editText}>
+                {postingUpdate
+                  ? t("daily_updates.posting")
+                  : t("daily_updates.submit_button")}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {canEdit ? (
           <Pressable onPress={onEdit} style={styles.editButton}>
@@ -748,5 +1335,138 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.inkSoft,
+  },
+  // ---- daily updates (Phase 6.2) ----
+  dailyUpdatesTitle: {
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.mossDeep,
+    marginTop: spacing.lg,
+  },
+  updatesList: {
+    gap: spacing.md,
+    width: "100%",
+  },
+  updateCard: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+  },
+  updateDate: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.inkSoft,
+  },
+  updatePhotosRow: {
+    gap: spacing.sm,
+  },
+  updatePhoto: {
+    width: 140,
+    height: 140,
+    borderRadius: radii.md,
+    backgroundColor: colors.whisper,
+  },
+  updateNote: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  postForm: {
+    width: "100%",
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    marginTop: spacing.md,
+  },
+  pendingGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  pendingThumbWrap: {
+    position: "relative",
+  },
+  pendingThumb: {
+    width: 100,
+    height: 100,
+    borderRadius: radii.md,
+    backgroundColor: colors.whisper,
+    // Dashed outline marks the photo as "not yet saved" — saved-update
+    // cards intentionally show no border at all.
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: colors.inkSoft,
+  },
+  // Existing photo shown inside the edit form. Same dimensions as
+  // pendingThumb but no dashed border — visually identical to a saved
+  // photo, just with the × overlay for removal.
+  editKeepThumb: {
+    width: 100,
+    height: 100,
+    borderRadius: radii.md,
+    backgroundColor: colors.whisper,
+  },
+  entryActionRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    flexWrap: "wrap",
+  },
+  entryButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  entryButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+  },
+  pendingRemoveButton: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pendingRemoveText: {
+    color: colors.cream,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  addPhotoButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.moss,
+    alignSelf: "flex-start",
+  },
+  addPhotoText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.moss,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    minHeight: 60,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+    backgroundColor: colors.cream,
   },
 });

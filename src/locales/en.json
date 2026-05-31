@@ -130,6 +130,25 @@
     "host_complete_failed": "Couldn't complete the stay. Please try again.",
     "host_completing": "Completing…"
   },
+  "daily_updates": {
+    "section_title": "Daily updates",
+    "empty": "No updates yet",
+    "add_photo_button": "+ Add photos",
+    "note_placeholder": "Add a note (optional)",
+    "submit_button": "Save",
+    "posting": "Saving…",
+    "post_failed": "Couldn't post the update. Please try again.",
+    "photo_required": "Add a photo or a note",
+    "leave_confirm": "You have an unsaved update. Leave without saving?",
+    "edit_button": "Edit",
+    "edit_save_button": "Save changes",
+    "edit_cancel_button": "Cancel",
+    "edit_saving": "Saving…",
+    "edit_save_failed": "Couldn't save changes. Please try again.",
+    "delete_button": "Delete",
+    "deleting": "Deleting…",
+    "delete_failed": "Couldn't delete the update. Please try again."
+  },
   "supabase": {
     "checking": "Checking Supabase connection…",
     "connected": "Connected to Supabase ✓",

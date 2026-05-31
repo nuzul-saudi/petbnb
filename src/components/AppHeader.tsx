@@ -11,9 +11,21 @@ import { colors, fonts, spacing } from '@/theme/tokens';
 export type AppHeaderProps = {
   locale: 'ar' | 'en';
   onLanguageToggle: () => void;
+  /**
+   * Optional gate run before each nav-item press. Return false to cancel
+   * the navigation (e.g. when the screen has unsaved work and asked the
+   * user "leave without saving?" via window.confirm and they tapped Cancel).
+   * Returning true (or not providing the callback) lets nav proceed.
+   * The language toggle is NOT gated — switching locale is not navigation.
+   */
+  confirmLeave?: () => boolean;
 };
 
-export function AppHeader({ locale, onLanguageToggle }: AppHeaderProps) {
+export function AppHeader({
+  locale,
+  onLanguageToggle,
+  confirmLeave,
+}: AppHeaderProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
@@ -25,22 +37,30 @@ export function AppHeader({ locale, onLanguageToggle }: AppHeaderProps) {
     return pathname === route || pathname.startsWith(route + '/');
   };
 
+  // Wrap a nav action with the confirmLeave gate (if set). Synchronous so
+  // it composes cleanly with Pressable.onPress; web's window.confirm is
+  // synchronous, which is what we want for nav cancellation.
+  const safeNav = (fn: () => void) => () => {
+    if (confirmLeave && !confirmLeave()) return;
+    fn();
+  };
+
   return (
     <View style={styles.bar}>
       <NavItem
         label={t('nav.home')}
         active={isActive('/')}
-        onPress={() => router.push('/')}
+        onPress={safeNav(() => router.push('/'))}
       />
       <NavItem
         label={t('nav.bookings')}
         active={isActive('/bookings')}
-        onPress={() => router.push('/bookings')}
+        onPress={safeNav(() => router.push('/bookings'))}
       />
       <NavItem
         label={t('nav.account')}
         active={isActive('/profile')}
-        onPress={() => router.push('/profile')}
+        onPress={safeNav(() => router.push('/profile'))}
       />
       <Pressable onPress={onLanguageToggle} style={styles.langToggle}>
         <Text style={styles.langToggleText}>

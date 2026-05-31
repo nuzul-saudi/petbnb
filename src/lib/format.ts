@@ -32,6 +32,37 @@ export function todayIso(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** Format an ISO timestamp as "YYYY-MM-DD HH:MM" in Asia/Riyadh time
+ *  (UTC+3, no DST), 24-hour clock. Always returns digits in the locale's
+ *  preferred numerals — Arabic-Indic for 'ar', ASCII for 'en'.
+ *
+ *  Used for daily-update stamps and any other user-facing timestamp
+ *  that should be anchored to KSA local time regardless of the viewer's
+ *  device timezone. Petbnb is Saudi-first so this is the natural anchor.
+ *
+ *  Implementation note: uses en-GB as the base locale because it gives
+ *  stable 24-hour output across runtimes; formatToParts gives us each
+ *  field separately so we can rebuild "YYYY-MM-DD HH:MM" exactly. */
+export function formatRiyadhStamp(iso: string, locale: Locale): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  const stamp =
+    `${get('year')}-${get('month')}-${get('day')} ` +
+    `${get('hour')}:${get('minute')}`;
+  return locale === 'ar' ? toArabicDigits(stamp) : stamp;
+}
+
 /** Pick the locale-appropriate version of a bilingual field with
  *  fallback to the Arabic primary. Used for listing titles, descriptions,
  *  and host display names that may have optional _en versions.
