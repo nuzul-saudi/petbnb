@@ -1005,7 +1005,7 @@ export default function BookingDetailScreen() {
                 <Button
                   label={t("condition_reports.cancel_button")}
                   onPress={onCancelCheckIn}
-                  variant="destructive"
+                  variant="secondary"
                   disabled={crPosting}
                 />
                 <Button
@@ -1140,13 +1140,15 @@ export default function BookingDetailScreen() {
                         }
                         onPress={() => onEditSave(u.id)}
                         variant="primary"
+                        size="compact"
                         loading={inFlight}
                         disabled={!canSave}
                       />
                       <Button
                         label={t("daily_updates.edit_cancel_button")}
                         onPress={onEditCancel}
-                        variant="destructive"
+                        variant="secondary"
+                        size="compact"
                         disabled={inFlight}
                       />
                     </View>
@@ -1189,6 +1191,7 @@ export default function BookingDetailScreen() {
                         label={t("daily_updates.edit_button")}
                         onPress={() => onEditStart(u)}
                         variant="secondary"
+                        size="compact"
                         disabled={
                           editingEntryId !== null || deletingFlight !== null
                         }
@@ -1201,6 +1204,7 @@ export default function BookingDetailScreen() {
                         }
                         onPress={() => onDelete(u.id)}
                         variant="destructive"
+                        size="compact"
                         loading={deletingFlight === u.id}
                         disabled={
                           editingEntryId !== null || deletingFlight !== null
