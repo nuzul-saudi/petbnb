@@ -907,37 +907,6 @@ export default function BookingDetailScreen() {
                 </View>
               ) : null}
 
-              {checkOutReport ? (
-                <View style={styles.crReportCard}>
-                  <View style={styles.crReportHeader}>
-                    <Text style={styles.crReportPhaseLabel}>
-                      {t("condition_reports.check_out_label")}
-                    </Text>
-                    <Text style={styles.crReportStamp}>
-                      {formatRiyadhStamp(checkOutReport.created_at, locale)}
-                    </Text>
-                  </View>
-                  {Array.isArray(checkOutReport.photos) &&
-                  (checkOutReport.photos as string[]).length > 0 ? (
-                    <View style={styles.pendingGrid}>
-                      {(checkOutReport.photos as string[]).map((url, i) => (
-                        <Image
-                          key={`${checkOutReport.id}-${i}`}
-                          source={{ uri: url }}
-                          style={styles.updatePhoto}
-                          contentFit="cover"
-                          transition={150}
-                        />
-                      ))}
-                    </View>
-                  ) : null}
-                  {checkOutReport.health_notes ? (
-                    <Text style={styles.crReportNote}>
-                      {checkOutReport.health_notes}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
             </>
           )}
 
@@ -1298,6 +1267,42 @@ export default function BookingDetailScreen() {
               }
               fullWidth
             />
+          </View>
+        ) : null}
+
+        {/* Check-out report — sits below the daily updates section so the
+            on-screen flow reads check-in → daily updates → check-out.
+            Filing UI comes in a follow-up step; only displays here when a
+            check-out report already exists. */}
+        {checkOutReport ? (
+          <View style={styles.crReportCard}>
+            <View style={styles.crReportHeader}>
+              <Text style={styles.crReportPhaseLabel}>
+                {t("condition_reports.check_out_label")}
+              </Text>
+              <Text style={styles.crReportStamp}>
+                {formatRiyadhStamp(checkOutReport.created_at, locale)}
+              </Text>
+            </View>
+            {Array.isArray(checkOutReport.photos) &&
+            (checkOutReport.photos as string[]).length > 0 ? (
+              <View style={styles.pendingGrid}>
+                {(checkOutReport.photos as string[]).map((url, i) => (
+                  <Image
+                    key={`${checkOutReport.id}-${i}`}
+                    source={{ uri: url }}
+                    style={styles.updatePhoto}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {checkOutReport.health_notes ? (
+              <Text style={styles.crReportNote}>
+                {checkOutReport.health_notes}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
