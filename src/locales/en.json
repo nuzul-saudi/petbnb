@@ -147,7 +147,24 @@
     "edit_save_failed": "Couldn't save changes. Please try again.",
     "delete_button": "Delete",
     "deleting": "Deleting…",
-    "delete_failed": "Couldn't delete the update. Please try again."
+    "delete_failed": "Couldn't delete the update. Please try again.",
+    "check_in_first_hint": "File the check-in report first before posting daily updates."
+  },
+  "condition_reports": {
+    "section_title": "Condition reports",
+    "section_subtitle": "Drop-off and pick-up records",
+    "check_in_label": "Check-in (drop-off)",
+    "check_out_label": "Check-out (pick-up)",
+    "file_check_in_button": "+ File check-in report",
+    "add_photos_button": "+ Add photos",
+    "note_placeholder": "Condition note (optional)",
+    "save_button": "Save",
+    "cancel_button": "Cancel",
+    "saving": "Saving…",
+    "save_failed": "Couldn't save the report. Please try again.",
+    "content_required": "Add a photo or a note",
+    "leave_confirm": "You have an unsaved condition report. Leave without saving?",
+    "photo_cap_hint": "Up to 6 photos"
   },
   "supabase": {
     "checking": "Checking Supabase connection…",

@@ -147,7 +147,24 @@
     "edit_save_failed": "تعذر حفظ التعديل، حاولي مرة أخرى.",
     "delete_button": "حذف",
     "deleting": "جاري الحذف...",
-    "delete_failed": "تعذر حذف التحديث، حاولي مرة أخرى."
+    "delete_failed": "تعذر حذف التحديث، حاولي مرة أخرى.",
+    "check_in_first_hint": "يرجى تقديم تقرير الاستلام أولاً قبل نشر التحديثات اليومية."
+  },
+  "condition_reports": {
+    "section_title": "تقارير الحالة",
+    "section_subtitle": "سجل لحظة الاستلام والتسليم",
+    "check_in_label": "تقرير الاستلام (الوصول)",
+    "check_out_label": "تقرير التسليم (المغادرة)",
+    "file_check_in_button": "+ تقديم تقرير الاستلام",
+    "add_photos_button": "+ إضافة صور",
+    "note_placeholder": "ملاحظات الحالة (اختياري)",
+    "save_button": "حفظ",
+    "cancel_button": "إلغاء",
+    "saving": "جاري الحفظ...",
+    "save_failed": "تعذر حفظ التقرير، حاولي مرة أخرى.",
+    "content_required": "أضيفي صورة أو اكتبي ملاحظة",
+    "leave_confirm": "لديكِ تقرير غير محفوظ. هل تريدين المغادرة بدون حفظ؟",
+    "photo_cap_hint": "حتى 6 صور"
   },
   "supabase": {
     "checking": "جارٍ التحقق من الاتصال بـ Supabase…",
