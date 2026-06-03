@@ -961,9 +961,16 @@ export default function BookingDetailScreen() {
                 label={t("condition_reports.add_photos_button")}
                 onPress={onAddCrPhotos}
                 variant="secondary"
-                disabled={crPosting}
+                disabled={
+                  crPosting || crPendingPhotos.length >= CR_PHOTO_CAP
+                }
                 fullWidth
               />
+              {crPendingPhotos.length >= CR_PHOTO_CAP ? (
+                <Text style={styles.muted}>
+                  {t("condition_reports.photo_cap_hint")}
+                </Text>
+              ) : null}
 
               <TextInput
                 value={crNote}
@@ -1288,9 +1295,11 @@ export default function BookingDetailScreen() {
         {/* Check-out report — sits below the daily updates section so the
             on-screen flow reads check-in → daily updates → check-out.
             Filing UI comes in a follow-up step; only displays here when a
-            check-out report already exists. */}
+            check-out report already exists. Inline marginTop matches the
+            section-start rhythm used by crSectionTitle / dailyUpdatesTitle
+            (this is a standalone card with no preceding heading). */}
         {checkOutReport ? (
-          <View style={styles.crReportCard}>
+          <View style={[styles.crReportCard, { marginTop: spacing.lg }]}>
             <View style={styles.crReportHeader}>
               <Text style={styles.crReportPhaseLabel}>
                 {t("condition_reports.check_out_label")}
@@ -1684,6 +1693,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.mossDeep,
     textAlign: "right",
+    marginTop: spacing.lg, // matches dailyUpdatesTitle so the three
+    // sections (check-in / daily updates / check-out) have a consistent
+    // vertical rhythm now that the framed wrapper is gone.
   },
   crSectionSubtitle: {
     fontFamily: fonts.body,
