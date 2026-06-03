@@ -1643,6 +1643,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   noteInput: {
+    width: "100%",
     borderWidth: 1,
     borderColor: colors.whisper,
     borderRadius: radii.md,
@@ -1652,6 +1653,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
     backgroundColor: colors.cream,
+    // Belt-and-braces against the web textarea's intrinsic content
+    // width letting siblings (photo grid, errors) wrap beside it.
+    // The textarea is always full-width on its own line below photos.
   },
 
   // ---- Condition reports (Phase 6.4) ----
