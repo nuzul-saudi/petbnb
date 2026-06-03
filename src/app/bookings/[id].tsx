@@ -1200,8 +1200,11 @@ export default function BookingDetailScreen() {
           <Text style={styles.errorText}>{deleteError}</Text>
         ) : null}
 
-        {/* Post form — host-only, active-only */}
-        {canMutateUpdates ? (
+        {/* Post form — host-only, active-only, AND a check-in report
+            must exist (chronological gate: the stay-flow is check-in →
+            daily updates → check-out). Without a check-in, the hint
+            block below replaces the form. */}
+        {canMutateUpdates && checkInReport ? (
           <View style={styles.postForm}>
             {pendingPhotos.length > 0 ? (
               <View style={styles.pendingGrid}>
@@ -1267,6 +1270,18 @@ export default function BookingDetailScreen() {
               }
               fullWidth
             />
+          </View>
+        ) : null}
+
+        {/* Hint replacing the post form when the host is on an active
+            booking but hasn't filed the check-in report yet. Existing
+            updates above still display normally; only the compose form
+            is gated. */}
+        {canMutateUpdates && !checkInReport ? (
+          <View style={styles.postForm}>
+            <Text style={styles.muted}>
+              {t("daily_updates.check_in_first_hint")}
+            </Text>
           </View>
         ) : null}
 
