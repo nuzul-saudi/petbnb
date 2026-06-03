@@ -601,11 +601,20 @@ export default function BookingDetailScreen() {
   // proactively so the host doesn't tap a doomed action.
   const canFileCheckIn = canMutateUpdates && !checkInReport;
 
+  // Hard cap on condition-report photos: 6 total. A multi-select that
+  // pushes us over the cap is silently truncated (keep the first N that
+  // fit). UI also hides the "Add photos" button at cap so this branch
+  // is defensive.
+  const CR_PHOTO_CAP = 6;
   const onAddCrPhotos = async () => {
     setCrPostError(null);
     const sources = await pickPhotosMulti();
     if (sources.length === 0) return;
-    setCrPendingPhotos((prev) => [...prev, ...sources]);
+    setCrPendingPhotos((prev) => {
+      const room = Math.max(0, CR_PHOTO_CAP - prev.length);
+      if (room === 0) return prev;
+      return [...prev, ...sources.slice(0, room)];
+    });
   };
 
   const onRemoveCrPending = (index: number) => {
