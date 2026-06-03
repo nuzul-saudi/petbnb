@@ -859,18 +859,18 @@ export default function BookingDetailScreen() {
         </View>
 
         {/* ===== Condition reports (Phase 6.4) =====
-            Visually distinct framed block: bordered card with title +
-            subtitle inside, sitting above the unframed daily-updates
-            list. Both owner and host see filed reports; only the host
-            on an active booking sees the file button + compose form. */}
-        <View style={styles.conditionReportsBlock}>
-          <Text style={styles.crSectionTitle}>
-            {t("condition_reports.section_title")}
-          </Text>
-          <Text style={styles.crSectionSubtitle}>
-            {t("condition_reports.section_subtitle")}
-          </Text>
+            Bare heading + subtitle above the card, matching the daily-
+            updates pattern. Filed reports render in their own cards.
+            Both owner and host see filed reports; only the host on an
+            active booking sees the file button + compose form. */}
+        <Text style={styles.crSectionTitle}>
+          {t("condition_reports.section_title")}
+        </Text>
+        <Text style={styles.crSectionSubtitle}>
+          {t("condition_reports.section_subtitle")}
+        </Text>
 
+        <>
           {crLoading ? (
             <Text style={styles.muted}>{t("listing.loading")}</Text>
           ) : (
@@ -1033,7 +1033,7 @@ export default function BookingDetailScreen() {
               </View>
             </View>
           ) : null}
-        </View>
+        </>
 
         {/* Daily updates — visible to both owner and host */}
         <Text style={styles.dailyUpdatesTitle}>
@@ -1655,18 +1655,6 @@ const styles = StyleSheet.create({
   },
 
   // ---- Condition reports (Phase 6.4) ----
-  // Outer block: framed + tinted to read as a distinct section
-  // (heavier visual weight than the unframed daily-updates list below).
-  conditionReportsBlock: {
-    width: "100%",
-    backgroundColor: colors.paper,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.whisper,
-    padding: spacing.lg,
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
   crSectionTitle: {
     fontFamily: fonts.headingBold,
     fontSize: 18,
