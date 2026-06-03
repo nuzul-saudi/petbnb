@@ -24,11 +24,13 @@ import {
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive';
+export type ButtonSize = 'normal' | 'compact';
 
 export type ButtonProps = {
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
@@ -40,6 +42,7 @@ export function Button({
   label,
   onPress,
   variant = 'primary',
+  size = 'normal',
   disabled = false,
   loading = false,
   fullWidth = false,
@@ -47,6 +50,7 @@ export function Button({
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const variantStyle = VARIANT_STYLES[variant];
+  const sizeStyle = SIZE_STYLES[size];
 
   return (
     <Pressable
@@ -57,7 +61,13 @@ export function Button({
       accessibilityState={{ disabled: isDisabled }}
       style={[
         styles.base,
-        { backgroundColor: variantStyle.background, borderColor: variantStyle.border },
+        {
+          backgroundColor: variantStyle.background,
+          borderColor: variantStyle.border,
+          minHeight: sizeStyle.minHeight,
+          paddingVertical: sizeStyle.paddingVertical,
+          paddingHorizontal: sizeStyle.paddingHorizontal,
+        },
         fullWidth && styles.fullWidth,
         isDisabled && styles.disabled,
       ]}
@@ -67,12 +77,44 @@ export function Button({
           <ActivityIndicator size="small" color={variantStyle.label} />
         </View>
       ) : null}
-      <Text style={[styles.label, { color: variantStyle.label }]} numberOfLines={1}>
+      <Text
+        style={[
+          styles.label,
+          { color: variantStyle.label, fontSize: sizeStyle.fontSize },
+        ]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </Pressable>
   );
 }
+
+// Per-size dimensions. 'compact' is for inline pill-style actions (e.g.
+// per-entry Edit/Delete in a row of cards) that should NOT pull as much
+// visual weight as a primary screen CTA.
+const SIZE_STYLES: Record<
+  ButtonSize,
+  {
+    minHeight: number;
+    paddingVertical: number;
+    paddingHorizontal: number;
+    fontSize: number;
+  }
+> = {
+  normal: {
+    minHeight: 44, // Apple HIG tap target
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    fontSize: 15,
+  },
+  compact: {
+    minHeight: 32,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
+  },
+};
 
 // Per-variant color triple. Kept as a record so adding a fourth variant
 // later is a one-row change.
@@ -103,11 +145,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
     borderRadius: radii.lg,
     borderWidth: 1,
-    minHeight: 44, // Apple HIG tap target
+    // paddingVertical, paddingHorizontal, and minHeight come from SIZE_STYLES.
   },
   fullWidth: {
     alignSelf: 'stretch',
@@ -117,7 +157,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: fonts.bodyBold,
-    fontSize: 15,
+    // fontSize comes from SIZE_STYLES.
   },
   spinnerWrap: {
     // ActivityIndicator handles its own dimensions; the wrap just keeps
