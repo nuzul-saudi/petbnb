@@ -50,7 +50,7 @@ import {
   type AddonSelection,
   type AddonType,
 } from "@/lib/pricing";
-import { colors, fonts, radii, spacing } from "@/theme/tokens";
+import { colors, fonts, radii, shadows, spacing } from "@/theme/tokens";
 
 export default function BookingDetailScreen() {
   const router = useRouter();
@@ -859,10 +859,12 @@ export default function BookingDetailScreen() {
         </View>
 
         {/* ===== Condition reports (Phase 6.4) =====
-            Bare heading + subtitle above the card, matching the daily-
-            updates pattern. Filed reports render in their own cards.
-            Both owner and host see filed reports; only the host on an
-            active booking sees the file button + compose form. */}
+            Whole section (heading + saved check-in + file button /
+            compose form) lives in one sectionCard, mirroring the
+            booking-summary card above. Both owner and host see filed
+            reports; only the host on an active booking sees the file
+            button + compose form. */}
+        <View style={styles.sectionCard}>
         <Text style={styles.crSectionTitle}>
           {t("condition_reports.section_title")}
         </Text>
@@ -887,7 +889,11 @@ export default function BookingDetailScreen() {
                   </View>
                   {Array.isArray(checkInReport.photos) &&
                   (checkInReport.photos as string[]).length > 0 ? (
-                    <View style={styles.pendingGrid}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.updatePhotosRow}
+                    >
                       {(checkInReport.photos as string[]).map((url, i) => (
                         <Image
                           key={`${checkInReport.id}-${i}`}
@@ -897,10 +903,10 @@ export default function BookingDetailScreen() {
                           transition={150}
                         />
                       ))}
-                    </View>
+                    </ScrollView>
                   ) : null}
                   {checkInReport.health_notes ? (
-                    <Text style={styles.crReportNote}>
+                    <Text style={styles.updateNote}>
                       {checkInReport.health_notes}
                     </Text>
                   ) : null}
@@ -1010,8 +1016,11 @@ export default function BookingDetailScreen() {
             </View>
           ) : null}
         </>
+        </View>
 
-        {/* Daily updates — visible to both owner and host */}
+        {/* Daily updates — visible to both owner and host. Same
+            sectionCard wrapper as condition-reports above. */}
+        <View style={styles.sectionCard}>
         <Text style={styles.dailyUpdatesTitle}>
           {t("daily_updates.section_title")}
         </Text>
@@ -1263,20 +1272,34 @@ export default function BookingDetailScreen() {
               <Text style={styles.errorText}>{postError}</Text>
             ) : null}
 
-            <Button
-              label={
-                postingUpdate
-                  ? t("daily_updates.posting")
-                  : t("daily_updates.submit_button")
-              }
-              onPress={onSubmitUpdate}
-              variant="primary"
-              loading={postingUpdate}
-              disabled={
-                pendingPhotos.length === 0 && updateNote.trim() === ""
-              }
-              fullWidth
-            />
+            <View style={styles.crFormActions}>
+              <Button
+                label={t("daily_updates.cancel_button")}
+                onPress={() => {
+                  setPendingPhotos([]);
+                  setUpdateNote("");
+                  setPostError(null);
+                }}
+                variant="secondary"
+                disabled={
+                  postingUpdate ||
+                  (pendingPhotos.length === 0 && updateNote.trim() === "")
+                }
+              />
+              <Button
+                label={
+                  postingUpdate
+                    ? t("daily_updates.posting")
+                    : t("daily_updates.submit_button")
+                }
+                onPress={onSubmitUpdate}
+                variant="primary"
+                loading={postingUpdate}
+                disabled={
+                  pendingPhotos.length === 0 && updateNote.trim() === ""
+                }
+              />
+            </View>
           </View>
         ) : null}
 
@@ -1291,6 +1314,7 @@ export default function BookingDetailScreen() {
             </Text>
           </View>
         ) : null}
+        </View>
 
         {/* Check-out report — sits below the daily updates section so the
             on-screen flow reads check-in → daily updates → check-out.
@@ -1310,7 +1334,11 @@ export default function BookingDetailScreen() {
             </View>
             {Array.isArray(checkOutReport.photos) &&
             (checkOutReport.photos as string[]).length > 0 ? (
-              <View style={styles.pendingGrid}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.updatePhotosRow}
+              >
                 {(checkOutReport.photos as string[]).map((url, i) => (
                   <Image
                     key={`${checkOutReport.id}-${i}`}
@@ -1320,10 +1348,10 @@ export default function BookingDetailScreen() {
                     transition={150}
                   />
                 ))}
-              </View>
+              </ScrollView>
             ) : null}
             {checkOutReport.health_notes ? (
-              <Text style={styles.crReportNote}>
+              <Text style={styles.updateNote}>
                 {checkOutReport.health_notes}
               </Text>
             ) : null}
@@ -1493,6 +1521,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.whisper,
   },
+  // Same shell as summaryCard, used to wrap the condition-reports and
+  // daily-updates sections so each reads as a card matching the
+  // booking-summary card above. Owns the inter-card marginTop so child
+  // headings (crSectionTitle / dailyUpdatesTitle) can sit flush at the
+  // top of the card's padding.
+  sectionCard: {
+    width: "100%",
+    backgroundColor: colors.paper,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    marginTop: spacing.lg,
+  },
   summaryTitle: {
     fontFamily: fonts.headingBold,
     fontSize: 18,
@@ -1577,7 +1620,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 18,
     color: colors.mossDeep,
-    marginTop: spacing.lg,
   },
   updatesList: {
     gap: spacing.md,
@@ -1585,11 +1627,10 @@ const styles = StyleSheet.create({
   },
   updateCard: {
     backgroundColor: colors.paper,
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     padding: spacing.md,
     gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.whisper,
+    ...shadows.card,
   },
   updateDate: {
     fontFamily: fonts.bodyBold,
@@ -1693,9 +1734,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.mossDeep,
     textAlign: "right",
-    marginTop: spacing.lg, // matches dailyUpdatesTitle so the three
-    // sections (check-in / daily updates / check-out) have a consistent
-    // vertical rhythm now that the framed wrapper is gone.
   },
   crSectionSubtitle: {
     fontFamily: fonts.body,
@@ -1707,12 +1745,11 @@ const styles = StyleSheet.create({
   // Saved (read-only) report card. Muted vs the compose form so it
   // visually reads as immutable.
   crReportCard: {
-    backgroundColor: colors.cream,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.whisper,
+    backgroundColor: colors.paper,
+    borderRadius: radii.xl,
     padding: spacing.md,
     gap: spacing.sm,
+    ...shadows.card,
   },
   crReportHeader: {
     flexDirection: "row",

@@ -136,6 +136,7 @@
     "add_photo_button": "+ Add photos",
     "note_placeholder": "Add a note (optional)",
     "submit_button": "Save",
+    "cancel_button": "Cancel",
     "posting": "Saving…",
     "post_failed": "Couldn't post the update. Please try again.",
     "photo_required": "Add a photo or a note",

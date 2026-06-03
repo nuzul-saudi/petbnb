@@ -136,6 +136,7 @@
     "add_photo_button": "+ إضافة صور",
     "note_placeholder": "اكتبي ملاحظة (اختياري)",
     "submit_button": "حفظ",
+    "cancel_button": "إلغاء",
     "posting": "جاري الحفظ...",
     "post_failed": "تعذر نشر التحديث، حاولي مرة أخرى.",
     "photo_required": "أضيفي صورة أو اكتبي ملاحظة",
