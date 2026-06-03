@@ -13,6 +13,7 @@ import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppHeader } from "@/components/AppHeader";
+import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
 import { useAuth } from "@/lib/auth";
 import {
@@ -24,6 +25,11 @@ import {
   startBookingAsHost,
   type BookingDetail,
 } from "@/lib/bookings";
+import {
+  createConditionReport,
+  listConditionReports,
+  type ConditionReport,
+} from "@/lib/condition-reports";
 import {
   createDailyUpdate,
   deleteDailyUpdate,
@@ -92,6 +98,19 @@ export default function BookingDetailScreen() {
   const [deletingFlight, setDeletingFlight] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Condition reports (Phase 6.4). Immutable check-in / check-out
+  // evidence files, host only. Step 2 builds check-in; check-out wires
+  // into "Complete stay" in Step 3.
+  const [conditionReports, setConditionReports] = useState<ConditionReport[]>(
+    [],
+  );
+  const [crLoading, setCrLoading] = useState(true);
+  const [filingCheckIn, setFilingCheckIn] = useState(false);
+  const [crPendingPhotos, setCrPendingPhotos] = useState<PetPhotoSource[]>([]);
+  const [crNote, setCrNote] = useState("");
+  const [crPosting, setCrPosting] = useState(false);
+  const [crPostError, setCrPostError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -136,6 +155,26 @@ export default function BookingDetailScreen() {
     };
   }, [id]);
 
+  // Condition reports load — same pattern as daily-updates.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    listConditionReports(id)
+      .then((rows) => {
+        if (!cancelled) setConditionReports(rows);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        console.warn("[condition_reports.load_failed]", e);
+      })
+      .finally(() => {
+        if (!cancelled) setCrLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
   // Daily-update form dirty-tracking. The form is dirty when there's at
   // least one pending photo OR the note has any non-whitespace content.
   // Wired into:
@@ -149,6 +188,16 @@ export default function BookingDetailScreen() {
     pendingPhotos.length > 0 ||
     updateNote.trim() !== "" ||
     editingEntryId !== null;
+
+  // Condition-report check-in form has the same leave-warning needs.
+  const isCrFormDirty =
+    filingCheckIn &&
+    (crPendingPhotos.length > 0 || crNote.trim() !== "");
+
+  // Any open form with unsaved work. Used by confirmLeaveIfDirty and the
+  // beforeunload effect so both daily-updates AND condition-reports
+  // unsaved work is protected.
+  const isAnyFormDirty = isUpdateFormDirty || isCrFormDirty;
 
   // Auto-close any open edit form if the booking transitions out of
   // 'active'. Migration 0015 + the lib status guard would reject the
@@ -169,10 +218,28 @@ export default function BookingDetailScreen() {
     }
   }, [booking?.status, editingEntryId]);
 
+  // Same protective pattern for the condition-report check-in form: if
+  // the booking transitions out of 'active', the lib + RLS would reject
+  // a save anyway, so close the form proactively.
+  useEffect(() => {
+    if (booking && booking.status !== "active" && filingCheckIn) {
+      setFilingCheckIn(false);
+      setCrPendingPhotos([]);
+      setCrNote("");
+      setCrPostError(null);
+    }
+  }, [booking?.status, filingCheckIn]);
+
   const confirmLeaveIfDirty = (): boolean => {
-    if (!isUpdateFormDirty) return true;
+    if (!isAnyFormDirty) return true;
     if (Platform.OS === "web" && typeof window !== "undefined") {
-      return window.confirm(t("daily_updates.leave_confirm"));
+      // Use the leave message that matches whichever form is dirty.
+      // If both happen to be dirty (rare — different sections), CR
+      // wins because that's the heavier-stakes evidence record.
+      const msg = isCrFormDirty
+        ? t("condition_reports.leave_confirm")
+        : t("daily_updates.leave_confirm");
+      return window.confirm(msg);
     }
     // Native: no synchronous confirm. Allow the nav. A native Alert.alert
     // is async and can't gate a synchronous Pressable.onPress reliably;
@@ -180,20 +247,20 @@ export default function BookingDetailScreen() {
     return true;
   };
 
-  // Web only: ask before tab close / refresh while the form is dirty.
+  // Web only: ask before tab close / refresh while any form is dirty.
   // preventDefault alone triggers the browser's native "leave site?"
   // prompt on all modern browsers (Chrome ≥119, all Firefox/Safari in
   // common use). The legacy `event.returnValue = ''` shim is deprecated
   // and no longer needed.
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
-    if (!isUpdateFormDirty) return;
+    if (!isAnyFormDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [isUpdateFormDirty]);
+  }, [isAnyFormDirty]);
 
   // Reconstruct AddonSelection[] from the persisted booking_addons rows
   // so we can re-run the same breakdown function the request screen used.
@@ -520,6 +587,79 @@ export default function BookingDetailScreen() {
     }
   };
 
+  // ---- Condition reports (Phase 6.4) ----
+  // Pull each phase out of the loaded list. Order doesn't matter — we
+  // just look up by phase name. The (booking_id, phase) unique index
+  // from migration 0017 guarantees at most one of each per booking.
+  const checkInReport = conditionReports.find((r) => r.phase === "check_in");
+  const checkOutReport = conditionReports.find(
+    (r) => r.phase === "check_out",
+  );
+
+  // Same gate as canMutateUpdates plus "no check-in filed yet". The
+  // unique index backstops this, but the UI should hide the button
+  // proactively so the host doesn't tap a doomed action.
+  const canFileCheckIn = canMutateUpdates && !checkInReport;
+
+  const onAddCrPhotos = async () => {
+    setCrPostError(null);
+    const sources = await pickPhotosMulti();
+    if (sources.length === 0) return;
+    setCrPendingPhotos((prev) => [...prev, ...sources]);
+  };
+
+  const onRemoveCrPending = (index: number) => {
+    setCrPendingPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const onOpenFileCheckIn = () => {
+    setFilingCheckIn(true);
+    setCrPendingPhotos([]);
+    setCrNote("");
+    setCrPostError(null);
+  };
+
+  const onCancelCheckIn = () => {
+    setFilingCheckIn(false);
+    setCrPendingPhotos([]);
+    setCrNote("");
+    setCrPostError(null);
+  };
+
+  const onSaveCheckIn = async () => {
+    if (!booking || !user) return;
+    // Content rule mirrors the lib's guard; UI catches it before the
+    // network round-trip.
+    if (crPendingPhotos.length === 0 && crNote.trim() === "") {
+      setCrPostError(t("condition_reports.content_required"));
+      return;
+    }
+    setCrPosting(true);
+    setCrPostError(null);
+    try {
+      await createConditionReport({
+        bookingId: booking.id,
+        hostId: user.id,
+        phase: "check_in",
+        sources: crPendingPhotos,
+        note: crNote.trim() === "" ? null : crNote.trim(),
+      });
+      // On success: close + clear the form, refetch the list so the
+      // new report appears as a read-only card and the file button
+      // disappears.
+      setFilingCheckIn(false);
+      setCrPendingPhotos([]);
+      setCrNote("");
+      const fresh = await listConditionReports(booking.id);
+      setConditionReports(fresh);
+    } catch (e) {
+      console.warn("[condition_reports.save_failed]", e);
+      setCrPostError(t("condition_reports.save_failed"));
+    } finally {
+      setCrPosting(false);
+    }
+  };
+
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session) return <Redirect href="/sign-in" />;
 
@@ -540,12 +680,11 @@ export default function BookingDetailScreen() {
           <Text style={styles.errorText}>
             {error ?? t("listing.not_found")}
           </Text>
-          <Pressable
+          <Button
+            label={t("booking.back_home")}
             onPress={() => router.replace("/")}
-            style={styles.backButton}
-          >
-            <Text style={styles.backText}>{t("booking.back_home")}</Text>
-          </Pressable>
+            variant="secondary"
+          />
         </View>
       </SafeAreaView>
     );
@@ -710,6 +849,183 @@ export default function BookingDetailScreen() {
           </Text>
         </View>
 
+        {/* ===== Condition reports (Phase 6.4) =====
+            Visually distinct framed block: bordered card with title +
+            subtitle inside, sitting above the unframed daily-updates
+            list. Both owner and host see filed reports; only the host
+            on an active booking sees the file button + compose form. */}
+        <View style={styles.conditionReportsBlock}>
+          <Text style={styles.crSectionTitle}>
+            {t("condition_reports.section_title")}
+          </Text>
+          <Text style={styles.crSectionSubtitle}>
+            {t("condition_reports.section_subtitle")}
+          </Text>
+
+          {crLoading ? (
+            <Text style={styles.muted}>{t("listing.loading")}</Text>
+          ) : (
+            <>
+              {checkInReport ? (
+                <View style={styles.crReportCard}>
+                  <View style={styles.crReportHeader}>
+                    <Text style={styles.crReportPhaseLabel}>
+                      {t("condition_reports.check_in_label")}
+                    </Text>
+                    <Text style={styles.crReportStamp}>
+                      {formatRiyadhStamp(checkInReport.created_at, locale)}
+                    </Text>
+                  </View>
+                  {Array.isArray(checkInReport.photos) &&
+                  (checkInReport.photos as string[]).length > 0 ? (
+                    <View style={styles.pendingGrid}>
+                      {(checkInReport.photos as string[]).map((url, i) => (
+                        <Image
+                          key={`${checkInReport.id}-${i}`}
+                          source={{ uri: url }}
+                          style={styles.updatePhoto}
+                          contentFit="cover"
+                          transition={150}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  {checkInReport.health_notes ? (
+                    <Text style={styles.crReportNote}>
+                      {checkInReport.health_notes}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {checkOutReport ? (
+                <View style={styles.crReportCard}>
+                  <View style={styles.crReportHeader}>
+                    <Text style={styles.crReportPhaseLabel}>
+                      {t("condition_reports.check_out_label")}
+                    </Text>
+                    <Text style={styles.crReportStamp}>
+                      {formatRiyadhStamp(checkOutReport.created_at, locale)}
+                    </Text>
+                  </View>
+                  {Array.isArray(checkOutReport.photos) &&
+                  (checkOutReport.photos as string[]).length > 0 ? (
+                    <View style={styles.pendingGrid}>
+                      {(checkOutReport.photos as string[]).map((url, i) => (
+                        <Image
+                          key={`${checkOutReport.id}-${i}`}
+                          source={{ uri: url }}
+                          style={styles.updatePhoto}
+                          contentFit="cover"
+                          transition={150}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  {checkOutReport.health_notes ? (
+                    <Text style={styles.crReportNote}>
+                      {checkOutReport.health_notes}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
+          )}
+
+          {/* Host-only check-in compose: file button collapsed,
+              full form when filingCheckIn is true. */}
+          {canFileCheckIn && !filingCheckIn ? (
+            <Button
+              label={t("condition_reports.file_check_in_button")}
+              onPress={onOpenFileCheckIn}
+              variant="secondary"
+              fullWidth
+            />
+          ) : null}
+
+          {canFileCheckIn && filingCheckIn ? (
+            <View style={styles.crForm}>
+              <Text style={styles.crFormHeader}>
+                {t("condition_reports.check_in_label")}
+              </Text>
+
+              {crPendingPhotos.length > 0 ? (
+                <View style={styles.pendingGrid}>
+                  {crPendingPhotos.map((src, i) => {
+                    const uri =
+                      src.kind === "web-file"
+                        ? URL.createObjectURL(src.file)
+                        : src.uri;
+                    return (
+                      <View
+                        key={`cr-pending-${i}`}
+                        style={styles.pendingThumbWrap}
+                      >
+                        <Image
+                          source={{ uri }}
+                          style={styles.pendingThumb}
+                          contentFit="cover"
+                        />
+                        <Pressable
+                          onPress={() => onRemoveCrPending(i)}
+                          disabled={crPosting}
+                          style={styles.pendingRemoveButton}
+                        >
+                          <Text style={styles.pendingRemoveText}>×</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              <Button
+                label={t("condition_reports.add_photos_button")}
+                onPress={onAddCrPhotos}
+                variant="secondary"
+                disabled={crPosting}
+                fullWidth
+              />
+
+              <TextInput
+                value={crNote}
+                onChangeText={setCrNote}
+                placeholder={t("condition_reports.note_placeholder")}
+                placeholderTextColor={colors.inkSoft}
+                multiline
+                editable={!crPosting}
+                style={styles.noteInput}
+              />
+
+              {crPostError ? (
+                <Text style={styles.errorText}>{crPostError}</Text>
+              ) : null}
+
+              <View style={styles.crFormActions}>
+                <Button
+                  label={t("condition_reports.cancel_button")}
+                  onPress={onCancelCheckIn}
+                  variant="destructive"
+                  disabled={crPosting}
+                />
+                <Button
+                  label={
+                    crPosting
+                      ? t("condition_reports.saving")
+                      : t("condition_reports.save_button")
+                  }
+                  onPress={onSaveCheckIn}
+                  variant="primary"
+                  loading={crPosting}
+                  disabled={
+                    crPendingPhotos.length === 0 && crNote.trim() === ""
+                  }
+                />
+              </View>
+            </View>
+          ) : null}
+        </View>
+
         {/* Daily updates — visible to both owner and host */}
         <Text style={styles.dailyUpdatesTitle}>
           {t("daily_updates.section_title")}
@@ -793,18 +1109,13 @@ export default function BookingDetailScreen() {
                       </View>
                     ) : null}
 
-                    <Pressable
+                    <Button
+                      label={t("daily_updates.add_photo_button")}
                       onPress={onEditAddPhotos}
+                      variant="secondary"
                       disabled={inFlight}
-                      style={[
-                        styles.addPhotoButton,
-                        inFlight && styles.buttonDisabled,
-                      ]}
-                    >
-                      <Text style={styles.addPhotoText}>
-                        {t("daily_updates.add_photo_button")}
-                      </Text>
-                    </Pressable>
+                      fullWidth
+                    />
 
                     <TextInput
                       value={editNote}
@@ -821,44 +1132,23 @@ export default function BookingDetailScreen() {
                     ) : null}
 
                     <View style={styles.entryActionRow}>
-                      <Pressable
-                        onPress={() => onEditSave(u.id)}
-                        disabled={inFlight || !canSave}
-                        style={[
-                          styles.entryButton,
-                          { borderColor: colors.moss },
-                          (inFlight || !canSave) && styles.buttonDisabled,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.entryButtonText,
-                            { color: colors.moss },
-                          ]}
-                        >
-                          {inFlight
+                      <Button
+                        label={
+                          inFlight
                             ? t("daily_updates.edit_saving")
-                            : t("daily_updates.edit_save_button")}
-                        </Text>
-                      </Pressable>
-                      <Pressable
+                            : t("daily_updates.edit_save_button")
+                        }
+                        onPress={() => onEditSave(u.id)}
+                        variant="primary"
+                        loading={inFlight}
+                        disabled={!canSave}
+                      />
+                      <Button
+                        label={t("daily_updates.edit_cancel_button")}
                         onPress={onEditCancel}
+                        variant="destructive"
                         disabled={inFlight}
-                        style={[
-                          styles.entryButton,
-                          { borderColor: colors.inkSoft },
-                          inFlight && styles.buttonDisabled,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.entryButtonText,
-                            { color: colors.inkSoft },
-                          ]}
-                        >
-                          {t("daily_updates.edit_cancel_button")}
-                        </Text>
-                      </Pressable>
+                      />
                     </View>
                   </View>
                 );
@@ -895,52 +1185,27 @@ export default function BookingDetailScreen() {
                       while another mutation is in flight. */}
                   {canMutateUpdates ? (
                     <View style={styles.entryActionRow}>
-                      <Pressable
+                      <Button
+                        label={t("daily_updates.edit_button")}
                         onPress={() => onEditStart(u)}
+                        variant="secondary"
                         disabled={
                           editingEntryId !== null || deletingFlight !== null
                         }
-                        style={[
-                          styles.entryButton,
-                          { borderColor: colors.moss },
-                          (editingEntryId !== null ||
-                            deletingFlight !== null) &&
-                            styles.buttonDisabled,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.entryButtonText,
-                            { color: colors.moss },
-                          ]}
-                        >
-                          {t("daily_updates.edit_button")}
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => onDelete(u.id)}
-                        disabled={
-                          editingEntryId !== null || deletingFlight !== null
-                        }
-                        style={[
-                          styles.entryButton,
-                          { borderColor: colors.terracotta },
-                          (editingEntryId !== null ||
-                            deletingFlight !== null) &&
-                            styles.buttonDisabled,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.entryButtonText,
-                            { color: colors.terracotta },
-                          ]}
-                        >
-                          {deletingFlight === u.id
+                      />
+                      <Button
+                        label={
+                          deletingFlight === u.id
                             ? t("daily_updates.deleting")
-                            : t("daily_updates.delete_button")}
-                        </Text>
-                      </Pressable>
+                            : t("daily_updates.delete_button")
+                        }
+                        onPress={() => onDelete(u.id)}
+                        variant="destructive"
+                        loading={deletingFlight === u.id}
+                        disabled={
+                          editingEntryId !== null || deletingFlight !== null
+                        }
+                      />
                     </View>
                   ) : null}
                 </View>
@@ -984,18 +1249,13 @@ export default function BookingDetailScreen() {
               </View>
             ) : null}
 
-            <Pressable
+            <Button
+              label={t("daily_updates.add_photo_button")}
               onPress={onAddPhoto}
+              variant="secondary"
               disabled={postingUpdate}
-              style={[
-                styles.addPhotoButton,
-                postingUpdate && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.addPhotoText}>
-                {t("daily_updates.add_photo_button")}
-              </Text>
-            </Pressable>
+              fullWidth
+            />
 
             <TextInput
               value={updateNote}
@@ -1011,35 +1271,30 @@ export default function BookingDetailScreen() {
               <Text style={styles.errorText}>{postError}</Text>
             ) : null}
 
-            <Pressable
-              onPress={onSubmitUpdate}
-              disabled={
-                postingUpdate ||
-                (pendingPhotos.length === 0 && updateNote.trim() === "")
-              }
-              style={[
-                styles.editButton,
-                (postingUpdate ||
-                  (pendingPhotos.length === 0 &&
-                    updateNote.trim() === "")) &&
-                  styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.editText}>
-                {postingUpdate
+            <Button
+              label={
+                postingUpdate
                   ? t("daily_updates.posting")
-                  : t("daily_updates.submit_button")}
-              </Text>
-            </Pressable>
+                  : t("daily_updates.submit_button")
+              }
+              onPress={onSubmitUpdate}
+              variant="primary"
+              loading={postingUpdate}
+              disabled={
+                pendingPhotos.length === 0 && updateNote.trim() === ""
+              }
+              fullWidth
+            />
           </View>
         ) : null}
 
         {canEdit ? (
-          <Pressable onPress={onEdit} style={styles.editButton}>
-            <Text style={styles.editText}>
-              {t("booking.edit_request_button")}
-            </Text>
-          </Pressable>
+          <Button
+            label={t("booking.edit_request_button")}
+            onPress={onEdit}
+            variant="secondary"
+            fullWidth
+          />
         ) : null}
 
         {isHost ? (
@@ -1049,67 +1304,59 @@ export default function BookingDetailScreen() {
             ) : null}
             {booking.status === "requested" ? (
               <>
-                <Pressable
-                  onPress={onHostAccept}
-                  disabled={!!hostFlight}
-                  style={[
-                    styles.editButton,
-                    !!hostFlight && styles.buttonDisabled,
-                  ]}
-                >
-                  <Text style={styles.editText}>
-                    {hostFlight === "accept"
+                <Button
+                  label={
+                    hostFlight === "accept"
                       ? t("booking.host_accepting")
-                      : t("booking.host_accept_button")}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={onHostDecline}
-                  disabled={!!hostFlight}
-                  style={[
-                    styles.cancelButton,
-                    !!hostFlight && styles.buttonDisabled,
-                  ]}
-                >
-                  <Text style={styles.cancelText}>
-                    {hostFlight === "decline"
+                      : t("booking.host_accept_button")
+                  }
+                  onPress={onHostAccept}
+                  variant="primary"
+                  loading={hostFlight === "accept"}
+                  disabled={!!hostFlight && hostFlight !== "accept"}
+                  fullWidth
+                />
+                <Button
+                  label={
+                    hostFlight === "decline"
                       ? t("booking.host_declining")
-                      : t("booking.host_decline_button")}
-                  </Text>
-                </Pressable>
+                      : t("booking.host_decline_button")
+                  }
+                  onPress={onHostDecline}
+                  variant="destructive"
+                  loading={hostFlight === "decline"}
+                  disabled={!!hostFlight && hostFlight !== "decline"}
+                  fullWidth
+                />
               </>
             ) : null}
             {booking.status === "accepted" ? (
-              <Pressable
-                onPress={onHostStart}
-                disabled={!!hostFlight}
-                style={[
-                  styles.editButton,
-                  !!hostFlight && styles.buttonDisabled,
-                ]}
-              >
-                <Text style={styles.editText}>
-                  {hostFlight === "start"
+              <Button
+                label={
+                  hostFlight === "start"
                     ? t("booking.host_starting")
-                    : t("booking.host_start_button")}
-                </Text>
-              </Pressable>
+                    : t("booking.host_start_button")
+                }
+                onPress={onHostStart}
+                variant="primary"
+                loading={hostFlight === "start"}
+                disabled={!!hostFlight && hostFlight !== "start"}
+                fullWidth
+              />
             ) : null}
             {booking.status === "active" ? (
-              <Pressable
-                onPress={onHostComplete}
-                disabled={!!hostFlight}
-                style={[
-                  styles.editButton,
-                  !!hostFlight && styles.buttonDisabled,
-                ]}
-              >
-                <Text style={styles.editText}>
-                  {hostFlight === "complete"
+              <Button
+                label={
+                  hostFlight === "complete"
                     ? t("booking.host_completing")
-                    : t("booking.host_complete_button")}
-                </Text>
-              </Pressable>
+                    : t("booking.host_complete_button")
+                }
+                onPress={onHostComplete}
+                variant="primary"
+                loading={hostFlight === "complete"}
+                disabled={!!hostFlight && hostFlight !== "complete"}
+                fullWidth
+              />
             ) : null}
           </>
         ) : null}
@@ -1119,23 +1366,26 @@ export default function BookingDetailScreen() {
             {cancelError ? (
               <Text style={styles.errorText}>{cancelError}</Text>
             ) : null}
-            <Pressable
-              onPress={onCancel}
-              disabled={cancelling}
-              style={[styles.cancelButton, cancelling && styles.buttonDisabled]}
-            >
-              <Text style={styles.cancelText}>
-                {cancelling
+            <Button
+              label={
+                cancelling
                   ? t("booking.cancelling")
-                  : t("booking.cancel_button")}
-              </Text>
-            </Pressable>
+                  : t("booking.cancel_button")
+              }
+              onPress={onCancel}
+              variant="destructive"
+              loading={cancelling}
+              fullWidth
+            />
           </>
         ) : null}
 
-        <Pressable onPress={() => router.replace("/")} style={styles.cta}>
-          <Text style={styles.ctaText}>{t("booking.back_home")}</Text>
-        </Pressable>
+        <Button
+          label={t("booking.back_home")}
+          onPress={() => router.replace("/")}
+          variant="secondary"
+          fullWidth
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -1274,67 +1524,11 @@ const styles = StyleSheet.create({
     color: colors.mossDeep,
     marginTop: spacing.xs,
   },
-  cta: {
-    backgroundColor: colors.moss,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xxl,
-    alignItems: "center",
-    marginTop: spacing.xl,
-  },
-  ctaText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    color: colors.cream,
-  },
-  editButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.moss,
-    alignItems: "center",
-    marginTop: spacing.md,
-  },
-  editText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 14,
-    color: colors.moss,
-  },
-  cancelButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.terracotta,
-    alignItems: "center",
-    marginTop: spacing.md,
-  },
-  cancelText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 14,
-    color: colors.terracotta,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
   errorText: {
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.terracotta,
     textAlign: "center",
-  },
-  backButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.inkSoft,
-  },
-  backText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
   },
   // ---- daily updates (Phase 6.2) ----
   dailyUpdatesTitle: {
@@ -1418,16 +1612,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     flexWrap: "wrap",
   },
-  entryButton: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-  },
-  entryButtonText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 12,
-  },
   pendingRemoveButton: {
     position: "absolute",
     top: -6,
@@ -1445,19 +1629,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 18,
   },
-  addPhotoButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.moss,
-    alignSelf: "flex-start",
-  },
-  addPhotoText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 13,
-    color: colors.moss,
-  },
   noteInput: {
     borderWidth: 1,
     borderColor: colors.whisper,
@@ -1468,5 +1639,87 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
     backgroundColor: colors.cream,
+  },
+
+  // ---- Condition reports (Phase 6.4) ----
+  // Outer block: framed + tinted to read as a distinct section
+  // (heavier visual weight than the unframed daily-updates list below).
+  conditionReportsBlock: {
+    width: "100%",
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    padding: spacing.lg,
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  crSectionTitle: {
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.mossDeep,
+    textAlign: "right",
+  },
+  crSectionSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    textAlign: "right",
+    marginTop: -spacing.sm,
+  },
+  // Saved (read-only) report card. Muted vs the compose form so it
+  // visually reads as immutable.
+  crReportCard: {
+    backgroundColor: colors.cream,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  crReportHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  },
+  crReportPhaseLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.mossDeep,
+  },
+  crReportStamp: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+  },
+  crReportNote: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+    textAlign: "right",
+  },
+  // "+ File check-in report" button — moss outlined pill, full-width.
+  // Active compose form. Slightly elevated bg so it stands apart from
+  // the saved cards above it.
+  crForm: {
+    backgroundColor: colors.cream,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.moss,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  crFormHeader: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.mossDeep,
+    textAlign: "right",
+    marginBottom: spacing.xs,
+  },
+  crFormActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });
