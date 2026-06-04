@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
+import { ConditionReportsSection } from "@/components/bookings/ConditionReportsSection";
 import { HostActions } from "@/components/bookings/HostActions";
 import { useBooking } from "@/hooks/useBooking";
 import { useConditionReports } from "@/hooks/useConditionReports";
@@ -798,165 +799,27 @@ export default function BookingDetailScreen() {
           </Text>
         </View>
 
-        {/* ===== Condition reports (Phase 6.4) =====
-            Whole section (heading + saved check-in + file button /
-            compose form) lives in one sectionCard, mirroring the
-            booking-summary card above. Both owner and host see filed
-            reports; only the host on an active booking sees the file
-            button + compose form. */}
-        <View style={styles.sectionCard}>
-        <Text style={styles.crSectionTitle}>
-          {t("condition_reports.section_title")}
-        </Text>
-        <Text style={styles.crSectionSubtitle}>
-          {t("condition_reports.section_subtitle")}
-        </Text>
-
-        <>
-          {crLoading ? (
-            <Text style={styles.muted}>{t("listing.loading")}</Text>
-          ) : (
-            <>
-              {checkInReport ? (
-                <View style={styles.crReportCard}>
-                  <View style={styles.crReportHeader}>
-                    <Text style={styles.crReportPhaseLabel}>
-                      {t("condition_reports.check_in_label")}
-                    </Text>
-                    <Text style={styles.crReportStamp}>
-                      {formatRiyadhStamp(checkInReport.created_at, locale)}
-                    </Text>
-                  </View>
-                  {Array.isArray(checkInReport.photos) &&
-                  (checkInReport.photos as string[]).length > 0 ? (
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.updatePhotosRow}
-                    >
-                      {(checkInReport.photos as string[]).map((url, i) => (
-                        <Image
-                          key={`${checkInReport.id}-${i}`}
-                          source={{ uri: url }}
-                          style={styles.updatePhoto}
-                          contentFit="cover"
-                          transition={150}
-                        />
-                      ))}
-                    </ScrollView>
-                  ) : null}
-                  {checkInReport.health_notes ? (
-                    <Text style={styles.updateNote}>
-                      {checkInReport.health_notes}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
-
-            </>
-          )}
-
-          {/* Host-only check-in compose: file button collapsed,
-              full form when filingCheckIn is true. */}
-          {canFileCheckIn && !filingCheckIn ? (
-            <Button
-              label={t("condition_reports.file_check_in_button")}
-              onPress={onOpenFileCheckIn}
-              variant="secondary"
-              fullWidth
-            />
-          ) : null}
-
-          {canFileCheckIn && filingCheckIn ? (
-            <View style={styles.crForm}>
-              <Text style={styles.crFormHeader}>
-                {t("condition_reports.check_in_label")}
-              </Text>
-
-              {crPendingPhotos.length > 0 ? (
-                <View style={styles.pendingGrid}>
-                  {crPendingPhotos.map((src, i) => {
-                    const uri =
-                      src.kind === "web-file"
-                        ? URL.createObjectURL(src.file)
-                        : src.uri;
-                    return (
-                      <View
-                        key={`cr-pending-${i}`}
-                        style={styles.pendingThumbWrap}
-                      >
-                        <Image
-                          source={{ uri }}
-                          style={styles.pendingThumb}
-                          contentFit="cover"
-                        />
-                        <Pressable
-                          onPress={() => onRemoveCrPending(i)}
-                          disabled={crPosting}
-                          style={styles.pendingRemoveButton}
-                        >
-                          <Text style={styles.pendingRemoveText}>×</Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : null}
-
-              <Button
-                label={t("condition_reports.add_photos_button")}
-                onPress={onAddCrPhotos}
-                variant="secondary"
-                disabled={
-                  crPosting || crPendingPhotos.length >= CR_PHOTO_CAP
-                }
-                fullWidth
-              />
-              {crPendingPhotos.length >= CR_PHOTO_CAP ? (
-                <Text style={styles.muted}>
-                  {t("condition_reports.photo_cap_hint")}
-                </Text>
-              ) : null}
-
-              <TextInput
-                value={crNote}
-                onChangeText={setCrNote}
-                placeholder={t("condition_reports.note_placeholder")}
-                placeholderTextColor={colors.inkSoft}
-                multiline
-                editable={!crPosting}
-                style={styles.noteInput}
-              />
-
-              {crPostError ? (
-                <Text style={styles.errorText}>{crPostError}</Text>
-              ) : null}
-
-              <View style={styles.crFormActions}>
-                <Button
-                  label={t("condition_reports.cancel_button")}
-                  onPress={onCancelCheckIn}
-                  variant="secondary"
-                  disabled={crPosting}
-                />
-                <Button
-                  label={
-                    crPosting
-                      ? t("condition_reports.saving")
-                      : t("condition_reports.save_button")
-                  }
-                  onPress={onSaveCheckIn}
-                  variant="primary"
-                  loading={crPosting}
-                  disabled={
-                    crPendingPhotos.length === 0 && crNote.trim() === ""
-                  }
-                />
-              </View>
-            </View>
-          ) : null}
-        </>
-        </View>
+        {/* Condition reports section — extracted to
+            ConditionReportsSection. Parent owns state + handlers
+            (including isCrFormDirty for the leave-warning) and passes
+            them down; the component is presentational. */}
+        <ConditionReportsSection
+          crLoading={crLoading}
+          checkInReport={checkInReport}
+          canFileCheckIn={canFileCheckIn}
+          filingCheckIn={filingCheckIn}
+          crPendingPhotos={crPendingPhotos}
+          crNote={crNote}
+          crPosting={crPosting}
+          crPostError={crPostError}
+          CR_PHOTO_CAP={CR_PHOTO_CAP}
+          onOpenFileCheckIn={onOpenFileCheckIn}
+          onCancelCheckIn={onCancelCheckIn}
+          onAddCrPhotos={onAddCrPhotos}
+          onRemoveCrPending={onRemoveCrPending}
+          onSaveCheckIn={onSaveCheckIn}
+          setCrNote={setCrNote}
+        />
 
         {/* Daily updates — visible to both owner and host. Same
             sectionCard wrapper as condition-reports above. */}
@@ -1616,20 +1479,9 @@ const styles = StyleSheet.create({
     // The textarea is always full-width on its own line below photos.
   },
 
-  // ---- Condition reports (Phase 6.4) ----
-  crSectionTitle: {
-    fontFamily: fonts.headingBold,
-    fontSize: 18,
-    color: colors.mossDeep,
-    textAlign: "right",
-  },
-  crSectionSubtitle: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.inkSoft,
-    textAlign: "right",
-    marginTop: -spacing.sm,
-  },
+  // ---- Condition reports (Phase 6.4) — styles still used by the
+  // standalone check-out card lower in the JSX. Section title +
+  // subtitle + form styles moved into ConditionReportsSection. ----
   // Saved (read-only) report card. Muted vs the compose form so it
   // visually reads as immutable.
   crReportCard: {
@@ -1659,24 +1511,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
     textAlign: "right",
-  },
-  // "+ File check-in report" button — moss outlined pill, full-width.
-  // Active compose form. Slightly elevated bg so it stands apart from
-  // the saved cards above it.
-  crForm: {
-    backgroundColor: colors.cream,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.moss,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  crFormHeader: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 14,
-    color: colors.mossDeep,
-    textAlign: "right",
-    marginBottom: spacing.xs,
   },
   crFormActions: {
     flexDirection: "row",
