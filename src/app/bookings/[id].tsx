@@ -15,25 +15,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
+import { useBooking } from "@/hooks/useBooking";
+import { useConditionReports } from "@/hooks/useConditionReports";
+import { useDailyUpdates } from "@/hooks/useDailyUpdates";
 import { useAuth } from "@/lib/auth";
 import {
   acceptBookingAsHost,
   cancelBookingAsOwner,
   completeBookingAsHost,
   declineBookingAsHost,
-  getBooking,
   startBookingAsHost,
-  type BookingDetail,
 } from "@/lib/bookings";
-import {
-  createConditionReport,
-  listConditionReports,
-  type ConditionReport,
-} from "@/lib/condition-reports";
+import { createConditionReport } from "@/lib/condition-reports";
 import {
   createDailyUpdate,
   deleteDailyUpdate,
-  listDailyUpdates,
   updateDailyUpdate,
   type DailyUpdate,
 } from "@/lib/daily-updates";
@@ -60,9 +56,16 @@ export default function BookingDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === "string" ? params.id : "";
 
-  const [booking, setBooking] = useState<BookingDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Booking — loaded via useBooking. The hook owns data + loading; the
+  // screen owns the translated `error` string so it can pick the right
+  // i18n key on failure (matches the original setError(t(...)) flow).
   const [error, setError] = useState<string | null>(null);
+  const {
+    data: booking,
+    loading,
+    refetch: refetchBooking,
+  } = useBooking(id, () => setError(t("booking.load_failed")));
+
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
@@ -73,10 +76,13 @@ export default function BookingDetailScreen() {
   >(null);
   const [hostError, setHostError] = useState<string | null>(null);
 
-  // Daily updates: list (loaded alongside the booking), plus host-only
-  // post form state (pending photo list + optional note).
-  const [updates, setUpdates] = useState<DailyUpdate[]>([]);
-  const [updatesLoading, setUpdatesLoading] = useState(true);
+  // Daily updates — loaded via useDailyUpdates (parallel to the booking
+  // fetch). Plus host-only post form state (pending photo list + note).
+  const {
+    data: updates,
+    loading: updatesLoading,
+    refetch: refetchUpdates,
+  } = useDailyUpdates(id);
   const [pendingPhotos, setPendingPhotos] = useState<PetPhotoSource[]>([]);
   const [updateNote, setUpdateNote] = useState("");
   const [postingUpdate, setPostingUpdate] = useState(false);
@@ -98,82 +104,20 @@ export default function BookingDetailScreen() {
   const [deletingFlight, setDeletingFlight] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Condition reports (Phase 6.4). Immutable check-in / check-out
-  // evidence files, host only. Step 2 builds check-in; check-out wires
-  // into "Complete stay" in Step 3.
-  const [conditionReports, setConditionReports] = useState<ConditionReport[]>(
-    [],
-  );
-  const [crLoading, setCrLoading] = useState(true);
+  // Condition reports (Phase 6.4) — loaded via useConditionReports. Same
+  // hook shape as updates. Immutable check-in / check-out evidence files,
+  // host only. Step 2 builds check-in; check-out wires into "Complete
+  // stay" in Step 3.
+  const {
+    data: conditionReports,
+    loading: crLoading,
+    refetch: refetchConditionReports,
+  } = useConditionReports(id);
   const [filingCheckIn, setFilingCheckIn] = useState(false);
   const [crPendingPhotos, setCrPendingPhotos] = useState<PetPhotoSource[]>([]);
   const [crNote, setCrNote] = useState("");
   const [crPosting, setCrPosting] = useState(false);
   const [crPostError, setCrPostError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    getBooking(id)
-      .then((b) => {
-        if (cancelled) return;
-        setBooking(b);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        console.warn("[booking.load_failed]", e);
-        setError(t("booking.load_failed"));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  // Daily updates load — parallel to the booking fetch so neither blocks
-  // the other. Refetched after the host successfully posts a new update.
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    listDailyUpdates(id)
-      .then((rows) => {
-        if (!cancelled) setUpdates(rows);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        console.warn("[daily_updates.load_failed]", e);
-        // Silent failure: the empty-state copy will show. Updates are
-        // a secondary surface; don't crash the whole booking page.
-      })
-      .finally(() => {
-        if (!cancelled) setUpdatesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  // Condition reports load — same pattern as daily-updates.
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    listConditionReports(id)
-      .then((rows) => {
-        if (!cancelled) setConditionReports(rows);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        console.warn("[condition_reports.load_failed]", e);
-      })
-      .finally(() => {
-        if (!cancelled) setCrLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
 
   // Daily-update form dirty-tracking. The form is dirty when there's at
   // least one pending photo OR the note has any non-whitespace content.
@@ -384,8 +328,7 @@ export default function BookingDetailScreen() {
     setHostError(null);
     try {
       await fn(booking.id);
-      const fresh = await getBooking(booking.id);
-      if (fresh) setBooking(fresh);
+      await refetchBooking();
     } catch (e) {
       console.warn(`[booking.host_${action}_failed]`, e);
       setHostError(t(failedKey));
@@ -485,8 +428,7 @@ export default function BookingDetailScreen() {
       // update appears at the top.
       setPendingPhotos([]);
       setUpdateNote("");
-      const fresh = await listDailyUpdates(booking.id);
-      setUpdates(fresh);
+      await refetchUpdates();
     } catch (e) {
       console.warn("[daily_updates.post_failed]", e);
       setPostError(t("daily_updates.post_failed"));
@@ -558,8 +500,7 @@ export default function BookingDetailScreen() {
       });
       // Exit edit mode + refetch so the row reflects the new state.
       onEditCancel();
-      const fresh = await listDailyUpdates(booking.id);
-      setUpdates(fresh);
+      await refetchUpdates();
     } catch (e) {
       console.warn("[daily_updates.edit_save_failed]", e);
       setEditError(t("daily_updates.edit_save_failed"));
@@ -577,8 +518,7 @@ export default function BookingDetailScreen() {
     setDeleteError(null);
     try {
       await deleteDailyUpdate({ updateId: entryId, hostId: user.id });
-      const fresh = await listDailyUpdates(booking.id);
-      setUpdates(fresh);
+      await refetchUpdates();
     } catch (e) {
       console.warn("[daily_updates.delete_failed]", e);
       setDeleteError(t("daily_updates.delete_failed"));
@@ -659,8 +599,7 @@ export default function BookingDetailScreen() {
       setFilingCheckIn(false);
       setCrPendingPhotos([]);
       setCrNote("");
-      const fresh = await listConditionReports(booking.id);
-      setConditionReports(fresh);
+      await refetchConditionReports();
     } catch (e) {
       console.warn("[condition_reports.save_failed]", e);
       setCrPostError(t("condition_reports.save_failed"));
