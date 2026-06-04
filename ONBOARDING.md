@@ -12,9 +12,13 @@
 
 - **What:** Petbnb is a Saudi Arabia–first, Arabic-language, RTL pet-hosting
   marketplace MVP (Airbnb-for-cats; pivoting to cats+dogs in Step 5.7).
-- **Stage:** Steps 1 → 5.6 shipped; Step 5.7 (multi-species) and Steps 6–10
-  (condition reports, host flow, bookings tracking, messaging, marketplace)
-  are next.
+- **Stage:** Steps 1 → 5.8 + Step 6 (top nav) + Step 7 prep shipped. This
+  session added host booking lifecycle controls (accept/decline/start/
+  complete), host daily photo updates (editable, deletable, active-only),
+  and condition-reports CHECK-IN (immutable, host-only RLS, 6-photo cap).
+  Next: condition-report CHECK-OUT filing (display-only today), then
+  Step 7 (host onboarding), then Steps 8–10 (bookings tracking, messaging,
+  marketplace). Step 5.7 multi-species (cats+dogs) parked.
 - **Who built it:** Non-technical founder + Claude pairing one step at a
   time. Founder reviews every plan; Claude writes the code and runs
   verifications.
@@ -176,7 +180,16 @@ Petbnb/
 │   │   ├── PhotoGallery.tsx    ← Swipeable photos for listing detail
 │   │   ├── RoleEditor.tsx      ← Owner/host/both role-card picker
 │   │   ├── BreedPicker.tsx     ← Horizontal breed tile picker
-│   │   └── AppHeader.tsx       ← Top-nav bar on signed-in screens (home / bookings / account + language toggle)
+│   │   ├── AppHeader.tsx       ← Top-nav bar on signed-in screens (home / bookings / account + language toggle)
+│   │   └── bookings/           ← Sub-components of the booking detail screen
+│   │       ├── HostActions.tsx              ← Accept/Decline/Start/Complete buttons
+│   │       ├── ConditionReportsSection.tsx  ← Heading + saved check-in + file button + compose form
+│   │       └── DailyUpdatesSection.tsx      ← Heading + updates list (inline-edit fork) + compose form + check-in-first hint
+│   │
+│   ├── hooks/                  ← Custom React hooks (data loading for the booking screen)
+│   │   ├── useBooking.ts            ← getBooking + refetch (with onLoadError callback)
+│   │   ├── useDailyUpdates.ts       ← listDailyUpdates + refetch
+│   │   └── useConditionReports.ts   ← listConditionReports + refetch
 │   │
 │   ├── lib/                    ← Data + utility layer
 │   │   ├── supabase.ts         ← Typed Supabase client + pingSupabase()
@@ -192,6 +205,8 @@ Petbnb/
 │   │   ├── listings.ts         ← Feed queries + distanceKm haversine
 │   │   ├── pets.ts             ← Pet CRUD + photo upload helpers
 │   │   ├── bookings.ts         ← Booking create/read + multi-pet via junction
+│   │   ├── daily-updates.ts    ← Daily-update CRUD with host-only + active-only guards
+│   │   ├── condition-reports.ts ← Condition-report CRUD (immutable; host-only insert)
 │   │   └── admin.ts            ← Admin queries (uses admin_list_users RPC)
 │   │
 │   ├── types/
@@ -222,8 +237,41 @@ Petbnb/
         ├── 0010_edit_booking_rls.sql    ← owner UPDATE/DELETE policies on booking_pets + booking_addons, gated to status='requested' (5.6F)
         ├── 0011_profile_locale.sql      ← profiles.locale ('ar'|'en', default 'ar') for per-user language preference (5.8.3)
         ├── 0012_bilingual_content.sql   ← listings.title_en, listings.description_en, profiles.display_name_en (Step 7 prep)
-        └── 0013_rename_display_name_en.sql ← rename profiles.display_name_en → profiles.full_name_en (Step 7 prep)
+        ├── 0013_rename_display_name_en.sql ← rename profiles.display_name_en → profiles.full_name_en (Step 7 prep)
+        ├── 0014_daily_updates_editable.sql      ← UPDATE/DELETE policies for host on own active daily_updates (Phase 6.3)
+        ├── 0015_daily_updates_active_only.sql   ← INSERT/UPDATE/DELETE gated to booking.status='active' (Phase 6.3)
+        ├── 0016_condition_reports_host_only.sql ← INSERT restricted to listing's host while booking.status='active' (Phase 6.4)
+        └── 0017_condition_reports_unique_phase.sql ← Unique index (booking_id, phase) — at most 1 check-in + 1 check-out per booking (Phase 6.4)
 ```
+
+**Booking screen architecture (post-refactor):**
+
+`src/app/bookings/[id].tsx` is now a ~1,200-line coordinator (down from
+~1,800). The rendering sections live in `src/components/bookings/`:
+
+- `HostActions.tsx` — Accept/Decline/Start/Complete buttons
+- `ConditionReportsSection.tsx` — heading + saved check-in card + file
+  button + compose form
+- `DailyUpdatesSection.tsx` — heading + updates list (with inline-edit
+  fork) + compose form + check-in-first hint
+
+Data loads via three hooks in `src/hooks/`, each returning
+`{ data, loading, refetch }`:
+
+- `useBooking(id, onLoadError?)` — wraps `getBooking`
+- `useDailyUpdates(id)` — wraps `listDailyUpdates`
+- `useConditionReports(id)` — wraps `listConditionReports`
+
+State and handlers (including the host action handlers, daily-update
+compose/edit/delete handlers, and CR compose handlers) stay in the
+parent; the components are presentational. The dirty-state predicates
+(`isUpdateFormDirty`, `isCrFormDirty`, `isAnyFormDirty`) and the
+`confirmLeaveIfDirty` + `beforeunload` listener also stay in the parent
+so the cross-section leave-warning is preserved.
+
+**Shared styles are currently DUPLICATED** across the three components
+(each duplicate flagged `// shared with parent`). A future tidy-up will
+consolidate them into a shared module.
 
 ---
 
@@ -336,6 +384,25 @@ history exists (deep link, refresh, post-replace). Use
 ## 7. What's been built (commit history)
 
 ```
+566bd25  refactor(bookings): extract DailyUpdatesSection component
+530a7b5  refactor(bookings): extract ConditionReportsSection component
+d40cb8f  refactor(bookings): extract HostActions component
+c995fa0  refactor(bookings): extract data-loading hooks
+5239c38  polish(bookings): wrap sections in matching cards, daily-update cancel button, condition-report note/photo layout
+5ed354e  feat(bookings): condition reports (check-in) — host-filed, immutable, host-only RLS, unique per phase, 6-photo cap
+beaf503  polish(bookings): photo-cap hint + section spacing
+17e3bcf  feat(bookings): gate daily-updates compose form on check-in existing
+bb988ff  refactor(bookings): relocate check-out report below daily updates
+1d74cad  fix(bookings): note full-width below photos in all forms
+59b7a2c  refactor(bookings): condition-reports heading moved outside the framed card
+becbc44  feat(bookings): cap condition-report photos at 6
+0ea8093  refactor(bookings): compact in-card buttons, form cancels to secondary
+459d2d5  feat(ui): add compact size variant to Button
+f8224f3  refactor(bookings): adopt Button component on booking-detail screen
+5309f4c  feat(ui): reusable Button component with 3 variants (primary/secondary/destructive)
+7371b68  feat(bookings): editable host daily updates with active-only enforcement
+ae550e5  feat(bookings): host accept/decline/start/complete controls
+24d0f18  ONBOARDING.md: refresh through Step 7 prep
 68deb83  Step 7 prep: optional bilingual content + cleanup duplicate feed nav
 5ecca0e  fix: AppHeader toggle position + async-storage compat + remove stale @ts-expect-error
 ad46311  Step 6 (top nav) + 5.8.3-5.8.5 (locale persistence + toggle + RTL/LTR audit)
@@ -397,10 +464,22 @@ d871b8d  Step 2: Supabase wiring complete
 - **Step 5.8.5** — RTL/LTR layout flip: `configureRTL` becomes locale-aware, `AppShell` wraps content inside `LocaleProvider`. ~35 hardcoded `textAlign:'right'` instances remain in `admin/*` and `(auth)/*` — deferred.
 - **Step 6** — Top nav bar (`AppHeader` on all signed-in screens; auth / suspended / admin excluded). Landed alongside 5.8.3–5.8.5 in the same commit.
 - **Step 7 prep** — Optional bilingual content fields. Migrations 0012 + 0013 add `listings.title_en`, `listings.description_en`, `profiles.full_name_en`. `pickLocalized()` helper added in `lib/format.ts`. Duplicate nav pills removed from the feed page.
+- **Phase 6.1** — Host booking lifecycle controls. Accept + Decline buttons when `status='requested'`; Start when `status='accepted'`; Complete when `status='active'`. Single-in-flight indicator (`hostFlight`) so at most one transition runs at a time. Confirm prompts (web `window.confirm`) before each action; refetches the booking on success so the now-illegal buttons hide.
+- **Phase 6.2** — Host daily photo updates. Multi-photo via image picker, optional Arabic note, Riyadh-time stamps via `formatRiyadhStamp`, editable + deletable per-entry while `status='active'`. Migration 0014 adds UPDATE/DELETE policies for the host on their own active `daily_updates`; migration 0015 gates INSERT/UPDATE/DELETE to `booking.status='active'`. The daily-updates compose form is also gated on a check-in report existing (chronological stay-flow gate).
+- **Phase 6.4** — Condition reports CHECK-IN. Host files a check-in with up to 6 photos + optional Arabic note; immutable once saved (no UPDATE/DELETE policies). Migration 0016 restricts INSERT to the listing's host while `booking.status='active'`; migration 0017 adds a unique index `(booking_id, phase)` so at most one check-in and one check-out per booking. Both owner and host see filed reports as read-only cards. **CHECK-OUT filing UI is NOT done yet** — only display when a check-out report already exists, which can't happen until the filing UI lands.
+- **Design-system rollout** — Reusable `Button` component in `src/components/Button.tsx` (3 variants primary/secondary/destructive × 2 sizes normal/compact), adopted across `src/app/bookings/[id].tsx`. Standardizes height, padding, font, disabled/loading state.
+- **Booking-screen refactor** — `src/app/bookings/[id].tsx` went from ~1,800 → ~1,200 lines. Three data-loading hooks extracted to `src/hooks/` (`useBooking`, `useDailyUpdates`, `useConditionReports`), each returning `{ data, loading, refetch }`. Three presentational components extracted to `src/components/bookings/` (`HostActions`, `ConditionReportsSection`, `DailyUpdatesSection`). State + handler bodies + dirty-state predicates + leave-warning all stay in the parent. Shared styles currently duplicated across components (each flagged `// shared with parent`) — deferred consolidation.
 
 ---
 
 ## 8. What's next
+
+**Phase 6.4 finish — CONDITION REPORT CHECK-OUT filing.** Check-in
+filing is done; check-out display works when a report exists, but
+there's no UI to actually file one yet. Should land before Step 7
+since it completes the stay flow. Same shape as check-in: host-only,
+6-photo cap, immutable; the unique index from migration 0017 already
+backstops "at most one check-out per booking".
 
 **Step 7 — Host onboarding flow.** Hosts currently land on a placeholder
 screen. Step 7 builds: host profile setup (name + optional English,
@@ -670,10 +749,17 @@ If `OwningProcess` is `macmnsvc`, that's McAfee. Restart Expo with
 
 ### Git
 
+**Remote:** PRIVATE repo at `https://github.com/nuzul-saudi/petbnb`.
+Auth via Git Credential Manager (Windows Credential Manager backs the
+token). The `gh` CLI is NOT used because McAfee TLS-inspection breaks
+its Go HTTPS stack on this machine — plain `git push` / `git pull`
+work fine since they go through GCM, not gh's own HTTPS client.
+
 ```powershell
 git log --oneline -10        # Recent commits
 git status --short            # What's pending
 git diff --stat              # Summary of staged changes
+git push                      # Push to PRIVATE origin/main (GCM handles auth)
 ```
 
 **Never** commit `.env` (gitignored), API keys, Supabase project IDs, or
