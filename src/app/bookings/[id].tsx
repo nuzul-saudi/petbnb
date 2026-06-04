@@ -2,11 +2,9 @@ import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { Image } from "expo-image";
@@ -16,6 +14,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
 import { ConditionReportsSection } from "@/components/bookings/ConditionReportsSection";
+import { DailyUpdatesSection } from "@/components/bookings/DailyUpdatesSection";
 import { HostActions } from "@/components/bookings/HostActions";
 import { useBooking } from "@/hooks/useBooking";
 import { useConditionReports } from "@/hooks/useConditionReports";
@@ -821,303 +820,43 @@ export default function BookingDetailScreen() {
           setCrNote={setCrNote}
         />
 
-        {/* Daily updates — visible to both owner and host. Same
-            sectionCard wrapper as condition-reports above. */}
-        <View style={styles.sectionCard}>
-        <Text style={styles.dailyUpdatesTitle}>
-          {t("daily_updates.section_title")}
-        </Text>
-
-        {updatesLoading ? (
-          <Text style={styles.muted}>{t("listing.loading")}</Text>
-        ) : updates.length === 0 ? (
-          <Text style={styles.muted}>{t("daily_updates.empty")}</Text>
-        ) : (
-          <View style={styles.updatesList}>
-            {updates.map((u) => {
-              const photos = Array.isArray(u.photos)
-                ? (u.photos as string[])
-                : [];
-              // Belt-and-suspenders: also gate the edit-form render on
-              // canMutateUpdates, so a stale editingEntryId during a
-              // status transition can't flash the edit form.
-              const isEditing = editingEntryId === u.id && canMutateUpdates;
-
-              if (isEditing) {
-                const inFlight = editingFlight === u.id;
-                const keptPhotos = photos.filter((url) => editKeep.has(url));
-                const hasAnyPhoto =
-                  keptPhotos.length > 0 || editNewSources.length > 0;
-                const canSave = hasAnyPhoto || editNote.trim() !== "";
-                return (
-                  <View key={u.id} style={styles.updateCard}>
-                    <Text style={styles.updateDate}>
-                      {formatRiyadhStamp(u.created_at, locale)}
-                    </Text>
-                    {hasAnyPhoto ? (
-                      <View style={styles.pendingGrid}>
-                        {keptPhotos.map((url) => (
-                          <View
-                            key={`keep-${url}`}
-                            style={styles.pendingThumbWrap}
-                          >
-                            <Image
-                              source={{ uri: url }}
-                              style={styles.editKeepThumb}
-                              contentFit="cover"
-                              transition={150}
-                            />
-                            <Pressable
-                              onPress={() => onEditRemoveExisting(url)}
-                              disabled={inFlight}
-                              style={styles.pendingRemoveButton}
-                              accessibilityLabel="Remove photo"
-                            >
-                              <Text style={styles.pendingRemoveText}>×</Text>
-                            </Pressable>
-                          </View>
-                        ))}
-                        {editNewSources.map((src, i) => {
-                          const uri =
-                            src.kind === "web-file"
-                              ? URL.createObjectURL(src.file)
-                              : src.uri;
-                          return (
-                            <View
-                              key={`edit-new-${i}`}
-                              style={styles.pendingThumbWrap}
-                            >
-                              <Image
-                                source={{ uri }}
-                                style={styles.pendingThumb}
-                                contentFit="cover"
-                              />
-                              <Pressable
-                                onPress={() => onEditRemoveNew(i)}
-                                disabled={inFlight}
-                                style={styles.pendingRemoveButton}
-                                accessibilityLabel="Remove photo"
-                              >
-                                <Text style={styles.pendingRemoveText}>×</Text>
-                              </Pressable>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    ) : null}
-
-                    <Button
-                      label={t("daily_updates.add_photo_button")}
-                      onPress={onEditAddPhotos}
-                      variant="secondary"
-                      disabled={inFlight}
-                      fullWidth
-                    />
-
-                    <TextInput
-                      value={editNote}
-                      onChangeText={setEditNote}
-                      placeholder={t("daily_updates.note_placeholder")}
-                      placeholderTextColor={colors.inkSoft}
-                      multiline
-                      editable={!inFlight}
-                      style={styles.noteInput}
-                    />
-
-                    {editError ? (
-                      <Text style={styles.errorText}>{editError}</Text>
-                    ) : null}
-
-                    <View style={styles.entryActionRow}>
-                      <Button
-                        label={
-                          inFlight
-                            ? t("daily_updates.edit_saving")
-                            : t("daily_updates.edit_save_button")
-                        }
-                        onPress={() => onEditSave(u.id)}
-                        variant="primary"
-                        size="compact"
-                        loading={inFlight}
-                        disabled={!canSave}
-                      />
-                      <Button
-                        label={t("daily_updates.edit_cancel_button")}
-                        onPress={onEditCancel}
-                        variant="secondary"
-                        size="compact"
-                        disabled={inFlight}
-                      />
-                    </View>
-                  </View>
-                );
-              }
-
-              // Normal display mode
-              return (
-                <View key={u.id} style={styles.updateCard}>
-                  <Text style={styles.updateDate}>
-                    {formatRiyadhStamp(u.created_at, locale)}
-                  </Text>
-                  {photos.length > 0 ? (
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.updatePhotosRow}
-                    >
-                      {photos.map((url, i) => (
-                        <Image
-                          key={`${u.id}-${i}`}
-                          source={{ uri: url }}
-                          style={styles.updatePhoto}
-                          contentFit="cover"
-                          transition={150}
-                        />
-                      ))}
-                    </ScrollView>
-                  ) : null}
-                  {u.note_ar ? (
-                    <Text style={styles.updateNote}>{u.note_ar}</Text>
-                  ) : null}
-                  {/* Edit + Delete (host + booking.status === 'active'
-                      only — same gate as canMutateUpdates). Both disable
-                      while another mutation is in flight. */}
-                  {canMutateUpdates ? (
-                    <View style={styles.entryActionRow}>
-                      <Button
-                        label={t("daily_updates.edit_button")}
-                        onPress={() => onEditStart(u)}
-                        variant="secondary"
-                        size="compact"
-                        disabled={
-                          editingEntryId !== null || deletingFlight !== null
-                        }
-                      />
-                      <Button
-                        label={
-                          deletingFlight === u.id
-                            ? t("daily_updates.deleting")
-                            : t("daily_updates.delete_button")
-                        }
-                        onPress={() => onDelete(u.id)}
-                        variant="destructive"
-                        size="compact"
-                        loading={deletingFlight === u.id}
-                        disabled={
-                          editingEntryId !== null || deletingFlight !== null
-                        }
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {deleteError ? (
-          <Text style={styles.errorText}>{deleteError}</Text>
-        ) : null}
-
-        {/* Post form — host-only, active-only, AND a check-in report
-            must exist (chronological gate: the stay-flow is check-in →
-            daily updates → check-out). Without a check-in, the hint
-            block below replaces the form. */}
-        {canMutateUpdates && checkInReport ? (
-          <View style={styles.postForm}>
-            {pendingPhotos.length > 0 ? (
-              <View style={styles.pendingGrid}>
-                {pendingPhotos.map((src, i) => {
-                  const uri =
-                    src.kind === "web-file"
-                      ? URL.createObjectURL(src.file)
-                      : src.uri;
-                  return (
-                    <View key={`pending-${i}`} style={styles.pendingThumbWrap}>
-                      <Image
-                        source={{ uri }}
-                        style={styles.pendingThumb}
-                        contentFit="cover"
-                      />
-                      <Pressable
-                        onPress={() => onRemovePending(i)}
-                        disabled={postingUpdate}
-                        style={styles.pendingRemoveButton}
-                        accessibilityLabel="Remove photo"
-                      >
-                        <Text style={styles.pendingRemoveText}>×</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
-
-            <Button
-              label={t("daily_updates.add_photo_button")}
-              onPress={onAddPhoto}
-              variant="secondary"
-              disabled={postingUpdate}
-              fullWidth
-            />
-
-            <TextInput
-              value={updateNote}
-              onChangeText={setUpdateNote}
-              placeholder={t("daily_updates.note_placeholder")}
-              placeholderTextColor={colors.inkSoft}
-              multiline
-              editable={!postingUpdate}
-              style={styles.noteInput}
-            />
-
-            {postError ? (
-              <Text style={styles.errorText}>{postError}</Text>
-            ) : null}
-
-            <View style={styles.crFormActions}>
-              <Button
-                label={t("daily_updates.cancel_button")}
-                onPress={() => {
-                  setPendingPhotos([]);
-                  setUpdateNote("");
-                  setPostError(null);
-                }}
-                variant="secondary"
-                disabled={
-                  postingUpdate ||
-                  (pendingPhotos.length === 0 && updateNote.trim() === "")
-                }
-              />
-              <Button
-                label={
-                  postingUpdate
-                    ? t("daily_updates.posting")
-                    : t("daily_updates.submit_button")
-                }
-                onPress={onSubmitUpdate}
-                variant="primary"
-                loading={postingUpdate}
-                disabled={
-                  pendingPhotos.length === 0 && updateNote.trim() === ""
-                }
-              />
-            </View>
-          </View>
-        ) : null}
-
-        {/* Hint replacing the post form when the host is on an active
-            booking but hasn't filed the check-in report yet. Existing
-            updates above still display normally; only the compose form
-            is gated. */}
-        {canMutateUpdates && !checkInReport ? (
-          <View style={styles.postForm}>
-            <Text style={styles.muted}>
-              {t("daily_updates.check_in_first_hint")}
-            </Text>
-          </View>
-        ) : null}
-        </View>
+        {/* Daily updates section — extracted to DailyUpdatesSection.
+            Parent owns ALL state + handlers (compose, per-entry edit,
+            delete) plus the dirty predicates (isUpdateFormDirty /
+            isAnyFormDirty) wired into confirmLeaveIfDirty +
+            beforeunload; the component is presentational. */}
+        <DailyUpdatesSection
+          updates={updates}
+          updatesLoading={updatesLoading}
+          canMutateUpdates={canMutateUpdates}
+          checkInReport={checkInReport}
+          pendingPhotos={pendingPhotos}
+          updateNote={updateNote}
+          postingUpdate={postingUpdate}
+          postError={postError}
+          onAddPhoto={onAddPhoto}
+          onRemovePending={onRemovePending}
+          onSubmitUpdate={onSubmitUpdate}
+          setUpdateNote={setUpdateNote}
+          setPendingPhotos={setPendingPhotos}
+          setPostError={setPostError}
+          editingEntryId={editingEntryId}
+          editKeep={editKeep}
+          editNewSources={editNewSources}
+          editNote={editNote}
+          editingFlight={editingFlight}
+          editError={editError}
+          onEditStart={onEditStart}
+          onEditCancel={onEditCancel}
+          onEditAddPhotos={onEditAddPhotos}
+          onEditRemoveExisting={onEditRemoveExisting}
+          onEditRemoveNew={onEditRemoveNew}
+          onEditSave={onEditSave}
+          setEditNote={setEditNote}
+          deletingFlight={deletingFlight}
+          deleteError={deleteError}
+          onDelete={onDelete}
+        />
 
         {/* Check-out report — sits below the daily updates section so the
             on-screen flow reads check-in → daily updates → check-out.
@@ -1366,28 +1105,10 @@ const styles = StyleSheet.create({
     color: colors.terracotta,
     textAlign: "center",
   },
-  // ---- daily updates (Phase 6.2) ----
-  dailyUpdatesTitle: {
-    fontFamily: fonts.headingBold,
-    fontSize: 18,
-    color: colors.mossDeep,
-  },
-  updatesList: {
-    gap: spacing.md,
-    width: "100%",
-  },
-  updateCard: {
-    backgroundColor: colors.paper,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    gap: spacing.sm,
-    ...shadows.card,
-  },
-  updateDate: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 12,
-    color: colors.inkSoft,
-  },
+  // ---- Saved-card display styles still used by the standalone
+  // check-out card lower in the JSX. (Originally lived alongside the
+  // daily-updates section heading + list + card styles, which moved
+  // into DailyUpdatesSection in the Phase 6.2 extraction.) ----
   updatePhotosRow: {
     gap: spacing.sm,
   },
@@ -1401,16 +1122,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.ink,
-  },
-  postForm: {
-    width: "100%",
-    backgroundColor: colors.paper,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.whisper,
-    marginTop: spacing.md,
   },
   pendingGrid: {
     flexDirection: "row",
@@ -1430,21 +1141,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: "dashed",
     borderColor: colors.inkSoft,
-  },
-  // Existing photo shown inside the edit form. Same dimensions as
-  // pendingThumb but no dashed border — visually identical to a saved
-  // photo, just with the × overlay for removal.
-  editKeepThumb: {
-    width: 100,
-    height: 100,
-    borderRadius: radii.md,
-    backgroundColor: colors.whisper,
-  },
-  entryActionRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-    flexWrap: "wrap",
   },
   pendingRemoveButton: {
     position: "absolute",
