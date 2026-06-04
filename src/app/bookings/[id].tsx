@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
+import { HostActions } from "@/components/bookings/HostActions";
 import { useBooking } from "@/hooks/useBooking";
 import { useConditionReports } from "@/hooks/useConditionReports";
 import { useDailyUpdates } from "@/hooks/useDailyUpdates";
@@ -1307,67 +1308,15 @@ export default function BookingDetailScreen() {
         ) : null}
 
         {isHost ? (
-          <>
-            {hostError ? (
-              <Text style={styles.errorText}>{hostError}</Text>
-            ) : null}
-            {booking.status === "requested" ? (
-              <>
-                <Button
-                  label={
-                    hostFlight === "accept"
-                      ? t("booking.host_accepting")
-                      : t("booking.host_accept_button")
-                  }
-                  onPress={onHostAccept}
-                  variant="primary"
-                  loading={hostFlight === "accept"}
-                  disabled={!!hostFlight && hostFlight !== "accept"}
-                  fullWidth
-                />
-                <Button
-                  label={
-                    hostFlight === "decline"
-                      ? t("booking.host_declining")
-                      : t("booking.host_decline_button")
-                  }
-                  onPress={onHostDecline}
-                  variant="destructive"
-                  loading={hostFlight === "decline"}
-                  disabled={!!hostFlight && hostFlight !== "decline"}
-                  fullWidth
-                />
-              </>
-            ) : null}
-            {booking.status === "accepted" ? (
-              <Button
-                label={
-                  hostFlight === "start"
-                    ? t("booking.host_starting")
-                    : t("booking.host_start_button")
-                }
-                onPress={onHostStart}
-                variant="primary"
-                loading={hostFlight === "start"}
-                disabled={!!hostFlight && hostFlight !== "start"}
-                fullWidth
-              />
-            ) : null}
-            {booking.status === "active" ? (
-              <Button
-                label={
-                  hostFlight === "complete"
-                    ? t("booking.host_completing")
-                    : t("booking.host_complete_button")
-                }
-                onPress={onHostComplete}
-                variant="primary"
-                loading={hostFlight === "complete"}
-                disabled={!!hostFlight && hostFlight !== "complete"}
-                fullWidth
-              />
-            ) : null}
-          </>
+          <HostActions
+            status={booking.status}
+            hostFlight={hostFlight}
+            hostError={hostError}
+            onAccept={onHostAccept}
+            onDecline={onHostDecline}
+            onStart={onHostStart}
+            onComplete={onHostComplete}
+          />
         ) : null}
 
         {canCancel ? (
