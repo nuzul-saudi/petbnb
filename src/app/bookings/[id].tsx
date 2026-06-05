@@ -1036,6 +1036,7 @@ export default function BookingDetailScreen() {
             onDecline={onHostDecline}
             onStart={onHostStart}
             onComplete={onHostComplete}
+            hideComplete={canFileCheckOut}
           />
         ) : null}
 

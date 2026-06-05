@@ -26,6 +26,14 @@ export type HostActionsProps = {
   onDecline: () => void;
   onStart: () => void;
   onComplete: () => void;
+  /**
+   * Suppress the active-state Complete button. Used when CheckOutSection
+   * is the active path to completion (active booking + no check-out
+   * report yet). When a check-out report exists but the booking is still
+   * active (the seam-retry case), this should be false so the host has a
+   * Complete button to finish the stay.
+   */
+  hideComplete?: boolean;
 };
 
 export function HostActions({
@@ -36,6 +44,7 @@ export function HostActions({
   onDecline,
   onStart,
   onComplete,
+  hideComplete = false,
 }: HostActionsProps) {
   const { t } = useTranslation();
 
@@ -86,7 +95,7 @@ export function HostActions({
           fullWidth
         />
       ) : null}
-      {status === "active" ? (
+      {status === "active" && !hideComplete ? (
         <Button
           label={
             hostFlight === "complete"
