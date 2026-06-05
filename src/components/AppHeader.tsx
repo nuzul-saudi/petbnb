@@ -71,60 +71,31 @@ export function AppHeader({
         activeColor={theme.accent}
         onPress={safeNav(() => router.push('/profile'))}
       />
-      {/* Persona switch — visible only for role='both'. Tapping the
-          inactive pill calls setPersona; tapping the active pill is a
-          no-op. Not gated by confirmLeave because switching persona
+      {/* Persona toggle — visible only for role='both'. Single
+          destination-labeled button: its label names the OTHER persona
+          (the one you'd switch TO). Tapping calls setPersona(the other
+          persona). Not gated by confirmLeave because switching persona
           doesn't navigate (it changes which home renders later, when
-          the user taps Home in the nav). */}
+          the user taps Home in the nav).
+
+          Pending-host attention badge placement is mode-dependent:
+            • Owner mode → badge sits ON the toggle (the toggle IS the
+              host-mode entry point, so the alert belongs there).
+            • Host mode → badge is a standalone Pressable next to the
+              toggle (the toggle says "Owner" and host-work alert on it
+              would read confusingly). Tapping the standalone badge
+              routes to the host home for now; 7.6 will repoint at the
+              pending-requests list. */}
       {profile?.role === 'both' ? (
         <View style={styles.personaSwitch}>
           <Pressable
-            onPress={() => {
-              if (persona !== 'owner') setPersona('owner');
-            }}
-            style={[
-              styles.personaPill,
-              persona === 'owner' && styles.personaPillActive,
-              persona === 'owner' && {
-                backgroundColor: theme.accent,
-                borderColor: theme.accent,
-              },
-            ]}
+            onPress={() => setPersona(persona === 'host' ? 'owner' : 'host')}
+            style={[styles.personaToggle, { borderColor: theme.accent }]}
           >
-            <Text
-              style={[
-                styles.personaPillText,
-                persona === 'owner' && styles.personaPillTextActive,
-              ]}
-            >
-              {t('persona.owner')}
+            <Text style={[styles.personaToggleText, { color: theme.accent }]}>
+              {persona === 'host' ? t('persona.owner') : t('persona.host')}
             </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              if (persona !== 'host') setPersona('host');
-            }}
-            style={[
-              styles.personaPill,
-              persona === 'host' && styles.personaPillActive,
-              persona === 'host' && {
-                backgroundColor: theme.accent,
-                borderColor: theme.accent,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.personaPillText,
-                persona === 'host' && styles.personaPillTextActive,
-              ]}
-            >
-              {t('persona.host')}
-            </Text>
-            {/* Attention dot (7.1e). Visible only when the host has
-                booking requests waiting and we're in the persona-switch
-                context (already gated on role='both' by the parent). */}
-            {pendingHostCount > 0 ? (
+            {persona === 'owner' && pendingHostCount > 0 ? (
               <View style={styles.attentionDot}>
                 <Text style={styles.attentionDotText}>
                   {pendingHostCount > 9 ? '9+' : String(pendingHostCount)}
@@ -132,6 +103,24 @@ export function AppHeader({
               </View>
             ) : null}
           </Pressable>
+          {persona === 'host' && pendingHostCount > 0 ? (
+            <Pressable
+              // TODO 7.6: route to the pending-requests list once it
+              // exists. Until then, '/' lands on the host home.
+              onPress={() => router.push('/')}
+              style={styles.requestsBadge}
+            >
+              {/* Inbox-tray glyph names the badge: this is pending
+                  requests, not a generic alert. Emoji avoids new i18n
+                  keys; reads in both LTR and RTL since flex-row
+                  reverses naturally and the glyph itself isn't
+                  directional. */}
+              <Text style={styles.requestsBadgeIcon}>📥</Text>
+              <Text style={styles.attentionDotText}>
+                {pendingHostCount > 9 ? '9+' : String(pendingHostCount)}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
       <Pressable onPress={onLanguageToggle} style={styles.langToggle}>
@@ -207,39 +196,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.moss,
   },
-  // Persona switch — two-pill toggle visible only for role='both'.
-  // Active pill: moss-filled. Inactive: whisper-outlined. Sized to fit
-  // the existing header density. 7.1e will add a small attention dot
-  // to the host pill; the layout already leaves room (the pill is its
-  // own positioned element, so a corner dot won't disrupt flow).
+  // Persona switch container — holds the single destination toggle
+  // and (in host mode) the standalone attention badge as siblings.
   personaSwitch: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
   },
-  personaPill: {
+  // Single destination-labeled toggle (replaces the old two-pill
+  // control). Outlined treatment — transparent bg + theme.accent border
+  // + theme.accent label applied inline at the JSX site. Matches the
+  // header's existing density (small pill, similar size to langToggle).
+  personaToggle: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.whisper,
   },
-  personaPillActive: {
-    backgroundColor: colors.moss,
-    borderColor: colors.moss,
-  },
-  personaPillText: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.inkSoft,
-  },
-  personaPillTextActive: {
+  personaToggleText: {
     fontFamily: fonts.bodyBold,
-    color: colors.cream,
+    fontSize: 11,
   },
-  // Attention dot on the host persona pill. `end` (not `right`) keeps
-  // the dot on the trailing edge of the pill in both LTR and RTL
-  // layouts. minWidth + paddingHorizontal lets the badge expand to
-  // accommodate "9+" without losing its pill shape for single digits.
+  // Attention badge that sits ON the destination toggle when in owner
+  // mode. `end` (not `right`) keeps it on the trailing edge in both
+  // LTR and RTL. minWidth + paddingHorizontal lets it stretch for
+  // "9+" without losing pill shape on single digits.
   attentionDot: {
     position: 'absolute',
     top: -4,
@@ -251,6 +232,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.terracotta,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Standalone host-mode badge — icon + count pill (replaces the bare
+  // attentionDotInline from the prior revision). The inbox glyph self-
+  // labels it as "pending requests" so the meaning is obvious on first
+  // encounter; the count behavior matches the owner-mode badge (1–9,
+  // "9+" cap, hidden at 0). Slightly taller than attentionDot to seat
+  // the icon comfortably alongside the count.
+  requestsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    minHeight: 18,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: radii.pill,
+    backgroundColor: colors.terracotta,
+  },
+  requestsBadgeIcon: {
+    fontSize: 12,
+    // tight lineHeight keeps the emoji centered with the count text
+    lineHeight: 14,
   },
   attentionDotText: {
     fontFamily: fonts.bodyBold,
