@@ -8,6 +8,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { usePersona } from '@/lib/persona';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export type AppHeaderProps = {
@@ -33,6 +34,7 @@ export function AppHeader({
   const pathname = usePathname();
   const { profile } = useAuth();
   const { persona, setPersona } = usePersona();
+  const theme = useTheme();
 
   // Active-route detection: '/' is exact-match; the others are prefix
   // matches so /bookings/[id] still highlights "My Bookings".
@@ -54,16 +56,19 @@ export function AppHeader({
       <NavItem
         label={t('nav.home')}
         active={isActive('/')}
+        activeColor={theme.accent}
         onPress={safeNav(() => router.push('/'))}
       />
       <NavItem
         label={t('nav.bookings')}
         active={isActive('/bookings')}
+        activeColor={theme.accent}
         onPress={safeNav(() => router.push('/bookings'))}
       />
       <NavItem
         label={t('nav.account')}
         active={isActive('/profile')}
+        activeColor={theme.accent}
         onPress={safeNav(() => router.push('/profile'))}
       />
       {/* Persona switch — visible only for role='both'. Tapping the
@@ -80,6 +85,10 @@ export function AppHeader({
             style={[
               styles.personaPill,
               persona === 'owner' && styles.personaPillActive,
+              persona === 'owner' && {
+                backgroundColor: theme.accent,
+                borderColor: theme.accent,
+              },
             ]}
           >
             <Text
@@ -98,6 +107,10 @@ export function AppHeader({
             style={[
               styles.personaPill,
               persona === 'host' && styles.personaPillActive,
+              persona === 'host' && {
+                backgroundColor: theme.accent,
+                borderColor: theme.accent,
+              },
             ]}
           >
             <Text
@@ -112,7 +125,7 @@ export function AppHeader({
         </View>
       ) : null}
       <Pressable onPress={onLanguageToggle} style={styles.langToggle}>
-        <Text style={styles.langToggleText}>
+        <Text style={[styles.langToggleText, { color: theme.accent }]}>
           {locale === 'ar'
             ? t('nav.lang_toggle_to_en')
             : t('nav.lang_toggle_to_ar')}
@@ -125,15 +138,27 @@ export function AppHeader({
 function NavItem({
   label,
   active,
+  activeColor,
   onPress,
 }: {
   label: string;
   active: boolean;
+  // Persona-aware accent for the active state. Owner mode resolves to
+  // colors.moss (matches the static navTextActive style), host mode to
+  // colors.goldDeep. Passed in by AppHeader so NavItem stays a plain
+  // sub-component without its own hook calls.
+  activeColor: string;
   onPress: () => void;
 }) {
   return (
     <Pressable onPress={onPress} style={styles.navItem}>
-      <Text style={[styles.navText, active && styles.navTextActive]}>
+      <Text
+        style={[
+          styles.navText,
+          active && styles.navTextActive,
+          active && { color: activeColor },
+        ]}
+      >
         {label}
       </Text>
     </Pressable>

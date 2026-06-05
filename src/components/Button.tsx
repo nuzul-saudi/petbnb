@@ -21,6 +21,7 @@ import {
   View,
 } from 'react-native';
 
+import { useTheme, type Theme } from '@/theme/theme';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive';
@@ -48,8 +49,9 @@ export function Button({
   fullWidth = false,
   accessibilityLabel,
 }: ButtonProps) {
+  const theme = useTheme();
   const isDisabled = disabled || loading;
-  const variantStyle = VARIANT_STYLES[variant];
+  const variantStyle = getVariantStyle(variant, theme);
   const sizeStyle = SIZE_STYLES[size];
 
   return (
@@ -116,28 +118,35 @@ const SIZE_STYLES: Record<
   },
 };
 
-// Per-variant color triple. Kept as a record so adding a fourth variant
-// later is a one-row change.
-const VARIANT_STYLES: Record<
-  ButtonVariant,
-  { background: string; border: string; label: string }
-> = {
-  primary: {
-    background: colors.moss,
-    border: colors.moss,
-    label: colors.cream,
-  },
-  secondary: {
-    background: 'transparent',
-    border: colors.moss,
-    label: colors.moss,
-  },
-  destructive: {
-    background: 'transparent',
-    border: colors.terracotta,
-    label: colors.terracotta,
-  },
-};
+// Per-variant color triple. Resolves the primary/secondary accent
+// against the active persona theme (owner=moss, host=goldDeep) so the
+// same Button automatically picks up the host accent for any host-mode
+// viewer. Destructive is universal — terracotta on both themes.
+function getVariantStyle(
+  variant: ButtonVariant,
+  theme: Theme,
+): { background: string; border: string; label: string } {
+  switch (variant) {
+    case 'primary':
+      return {
+        background: theme.accent,
+        border: theme.accent,
+        label: colors.cream,
+      };
+    case 'secondary':
+      return {
+        background: 'transparent',
+        border: theme.accent,
+        label: theme.accent,
+      };
+    case 'destructive':
+      return {
+        background: 'transparent',
+        border: colors.terracotta,
+        label: colors.terracotta,
+      };
+  }
+}
 
 const styles = StyleSheet.create({
   base: {
