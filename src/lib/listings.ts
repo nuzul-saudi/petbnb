@@ -243,3 +243,38 @@ export async function countCompletedBookingsForHost(
   if (error) throw error;
   return count ?? 0;
 }
+
+/**
+ * Count of pending (status='requested') bookings across all of a
+ * host's listings. Used by the AppHeader persona-switch attention dot
+ * (Step 7.1e) to flag waiting host work to a 'both' user currently in
+ * owner persona — the whole point of the dot is to be visible WHILE
+ * the user is in owner mode.
+ *
+ * Same query shape as countCompletedBookingsForHost above (host owns
+ * the listings, bookings RLS permits the host to read these rows).
+ * Only the status filter differs.
+ */
+export async function countPendingHostBookings(
+  hostId: string,
+): Promise<number> {
+  if (!supabase) return 0;
+
+  const { data: hostListings, error: lErr } = await supabase
+    .from('listings')
+    .select('id')
+    .eq('host_id', hostId);
+  if (lErr) throw lErr;
+  if (!hostListings || hostListings.length === 0) return 0;
+
+  const { count, error } = await supabase
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'requested')
+    .in(
+      'listing_id',
+      hostListings.map((l) => l.id),
+    );
+  if (error) throw error;
+  return count ?? 0;
+}

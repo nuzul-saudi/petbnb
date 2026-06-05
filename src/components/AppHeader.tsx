@@ -33,7 +33,7 @@ export function AppHeader({
   const router = useRouter();
   const pathname = usePathname();
   const { profile } = useAuth();
-  const { persona, setPersona } = usePersona();
+  const { persona, setPersona, pendingHostCount } = usePersona();
   const theme = useTheme();
 
   // Active-route detection: '/' is exact-match; the others are prefix
@@ -121,6 +121,16 @@ export function AppHeader({
             >
               {t('persona.host')}
             </Text>
+            {/* Attention dot (7.1e). Visible only when the host has
+                booking requests waiting and we're in the persona-switch
+                context (already gated on role='both' by the parent). */}
+            {pendingHostCount > 0 ? (
+              <View style={styles.attentionDot}>
+                <Text style={styles.attentionDotText}>
+                  {pendingHostCount > 9 ? '9+' : String(pendingHostCount)}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
       ) : null}
@@ -225,5 +235,27 @@ const styles = StyleSheet.create({
   personaPillTextActive: {
     fontFamily: fonts.bodyBold,
     color: colors.cream,
+  },
+  // Attention dot on the host persona pill. `end` (not `right`) keeps
+  // the dot on the trailing edge of the pill in both LTR and RTL
+  // layouts. minWidth + paddingHorizontal lets the badge expand to
+  // accommodate "9+" without losing its pill shape for single digits.
+  attentionDot: {
+    position: 'absolute',
+    top: -4,
+    end: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: colors.terracotta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attentionDotText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    color: colors.cream,
+    lineHeight: 12,
   },
 });
