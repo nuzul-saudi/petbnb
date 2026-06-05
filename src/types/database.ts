@@ -157,6 +157,7 @@ export type Database = {
           title_en: string | null;
           description_ar: string | null;
           description_en: string | null;
+          city: 'riyadh' | 'dammam';
           neighborhood: string;
           nightly_price_sar: number;
           max_concurrent_pets: number;
@@ -178,6 +179,7 @@ export type Database = {
           title_en?: string | null;
           description_ar?: string | null;
           description_en?: string | null;
+          city: 'riyadh' | 'dammam';
           neighborhood: string;
           nightly_price_sar: number;
           max_concurrent_pets?: number;
@@ -199,6 +201,7 @@ export type Database = {
           title_en?: string | null;
           description_ar?: string | null;
           description_en?: string | null;
+          city?: 'riyadh' | 'dammam';
           neighborhood?: string;
           nightly_price_sar?: number;
           max_concurrent_pets?: number;
