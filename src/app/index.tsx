@@ -298,7 +298,8 @@ function OwnerFeedHome() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.cream,
+    // backgroundColor intentionally omitted — the themed AppShell
+    // wrapper supplies it (cream in owner mode, honey in host mode).
   },
   // --- placeholder (host) ---
   placeholderContainer: {

@@ -10,13 +10,13 @@ import {
   ReemKufi_700Bold,
 } from '@expo-google-fonts/reem-kufi';
 import { useEffect } from 'react';
-import { I18nManager, Platform } from 'react-native';
+import { I18nManager, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/lib/auth';
 import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
 import { PersonaProvider } from '@/lib/persona';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/theme';
 
 // Locale-aware layout direction. On web we drive flow via document.dir;
 // on native, forceRTL() applies on next cold start (this session may
@@ -65,17 +65,20 @@ export default function RootLayout() {
 // useTranslation because it's the component that mounts the provider.
 function AppShell() {
   const { locale } = useTranslation();
+  const theme = useTheme();
 
   useEffect(() => {
     configureRTL(locale);
   }, [locale]);
 
+  // Theme-aware screen background: applied in ONE place here so that
+  // any screen whose own SafeAreaView omits backgroundColor inherits
+  // theme.background through transparency. Owner mode resolves to
+  // colors.cream — byte-identical to today's render where the Stack
+  // contentStyle supplied the same value.
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.cream },
-      }}
-    />
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <Stack screenOptions={{ headerShown: false }} />
+    </View>
   );
 }

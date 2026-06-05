@@ -227,7 +227,8 @@ function Amenity({ label, note }: { label: string; note?: string }) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.cream,
+    // backgroundColor intentionally omitted — themed AppShell wrapper
+    // supplies it (cream in owner mode, honey in host mode).
   },
   scroll: {
     paddingBottom: spacing.xxl,

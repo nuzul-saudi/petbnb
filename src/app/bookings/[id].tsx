@@ -1056,7 +1056,8 @@ export default function BookingDetailScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.cream,
+    // backgroundColor intentionally omitted — themed AppShell wrapper
+    // supplies it (cream in owner mode, honey in host mode).
   },
   scroll: {
     padding: spacing.xl,

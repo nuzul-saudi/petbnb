@@ -130,7 +130,8 @@ function StatusPill({ status }: { status: Enums<'booking_status'> }) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.cream,
+    // backgroundColor intentionally omitted — themed AppShell wrapper
+    // supplies it (cream in owner mode, honey in host mode).
   },
   header: {
     paddingHorizontal: spacing.xl,

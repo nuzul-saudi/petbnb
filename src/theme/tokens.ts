@@ -5,6 +5,10 @@ export const colors = {
   sand: '#F5EFE6',
   cream: '#FAF6EE',
   paper: '#FFFCF5',
+  // Host-mode screen background. Warmer + more saturated than cream
+  // so the persona shift is unmistakable at a glance per founder
+  // test-feedback. Resolved via theme.background; never hardcoded.
+  honey: '#EFE0B5',
 
   ink: '#1F2A1D',
   inkSoft: '#3D4A3A',
@@ -15,6 +19,11 @@ export const colors = {
 
   gold: '#C4A464',
   goldDeep: '#8C7340',
+  // Deepened gold used only by host-mode secondary buttons. goldDeep
+  // on honey is ~3.5:1 (sub-AA for normal text); goldInk on honey
+  // is ~5:1 (AA pass). Owner mode keeps moss everywhere and never
+  // touches this token.
+  goldInk: '#6E5A30',
 
   terracotta: '#B45842',
   rose: '#D49389',

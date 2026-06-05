@@ -136,8 +136,12 @@ function getVariantStyle(
     case 'secondary':
       return {
         background: 'transparent',
-        border: theme.accent,
-        label: theme.accent,
+        // accentInk (not accent): in host mode this is the deepened
+        // goldInk that stays crisp on the honey background. Owner mode
+        // resolves accentInk to the same moss value as accent, so
+        // owner secondary buttons render byte-identically.
+        border: theme.accentInk,
+        label: theme.accentInk,
       };
     case 'destructive':
       return {
