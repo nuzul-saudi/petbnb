@@ -11,11 +11,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { Button } from '@/components/Button';
 import { ListingCard } from '@/components/ListingCard';
 import { useAuth } from '@/lib/auth';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
-import { listActiveListings, type ListingFeedItem } from '@/lib/listings';
+import {
+  listActiveListings,
+  listOwnListings,
+  type ListingFeedItem,
+} from '@/lib/listings';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function HomeScreen() {
@@ -29,43 +34,118 @@ export default function HomeScreen() {
   if (profile.full_name.trim() === '') return <Redirect href="/role" />;
   if (profile.role === 'admin') return <Redirect href="/admin" />;
 
-  if (profile.role === 'host') return <HostPlaceholderHome />;
+  if (profile.role === 'host') return <HostHome />;
   return <OwnerFeedHome />;
 }
 
 // ---------------------------------------------------------------------------
-// Host-only home (placeholder until Step 7 ships the host dashboard).
+// Host-only home (Step 7.1a — replaces the placeholder).
+// Read-only list of the host's own listings + a Create entry point. No
+// listing writes (those start in 7.2). Persona switch, host theme, and
+// pending-request flag come in 7.1c–7.1e.
+// Sign-out access is preserved via the existing AppHeader → My Account
+// route (/profile carries the sign-out pressable).
 // ---------------------------------------------------------------------------
 
-function HostPlaceholderHome() {
+function HostHome() {
+  const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+
+  const [items, setItems] = useState<ListingFeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!profile) return;
+      if (!opts.silent) setLoading(true);
+      setError(null);
+      try {
+        const rows = await listOwnListings(profile.id);
+        setItems(rows);
+      } catch (e) {
+        console.warn('[host_home.load_failed]', e);
+        setError(t('feed.load_failed'));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [profile, t],
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load({ silent: true });
+  }, [load]);
+
+  const onCreate = () => {
+    // Target route built in Step 7.2 (create-listing screen). Expo's
+    // typed routes accept the literal even before the file exists, so
+    // no @ts-expect-error needed here.
+    router.push('/listings/new');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
-      <View style={styles.placeholderContainer}>
-        <Text style={styles.greeting}>
-          {t('home.signed_in_greeting', { name: profile!.full_name })}
-        </Text>
-
-        <View style={styles.metaRow}>
-          <Text style={styles.metaLabel}>{t('home.your_role')}:</Text>
-          <Text style={styles.metaValue}>{t(`role.${profile!.role}`)}</Text>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.greetingSmall}>
+            {t('home.signed_in_greeting', { name: profile!.full_name })}
+          </Text>
         </View>
-
-        <Text style={styles.placeholderTitle}>
-          {t('home.host_placeholder_title')}
-        </Text>
-        <Text style={styles.placeholderBody}>
-          {t('home.host_placeholder_body')}
-        </Text>
-
-        <Pressable onPress={signOut} style={styles.signOut}>
-          <Text style={styles.signOutText}>{t('home.sign_out')}</Text>
-        </Pressable>
       </View>
+
+      <View style={styles.createButtonWrap}>
+        <Button
+          label={t('home.host_home_create_button')}
+          onPress={onCreate}
+          variant="primary"
+          fullWidth
+        />
+      </View>
+
+      {loading ? (
+        <View style={styles.centered}>
+          <Text style={styles.centeredText}>{t('feed.loading')}</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : items.length === 0 ? (
+        <View style={styles.placeholderContainer}>
+          <Text style={styles.placeholderTitle}>
+            {t('home.host_home_empty_title')}
+          </Text>
+          <Text style={styles.placeholderBody}>
+            {t('home.host_home_empty_body')}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(it) => it.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <ListingCard
+              listing={item}
+              onPress={() => router.push(`/listings/${item.id}`)}
+            />
+          )}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -316,6 +396,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
+  },
+  createButtonWrap: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
   },
   centered: {
     flex: 1,

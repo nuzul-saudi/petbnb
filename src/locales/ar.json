@@ -9,8 +9,9 @@
     "signed_in_greeting": "أهلاً، {name}",
     "your_role": "دورك",
     "sign_out": "تسجيل الخروج",
-    "host_placeholder_title": "أنت مسجّل كمضيف",
-    "host_placeholder_body": "لوحة المضيف ستضاف في الخطوة ٧"
+    "host_home_empty_title": "لم تضيفي أي إعلان بعد",
+    "host_home_empty_body": "أنشئي إعلانك الأول لبدء استضافة القطط.",
+    "host_home_create_button": "إضافة إعلان جديد"
   },
   "feed": {
     "title": "المضيفون في الرياض",

@@ -156,6 +156,53 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
 }
 
 /**
+ * Returns a host's own listings — every row where host_id matches,
+ * regardless of is_active. Hosts need to see their inactive listings
+ * on their host home to manage them. RLS already permits a host to
+ * SELECT their own listing rows without further policy work.
+ *
+ * Shape mirrors listActiveListings (same nested select + cover-photo
+ * extraction), so callers can reuse ListingCard. distance_km is always
+ * null — distance has no meaning on the host's own list.
+ */
+export async function listOwnListings(
+  hostId: string,
+): Promise<ListingFeedItem[]> {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from('listings')
+    .select(
+      `
+      *,
+      host:profiles(id, full_name, full_name_en, avatar_url),
+      listing_photos(id, photo_url, sort_order)
+    `,
+    )
+    .eq('host_id', hostId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  // Same cover-photo + drop-join transform as listActiveListings.
+  return (data ?? []).map((row) => {
+    const photos = (row.listing_photos ?? []) as PhotoSummary[];
+    const cover = photos.length
+      ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
+      : null;
+    const { listing_photos: _drop, ...rest } = row as typeof row & {
+      listing_photos?: PhotoSummary[];
+    };
+    return {
+      ...(rest as Tables<'listings'>),
+      host: (row.host ?? null) as HostSummary | null,
+      cover_photo: cover,
+      distance_km: null,
+    };
+  });
+}
+
+/**
  * Count of completed bookings across all of a host's listings. Used by
  * the listing card + detail to decide whether to show real stats or the
  * "جديد" badge per the no-fake-numbers rule from test round 1.

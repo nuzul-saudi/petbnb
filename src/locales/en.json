@@ -9,8 +9,9 @@
     "signed_in_greeting": "Hi, {name}",
     "your_role": "Your role",
     "sign_out": "Sign out",
-    "host_placeholder_title": "You're registered as a sitter",
-    "host_placeholder_body": "The sitter dashboard will be added in Step 7"
+    "host_home_empty_title": "You haven't listed a place yet",
+    "host_home_empty_body": "Create your first listing to start hosting cats.",
+    "host_home_create_button": "Create a listing"
   },
   "feed": {
     "title": "Sitters in Riyadh",
