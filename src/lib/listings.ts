@@ -287,3 +287,60 @@ export async function countPendingHostBookings(
   if (error) throw error;
   return count ?? 0;
 }
+
+/**
+ * Insert a new host-created listing (Step 7.2d) — the first
+ * listings INSERT path in the codebase. Sets is_active=false
+ * EXPLICITLY (the migration 0019 default is also false, but writing
+ * it in code makes the approval-gate intent clear at the callsite).
+ *
+ * Title and description are written to the _ar columns regardless of
+ * the host's typing language. We have no language detection or
+ * translation step yet (deferred); _en columns stay NULL. The display
+ * path uses pickLocalized, which falls back to _ar when _en is empty,
+ * so listings render correctly in both locales until translation lands.
+ *
+ * tier and additional_pet_discount are NOT set — the DB schema defaults
+ * (bronze / 0.70) apply.
+ *
+ * RLS: listings_insert_host (migration 0004) permits the insert as long
+ * as host_id = auth.uid() and the user is not suspended. No policy
+ * change was needed for 7.2.
+ */
+export async function createListing(input: {
+  hostId: string;
+  city: CityKey;
+  neighborhood: string;
+  title: string;
+  description: string;
+  nightlyPrice: number;
+  maxConcurrentPets: number;
+  hasResidentPets: boolean;
+  residentPetsNote: string | null;
+  offersGrooming: boolean;
+  hostGender: 'female' | 'male';
+}): Promise<{ id: string }> {
+  if (!supabase) throw new Error('supabase not configured');
+
+  const { data, error } = await supabase
+    .from('listings')
+    .insert({
+      host_id: input.hostId,
+      city: input.city,
+      neighborhood: input.neighborhood,
+      title_ar: input.title,
+      description_ar: input.description,
+      nightly_price_sar: input.nightlyPrice,
+      max_concurrent_pets: input.maxConcurrentPets,
+      has_resident_pets: input.hasResidentPets,
+      resident_pets_note: input.residentPetsNote,
+      offers_grooming: input.offersGrooming,
+      host_gender: input.hostGender,
+      is_active: false,
+    })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return { id: data.id };
+}

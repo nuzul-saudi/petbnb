@@ -46,6 +46,36 @@
     "request_button": "Request booking",
     "back": "← Back"
   },
+  "listings": {
+    "form": {
+      "new_title": "Create a listing",
+      "back": "← Back",
+      "city_label": "City",
+      "district_label": "District",
+      "title_label": "Listing title",
+      "title_placeholder": "Cozy apartment near the park…",
+      "description_label": "Description",
+      "description_placeholder": "Tell guests what your place is like and what makes it cat-friendly.",
+      "nightly_price_label": "Nightly price (SAR)",
+      "max_cats_label": "Maximum cats",
+      "has_resident_pets_label": "I have resident pets",
+      "resident_pets_note_label": "About your resident pets",
+      "offers_grooming_label": "I offer grooming",
+      "host_gender_label": "Your gender",
+      "female_label": "Female",
+      "male_label": "Male",
+      "save_button": "Save",
+      "saving": "Saving…",
+      "cancel_button": "Cancel",
+      "save_failed": "Couldn't save the listing. Please try again.",
+      "title_required": "Add a title",
+      "description_required": "Add a description",
+      "district_required": "Pick a district",
+      "host_gender_required": "Pick your gender",
+      "invalid_price": "Enter a whole number ≥ 0",
+      "invalid_max_cats": "Enter a whole number ≥ 1"
+    }
+  },
   "booking": {
     "request_title": "Booking request",
     "back_to_listing": "← Back to sitter",

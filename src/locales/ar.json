@@ -46,6 +46,36 @@
     "request_button": "اطلب الحجز",
     "back": "← رجوع"
   },
+  "listings": {
+    "form": {
+      "new_title": "إنشاء إعلان جديد",
+      "back": "← رجوع",
+      "city_label": "المدينة",
+      "district_label": "الحي",
+      "title_label": "عنوان الإعلان",
+      "title_placeholder": "شقة دافئة قريبة من الحديقة…",
+      "description_label": "الوصف",
+      "description_placeholder": "اوصفي مكانك وما يجعله مناسباً للقطط.",
+      "nightly_price_label": "السعر / ليلة (ر.س)",
+      "max_cats_label": "أقصى عدد للقطط",
+      "has_resident_pets_label": "يوجد لديّ حيوانات مقيمة",
+      "resident_pets_note_label": "حدّثي الضيوف عن حيواناتك المقيمة",
+      "offers_grooming_label": "أقدّم خدمة الاستحمام",
+      "host_gender_label": "جنسك",
+      "female_label": "أنثى",
+      "male_label": "ذكر",
+      "save_button": "حفظ",
+      "saving": "جاري الحفظ...",
+      "cancel_button": "إلغاء",
+      "save_failed": "تعذّر حفظ الإعلان، حاولي مرة أخرى.",
+      "title_required": "أضيفي عنواناً",
+      "description_required": "أضيفي وصفاً",
+      "district_required": "اختاري الحي",
+      "host_gender_required": "اختاري جنسك",
+      "invalid_price": "أدخلي رقماً صحيحاً ≥ 0",
+      "invalid_max_cats": "أدخلي رقماً صحيحاً ≥ 1"
+    }
+  },
   "booking": {
     "request_title": "طلب حجز",
     "back_to_listing": "← العودة إلى الإعلان",
