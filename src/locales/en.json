@@ -165,7 +165,8 @@
     "save_failed": "Couldn't save the report. Please try again.",
     "content_required": "Add a photo or a note",
     "leave_confirm": "You have an unsaved condition report. Leave without saving?",
-    "photo_cap_hint": "Up to 6 photos"
+    "photo_cap_hint": "Up to 6 photos",
+    "checkout_complete_warning": "The check-out report was saved, but completing the stay didn't finish. Tap Complete stay again to finish."
   },
   "supabase": {
     "checking": "Checking Supabase connection…",

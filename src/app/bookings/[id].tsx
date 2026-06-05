@@ -120,6 +120,15 @@ export default function BookingDetailScreen() {
   const [crPosting, setCrPosting] = useState(false);
   const [crPostError, setCrPostError] = useState<string | null>(null);
 
+  // Mirror state for the check-OUT report compose form (Phase 6.4 — Phase
+  // 2 of check-out filing). Same shape as the check-in state above; wired
+  // into CheckOutSection in a follow-up step.
+  const [filingCheckOut, setFilingCheckOut] = useState(false);
+  const [coPendingPhotos, setCoPendingPhotos] = useState<PetPhotoSource[]>([]);
+  const [coNote, setCoNote] = useState("");
+  const [coPosting, setCoPosting] = useState(false);
+  const [coPostError, setCoPostError] = useState<string | null>(null);
+
   // Daily-update form dirty-tracking. The form is dirty when there's at
   // least one pending photo OR the note has any non-whitespace content.
   // Wired into:
@@ -139,10 +148,16 @@ export default function BookingDetailScreen() {
     filingCheckIn &&
     (crPendingPhotos.length > 0 || crNote.trim() !== "");
 
+  // Same shape for the check-out compose form.
+  const isCheckOutFormDirty =
+    filingCheckOut &&
+    (coPendingPhotos.length > 0 || coNote.trim() !== "");
+
   // Any open form with unsaved work. Used by confirmLeaveIfDirty and the
   // beforeunload effect so both daily-updates AND condition-reports
   // unsaved work is protected.
-  const isAnyFormDirty = isUpdateFormDirty || isCrFormDirty;
+  const isAnyFormDirty =
+    isUpdateFormDirty || isCrFormDirty || isCheckOutFormDirty;
 
   // Auto-close any open edit form if the booking transitions out of
   // 'active'. Migration 0015 + the lib status guard would reject the
@@ -175,13 +190,27 @@ export default function BookingDetailScreen() {
     }
   }, [booking?.status, filingCheckIn]);
 
+  // And again for the check-out form. NOTE: status flips to 'completed'
+  // on a successful onCompleteStay, so this effect will also fire after
+  // a successful completion — that's fine, it just clears an already-
+  // empty form.
+  useEffect(() => {
+    if (booking && booking.status !== "active" && filingCheckOut) {
+      setFilingCheckOut(false);
+      setCoPendingPhotos([]);
+      setCoNote("");
+      setCoPostError(null);
+    }
+  }, [booking?.status, filingCheckOut]);
+
   const confirmLeaveIfDirty = (): boolean => {
     if (!isAnyFormDirty) return true;
     if (Platform.OS === "web" && typeof window !== "undefined") {
       // Use the leave message that matches whichever form is dirty.
-      // If both happen to be dirty (rare — different sections), CR
-      // wins because that's the heavier-stakes evidence record.
-      const msg = isCrFormDirty
+      // Both CR forms (check-in + check-out) share the same message —
+      // they're both heavier-stakes evidence records. If a daily-update
+      // form AND a CR form are both dirty, CR wins.
+      const msg = (isCrFormDirty || isCheckOutFormDirty)
         ? t("condition_reports.leave_confirm")
         : t("daily_updates.leave_confirm");
       return window.confirm(msg);
@@ -542,6 +571,10 @@ export default function BookingDetailScreen() {
   // proactively so the host doesn't tap a doomed action.
   const canFileCheckIn = canMutateUpdates && !checkInReport;
 
+  // Check-out gate: same shape — host + active + no check-out yet.
+  // Migration 0017's unique index backstops this too.
+  const canFileCheckOut = canMutateUpdates && !checkOutReport;
+
   // Hard cap on condition-report photos: 6 total. A multi-select that
   // pushes us over the cap is silently truncated (keep the first N that
   // fit). UI also hides the "Add photos" button at cap so this branch
@@ -562,6 +595,23 @@ export default function BookingDetailScreen() {
     setCrPendingPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Check-out mirrors of the two photo handlers — same cap logic via
+  // CR_PHOTO_CAP, same setCoPostError(null) before append.
+  const onAddCoPhotos = async () => {
+    setCoPostError(null);
+    const sources = await pickPhotosMulti();
+    if (sources.length === 0) return;
+    setCoPendingPhotos((prev) => {
+      const room = Math.max(0, CR_PHOTO_CAP - prev.length);
+      if (room === 0) return prev;
+      return [...prev, ...sources.slice(0, room)];
+    });
+  };
+
+  const onRemoveCoPending = (index: number) => {
+    setCoPendingPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const onOpenFileCheckIn = () => {
     setFilingCheckIn(true);
     setCrPendingPhotos([]);
@@ -574,6 +624,20 @@ export default function BookingDetailScreen() {
     setCrPendingPhotos([]);
     setCrNote("");
     setCrPostError(null);
+  };
+
+  const onOpenFileCheckOut = () => {
+    setFilingCheckOut(true);
+    setCoPendingPhotos([]);
+    setCoNote("");
+    setCoPostError(null);
+  };
+
+  const onCancelCheckOut = () => {
+    setFilingCheckOut(false);
+    setCoPendingPhotos([]);
+    setCoNote("");
+    setCoPostError(null);
   };
 
   const onSaveCheckIn = async () => {
@@ -606,6 +670,60 @@ export default function BookingDetailScreen() {
       setCrPostError(t("condition_reports.save_failed"));
     } finally {
       setCrPosting(false);
+    }
+  };
+
+  // Check-out combines the report insert AND the booking-completion
+  // transition into one action ("Complete stay"). The report is OPTIONAL
+  // — an empty form just completes the stay with no evidence attached.
+  //
+  // Migration 0016 only allows the host to insert a CR row while
+  // booking.status='active', so the two writes must happen in this
+  // order: report first (while still 'active'), then completion (flips
+  // to 'completed'). They are separate writes, so handle the seam: if
+  // the report saves but the completion fails, surface a warning, keep
+  // the form open-ish, and skip the report insert on retry (a CR row
+  // for this phase now exists, so a second insert would violate the
+  // unique index from migration 0017).
+  const onCompleteStay = async () => {
+    if (!booking || !user) return;
+    const confirmed =
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? window.confirm(t("booking.host_complete_confirm"))
+        : true;
+    if (!confirmed) return;
+    setCoPosting(true);
+    setCoPostError(null);
+    try {
+      const hasContent =
+        coPendingPhotos.length > 0 || coNote.trim() !== "";
+      if (hasContent && !checkOutReport) {
+        await createConditionReport({
+          bookingId: booking.id,
+          hostId: user.id,
+          phase: "check_out",
+          sources: coPendingPhotos,
+          note: coNote.trim() === "" ? null : coNote.trim(),
+        });
+      }
+      try {
+        await completeBookingAsHost(booking.id);
+      } catch (e) {
+        console.warn("[booking.complete_after_report_failed]", e);
+        setCoPostError(t("condition_reports.checkout_complete_warning"));
+        await refetchConditionReports();
+        return;
+      }
+      setFilingCheckOut(false);
+      setCoPendingPhotos([]);
+      setCoNote("");
+      await refetchConditionReports();
+      await refetchBooking();
+    } catch (e) {
+      console.warn("[condition_reports.checkout_save_failed]", e);
+      setCoPostError(t("condition_reports.save_failed"));
+    } finally {
+      setCoPosting(false);
     }
   };
 
