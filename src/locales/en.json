@@ -18,7 +18,7 @@
     "host": "Sitter"
   },
   "feed": {
-    "title": "Sitters in Riyadh",
+    "title": "Sitters in {city}",
     "loading": "Loading sitters…",
     "empty": "No sitters available right now",
     "load_failed": "Couldn't load sitters",

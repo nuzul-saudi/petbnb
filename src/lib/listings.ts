@@ -1,10 +1,18 @@
 // Read-only data access for the listings feed and listing detail screen.
 // Inserts/updates land in Step 7 (host create-listing flow).
 
+import type { CityKey } from '@/lib/cities';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
 
 export type ListingFilter = {
+  /**
+   * Optional city filter (Step 7.2c). When omitted, no city constraint
+   * is applied — preserves the pre-7.2 behavior of every existing
+   * caller. The owner feed (OwnerFeedHome) sets this to the user's
+   * selected city.
+   */
+  city?: CityKey;
   neighborhood?: string;
   femaleHostsOnly?: boolean;
   /**
@@ -73,6 +81,7 @@ export async function listActiveListings(
     .eq('is_active', true)
     .order('created_at', { ascending: false });
 
+  if (filter.city) query = query.eq('city', filter.city);
   if (filter.neighborhood) query = query.eq('neighborhood', filter.neighborhood);
   if (filter.femaleHostsOnly) query = query.eq('host_gender', 'female');
 

@@ -14,6 +14,8 @@ import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { ListingCard } from '@/components/ListingCard';
 import { useAuth } from '@/lib/auth';
+import { CITIES, findCity, type CityKey } from '@/lib/cities';
+import { pickLocalized } from '@/lib/format';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
 import { usePersona } from '@/lib/persona';
@@ -183,6 +185,10 @@ function OwnerFeedHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [femaleOnly, setFemaleOnly] = useState(false);
+  // City filter (7.2c). Default Riyadh — the app's historical default
+  // and where every existing listing was backfilled to via migration
+  // 0019. Future polish: persist the user's preferred city on profiles.
+  const [city, setCity] = useState<CityKey>('riyadh');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
 
@@ -208,6 +214,7 @@ function OwnerFeedHome() {
       setError(null);
       try {
         const rows = await listActiveListings({
+          city,
           femaleHostsOnly: femaleOnly,
           sortByDistance: coords ?? undefined,
         });
@@ -220,7 +227,7 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [femaleOnly, coords, t],
+    [city, femaleOnly, coords, t],
   );
 
   useEffect(() => {
@@ -237,11 +244,45 @@ function OwnerFeedHome() {
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.feedTitle}>{t('feed.title')}</Text>
+          <Text style={styles.feedTitle}>
+            {t('feed.title', {
+              city: pickLocalized(
+                findCity(city)?.name_ar ?? '',
+                findCity(city)?.name_en ?? '',
+                locale,
+              ),
+            })}
+          </Text>
           <Text style={styles.greetingSmall}>
             {t('home.signed_in_greeting', { name: profile!.full_name })}
           </Text>
         </View>
+      </View>
+
+      {/* City selector (7.2c). Mirrors the femaleOnly filter-chip
+          pattern below — same pill shape, active = filled. Placed
+          above femaleOnly because city is the primary geographic
+          filter; female-only sits on top of it. */}
+      <View style={styles.cityRow}>
+        {CITIES.map((c) => (
+          <Pressable
+            key={c.key}
+            onPress={() => setCity(c.key)}
+            style={[
+              styles.cityChip,
+              city === c.key && styles.filterChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                city === c.key && styles.filterChipTextActive,
+              ]}
+            >
+              {pickLocalized(c.name_ar, c.name_en, locale)}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       <Pressable
@@ -391,6 +432,23 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    backgroundColor: colors.paper,
+  },
+  // City selector row (7.2c). Wraps the per-city chips so they share
+  // horizontal margin with the femaleOnly chip below; chips themselves
+  // drop the margin since the row container provides it.
+  cityRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  cityChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radii.pill,

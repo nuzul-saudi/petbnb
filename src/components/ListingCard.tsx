@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
+import { findCity, findDistrict } from '@/lib/cities';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import type { ListingFeedItem } from '@/lib/listings';
@@ -41,6 +42,21 @@ export function ListingCard({ listing, onPress, statusBadge }: Props) {
     listing.host_gender === 'female' ? 'listing.host_female' : 'listing.host_male',
   );
 
+  // 7.2c — city + district display. findDistrict returns undefined for
+  // legacy seed rows where neighborhood holds an Arabic string (not a
+  // slug from cities.ts); fall back to rendering the raw text so those
+  // rows still show their existing label without a data migration.
+  // New listings created by 7.2d's form will store slugs and resolve
+  // through findDistrict cleanly.
+  const cityRecord = findCity(listing.city);
+  const cityDisplay = cityRecord
+    ? pickLocalized(cityRecord.name_ar, cityRecord.name_en, locale)
+    : listing.city;
+  const districtRecord = findDistrict(listing.city, listing.neighborhood);
+  const districtDisplay = districtRecord
+    ? pickLocalized(districtRecord.name_ar, districtRecord.name_en, locale)
+    : listing.neighborhood;
+
   return (
     <Pressable onPress={onPress} style={styles.card}>
       {/* Sitter header — the hero of the card */}
@@ -69,7 +85,7 @@ export function ListingCard({ listing, onPress, statusBadge }: Props) {
           <View style={styles.metaRow}>
             <TierBadge tier={listing.tier} />
             <Text style={styles.metaText}>
-              {genderLabel} • 📍 {listing.neighborhood}
+              {genderLabel} • 📍 {districtDisplay}, {cityDisplay}
               {listing.distance_km != null
                 ? ` · ${t('feed.distance_label', { km: toArabicDigits(listing.distance_km.toFixed(1)) })}`
                 : ''}
