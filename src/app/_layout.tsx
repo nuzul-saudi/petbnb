@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/lib/auth';
 import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
+import { PersonaProvider } from '@/lib/persona';
 import { colors } from '@/theme/tokens';
 
 // Locale-aware layout direction. On web we drive flow via document.dir;
@@ -49,9 +50,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <LocaleProvider>
-          <AppShell />
-        </LocaleProvider>
+        <PersonaProvider>
+          <LocaleProvider>
+            <AppShell />
+          </LocaleProvider>
+        </PersonaProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

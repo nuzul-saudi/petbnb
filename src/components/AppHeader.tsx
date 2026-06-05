@@ -5,8 +5,10 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 
+import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
-import { colors, fonts, spacing } from '@/theme/tokens';
+import { usePersona } from '@/lib/persona';
+import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export type AppHeaderProps = {
   locale: 'ar' | 'en';
@@ -29,6 +31,8 @@ export function AppHeader({
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
+  const { profile } = useAuth();
+  const { persona, setPersona } = usePersona();
 
   // Active-route detection: '/' is exact-match; the others are prefix
   // matches so /bookings/[id] still highlights "My Bookings".
@@ -62,6 +66,51 @@ export function AppHeader({
         active={isActive('/profile')}
         onPress={safeNav(() => router.push('/profile'))}
       />
+      {/* Persona switch — visible only for role='both'. Tapping the
+          inactive pill calls setPersona; tapping the active pill is a
+          no-op. Not gated by confirmLeave because switching persona
+          doesn't navigate (it changes which home renders later, when
+          the user taps Home in the nav). */}
+      {profile?.role === 'both' ? (
+        <View style={styles.personaSwitch}>
+          <Pressable
+            onPress={() => {
+              if (persona !== 'owner') setPersona('owner');
+            }}
+            style={[
+              styles.personaPill,
+              persona === 'owner' && styles.personaPillActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.personaPillText,
+                persona === 'owner' && styles.personaPillTextActive,
+              ]}
+            >
+              {t('persona.owner')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              if (persona !== 'host') setPersona('host');
+            }}
+            style={[
+              styles.personaPill,
+              persona === 'host' && styles.personaPillActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.personaPillText,
+                persona === 'host' && styles.personaPillTextActive,
+              ]}
+            >
+              {t('persona.host')}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
       <Pressable onPress={onLanguageToggle} style={styles.langToggle}>
         <Text style={styles.langToggleText}>
           {locale === 'ar'
@@ -122,5 +171,34 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     color: colors.moss,
+  },
+  // Persona switch — two-pill toggle visible only for role='both'.
+  // Active pill: moss-filled. Inactive: whisper-outlined. Sized to fit
+  // the existing header density. 7.1e will add a small attention dot
+  // to the host pill; the layout already leaves room (the pill is its
+  // own positioned element, so a corner dot won't disrupt flow).
+  personaSwitch: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  personaPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+  },
+  personaPillActive: {
+    backgroundColor: colors.moss,
+    borderColor: colors.moss,
+  },
+  personaPillText: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.inkSoft,
+  },
+  personaPillTextActive: {
+    fontFamily: fonts.bodyBold,
+    color: colors.cream,
   },
 });

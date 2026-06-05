@@ -43,6 +43,7 @@ export type Database = {
           is_verified: boolean;
           is_suspended: boolean;
           locale: string;
+          persona: string | null;
           created_at: string;
         };
         Insert: {
@@ -57,6 +58,7 @@ export type Database = {
           is_verified?: boolean;
           is_suspended?: boolean;
           locale?: string;
+          persona?: string | null;
           created_at?: string;
         };
         Update: {
@@ -71,6 +73,7 @@ export type Database = {
           is_verified?: boolean;
           is_suspended?: boolean;
           locale?: string;
+          persona?: string | null;
           created_at?: string;
         };
         Relationships: [

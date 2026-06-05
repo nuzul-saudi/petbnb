@@ -16,6 +16,7 @@ import { ListingCard } from '@/components/ListingCard';
 import { useAuth } from '@/lib/auth';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
+import { usePersona } from '@/lib/persona';
 import {
   listActiveListings,
   listOwnListings,
@@ -25,6 +26,7 @@ import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const { initializing, session, profile } = useAuth();
+  const { persona } = usePersona();
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session) return <Redirect href="/sign-in" />;
@@ -35,6 +37,11 @@ export default function HomeScreen() {
   if (profile.role === 'admin') return <Redirect href="/admin" />;
 
   if (profile.role === 'host') return <HostHome />;
+  // 'both' users see whichever home their current persona names.
+  // Pure 'owner' falls through to OwnerFeedHome unchanged.
+  if (profile.role === 'both') {
+    return persona === 'host' ? <HostHome /> : <OwnerFeedHome />;
+  }
   return <OwnerFeedHome />;
 }
 
