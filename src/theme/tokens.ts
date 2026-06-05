@@ -5,10 +5,13 @@ export const colors = {
   sand: '#F5EFE6',
   cream: '#FAF6EE',
   paper: '#FFFCF5',
-  // Host-mode screen background. Warmer + more saturated than cream
-  // so the persona shift is unmistakable at a glance per founder
-  // test-feedback. Resolved via theme.background; never hardcoded.
-  honey: '#EFE0B5',
+  // Host-mode screen background. Iterated twice on test feedback:
+  // #EFE0B5 → #DDC988 → #D4BC78 (this value). Each step deepened to
+  // make the persona shift more obvious; the prior values still read
+  // as "tinted cream" rather than a distinctly different surface.
+  // Applied via theme.background to AppShell's wrapper AND AppHeader's
+  // bar, so both the body and the header tint together per persona.
+  honey: '#D4BC78',
 
   ink: '#1F2A1D',
   inkSoft: '#3D4A3A',
@@ -19,11 +22,12 @@ export const colors = {
 
   gold: '#C4A464',
   goldDeep: '#8C7340',
-  // Deepened gold used only by host-mode secondary buttons. goldDeep
-  // on honey is ~3.5:1 (sub-AA for normal text); goldInk on honey
-  // is ~5:1 (AA pass). Owner mode keeps moss everywhere and never
-  // touches this token.
-  goldInk: '#6E5A30',
+  // Deepened gold used only by host-mode secondary buttons. The
+  // new darker honey #DDC988 pushed the previous #6E5A30 down to
+  // ~4.0:1 (sub-AA); this further-deepened tone restores ~5.2:1 on
+  // the new bg. Owner mode keeps moss everywhere and never touches
+  // this token.
+  goldInk: '#5A4926',
 
   terracotta: '#B45842',
   rose: '#D49389',

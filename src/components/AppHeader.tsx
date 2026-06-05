@@ -52,7 +52,7 @@ export function AppHeader({
   };
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { backgroundColor: theme.background }]}>
       <NavItem
         label={t('nav.home')}
         active={isActive('/')}
@@ -171,7 +171,10 @@ const styles = StyleSheet.create({
     height: 56,
     paddingHorizontal: spacing.lg,
     gap: spacing.lg,
-    backgroundColor: colors.cream,
+    // backgroundColor applied inline at the JSX site so the header
+    // tints with the active persona (cream in owner, honey in host).
+    // Owner mode resolves theme.background to colors.cream — same
+    // pixel as the previous static value.
     borderBottomWidth: 1,
     borderBottomColor: colors.whisper,
   },
