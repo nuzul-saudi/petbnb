@@ -9,6 +9,13 @@ import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 type Props = {
   listing: ListingFeedItem;
   onPress: () => void;
+  /**
+   * Optional opt-in badge replacing the "new" pill in the host text
+   * block. The host home (Step 7.1b) passes a two-state active/inactive
+   * pill; the owner feed passes nothing → unchanged render. `color` is
+   * applied as the pill background, matching newBadge / TierBadge.
+   */
+  statusBadge?: { label: string; color: string };
 };
 
 // Sitter-first listing card (refactored in Step 5.5C from a photo-first
@@ -22,7 +29,7 @@ type Props = {
 // the JSDoc on the helper). Once a SECURITY DEFINER count RPC or counter
 // cache lands, this card can show real "{N} إقامة • ⭐ {avg}" stats and
 // only fall back to "جديد" for genuinely-new hosts.
-export function ListingCard({ listing, onPress }: Props) {
+export function ListingCard({ listing, onPress, statusBadge }: Props) {
   const { t, locale } = useTranslation();
 
   const host = listing.host;
@@ -69,9 +76,19 @@ export function ListingCard({ listing, onPress }: Props) {
             </Text>
           </View>
 
-          <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>{t('listing.host_new_badge')}</Text>
-          </View>
+          {/* Status badge (host home, 7.1b) takes the slot when supplied;
+              otherwise the owner-feed "new" pill renders unchanged. */}
+          {statusBadge ? (
+            <View
+              style={[styles.newBadge, { backgroundColor: statusBadge.color }]}
+            >
+              <Text style={styles.newBadgeText}>{statusBadge.label}</Text>
+            </View>
+          ) : (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>{t('listing.host_new_badge')}</Text>
+            </View>
+          )}
         </View>
       </View>
 

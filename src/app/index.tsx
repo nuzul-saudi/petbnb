@@ -139,6 +139,17 @@ function HostHome() {
             <ListingCard
               listing={item}
               onPress={() => router.push(`/listings/${item.id}`)}
+              statusBadge={
+                item.is_active
+                  ? {
+                      label: t('admin.listing_status_active'),
+                      color: colors.moss,
+                    }
+                  : {
+                      label: t('admin.listing_status_inactive'),
+                      color: colors.gold,
+                    }
+              }
             />
           )}
           refreshControl={
