@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
+import { CheckOutSection } from "@/components/bookings/CheckOutSection";
 import { ConditionReportsSection } from "@/components/bookings/ConditionReportsSection";
 import { DailyUpdatesSection } from "@/components/bookings/DailyUpdatesSection";
 import { HostActions } from "@/components/bookings/HostActions";
@@ -976,47 +977,29 @@ export default function BookingDetailScreen() {
           onDelete={onDelete}
         />
 
-        {/* Check-out report — sits below the daily updates section so the
-            on-screen flow reads check-in → daily updates → check-out.
-            Filing UI comes in a follow-up step; only displays here when a
-            check-out report already exists. Inline marginTop matches the
-            section-start rhythm used by crSectionTitle / dailyUpdatesTitle
-            (this is a standalone card with no preceding heading). */}
-        {checkOutReport ? (
-          <View style={[styles.crReportCard, { marginTop: spacing.lg }]}>
-            <View style={styles.crReportHeader}>
-              <Text style={styles.crReportPhaseLabel}>
-                {t("condition_reports.check_out_label")}
-              </Text>
-              <Text style={styles.crReportStamp}>
-                {formatRiyadhStamp(checkOutReport.created_at, locale)}
-              </Text>
-            </View>
-            {Array.isArray(checkOutReport.photos) &&
-            (checkOutReport.photos as string[]).length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.updatePhotosRow}
-              >
-                {(checkOutReport.photos as string[]).map((url, i) => (
-                  <Image
-                    key={`${checkOutReport.id}-${i}`}
-                    source={{ uri: url }}
-                    style={styles.updatePhoto}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                ))}
-              </ScrollView>
-            ) : null}
-            {checkOutReport.health_notes ? (
-              <Text style={styles.updateNote}>
-                {checkOutReport.health_notes}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
+        {/* Check-out section — extracted to CheckOutSection. Renders the
+            saved report (read-only) AND the host-only file+complete form.
+            On-screen order stays check-in → daily updates → check-out.
+            Parent owns state + handlers (including isCheckOutFormDirty
+            for the leave-warning) and onCompleteStay, which files the
+            report (optional) then transitions the booking to completed. */}
+        <CheckOutSection
+          crLoading={crLoading}
+          checkOutReport={checkOutReport}
+          canFileCheckOut={canFileCheckOut}
+          filingCheckOut={filingCheckOut}
+          coPendingPhotos={coPendingPhotos}
+          coNote={coNote}
+          coPosting={coPosting}
+          coPostError={coPostError}
+          CR_PHOTO_CAP={CR_PHOTO_CAP}
+          onOpenFileCheckOut={onOpenFileCheckOut}
+          onCancelCheckOut={onCancelCheckOut}
+          onAddCoPhotos={onAddCoPhotos}
+          onRemoveCoPending={onRemoveCoPending}
+          onCompleteStay={onCompleteStay}
+          setCoNote={setCoNote}
+        />
 
         {canEdit ? (
           <Button
