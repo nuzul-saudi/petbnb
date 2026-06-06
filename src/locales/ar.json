@@ -44,6 +44,7 @@
     "no_resident_pets": "لا يوجد حيوانات مقيمة",
     "offers_grooming": "خدمة الاستحمام متوفرة",
     "request_button": "اطلب الحجز",
+    "edit_button": "تعديل الإعلان",
     "back": "← رجوع"
   },
   "listings": {
@@ -68,12 +69,12 @@
       "saving": "جاري الحفظ...",
       "cancel_button": "إلغاء",
       "save_failed": "تعذّر حفظ الإعلان، حاولي مرة أخرى.",
-      "title_required": "أضيفي عنواناً",
-      "description_required": "أضيفي وصفاً",
-      "district_required": "اختاري الحي",
-      "host_gender_required": "اختاري جنسك",
-      "invalid_price": "أدخلي رقماً صحيحاً ≥ 0",
-      "invalid_max_cats": "أدخلي رقماً صحيحاً ≥ 1"
+      "title_required": "الرجاء إدخال عنوان",
+      "description_required": "الرجاء إدخال وصف",
+      "district_required": "الرجاء اختيار حي",
+      "host_gender_required": "الرجاء اختيار جنس المضيف",
+      "invalid_price": "السعر لليلة يجب أن يكون رقماً صحيحاً ≥ 0",
+      "invalid_max_cats": "أقصى عدد للقطط يجب أن يكون 1 على الأقل"
     }
   },
   "booking": {

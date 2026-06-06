@@ -44,6 +44,7 @@
     "no_resident_pets": "No resident pets",
     "offers_grooming": "Grooming available",
     "request_button": "Request booking",
+    "edit_button": "Edit listing",
     "back": "← Back"
   },
   "listings": {
@@ -68,12 +69,12 @@
       "saving": "Saving…",
       "cancel_button": "Cancel",
       "save_failed": "Couldn't save the listing. Please try again.",
-      "title_required": "Add a title",
-      "description_required": "Add a description",
-      "district_required": "Pick a district",
-      "host_gender_required": "Pick your gender",
-      "invalid_price": "Enter a whole number ≥ 0",
-      "invalid_max_cats": "Enter a whole number ≥ 1"
+      "title_required": "Please enter a title",
+      "description_required": "Please enter a description",
+      "district_required": "Please choose a district",
+      "host_gender_required": "Please choose the host gender",
+      "invalid_price": "Nightly price must be a whole number ≥ 0",
+      "invalid_max_cats": "Max cats must be at least 1"
     }
   },
   "booking": {

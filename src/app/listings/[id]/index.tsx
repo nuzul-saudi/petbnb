@@ -15,7 +15,7 @@ import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 export default function ListingDetailScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { initializing, session } = useAuth();
+  const { initializing, session, user } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   // Bilingual content fallback — _en field if present in current locale,
@@ -196,12 +196,28 @@ export default function ListingDetailScreen() {
             ) : null}
           </View>
 
-          <Pressable
-            onPress={() => router.push(`/listings/${listing.id}/request`)}
-            style={styles.cta}
-          >
-            <Text style={styles.ctaText}>{t('listing.request_button')}</Text>
-          </Pressable>
+          {/* Host viewing their own listing sees Edit instead of
+              Request booking — a host can't book their own place.
+              The Edit screen is Step 7.5; until it ships, the button
+              routes back to the host home so the host isn't stuck.
+              Owners (and any non-host viewer) still see Request. */}
+          {!!user && listing.host_id === user.id ? (
+            <Pressable
+              // TODO 7.5: repoint at /listings/[id]/edit when that
+              // screen exists.
+              onPress={() => router.replace('/')}
+              style={styles.cta}
+            >
+              <Text style={styles.ctaText}>{t('listing.edit_button')}</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => router.push(`/listings/${listing.id}/request`)}
+              style={styles.cta}
+            >
+              <Text style={styles.ctaText}>{t('listing.request_button')}</Text>
+            </Pressable>
+          )}
 
           <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
             <Text style={styles.backText}>{t('listing.back')}</Text>
