@@ -79,6 +79,30 @@
       "host_gender_required": "Please choose the host gender",
       "invalid_price": "Nightly price must be a whole number ≥ 0",
       "invalid_max_cats": "Max cats must be at least 1"
+    },
+    "photos": {
+      "title": "Listing photos",
+      "back": "← Back",
+      "loading": "Loading…",
+      "load_failed": "Couldn't load photos. Please try again.",
+      "not_available": "This listing isn't available to you.",
+      "current_label": "Current photos",
+      "pending_label": "Pending upload",
+      "cover_label": "Cover",
+      "make_cover": "Make cover",
+      "move_up": "Move up",
+      "move_down": "Move down",
+      "remove": "Remove",
+      "remove_confirm": "Remove this photo?",
+      "add": "+ Add photos",
+      "cap_reached": "Maximum reached ({cap} photos).",
+      "save": "Save",
+      "saving": "Saving…",
+      "save_failed": "Couldn't upload some photos. Please try again.",
+      "reorder_failed": "Couldn't update the order. Please try again.",
+      "delete_failed": "Couldn't remove the photo. Please try again.",
+      "leave_confirm": "You have unsaved photos. Leave without saving?",
+      "empty": "You haven't added any photos yet. Add at least 3 before publishing."
     }
   },
   "booking": {
