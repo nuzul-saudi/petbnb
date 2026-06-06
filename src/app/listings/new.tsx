@@ -28,6 +28,7 @@
 
 import { useState } from 'react';
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -87,6 +88,12 @@ export default function NewListingScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // District modal picker (Bucket B revision — replaces the vertical
+  // list that dominated the form). Search filters both EN (case-
+  // insensitive) and AR (substring) names.
+  const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
+  const [districtSearch, setDistrictSearch] = useState('');
+
   const clearFieldError = (field: FieldKey) => {
     setFieldErrors((prev) => {
       if (!prev[field]) return prev;
@@ -101,6 +108,37 @@ export default function NewListingScreen() {
 
   const selectedCity = findCity(city);
   const districts = selectedCity?.districts ?? [];
+
+  // Filtered list for the modal's search-as-you-type. Empty query →
+  // full list. Match strategy: lowercased substring on the English
+  // name (so the host can type "ol" and find Olaya), plus a literal
+  // substring match on the Arabic name (Arabic doesn't have case).
+  const districtSearchQuery = districtSearch.trim();
+  const filteredDistricts =
+    districtSearchQuery === ''
+      ? districts
+      : districts.filter(
+          (d) =>
+            d.name_en
+              .toLowerCase()
+              .includes(districtSearchQuery.toLowerCase()) ||
+            d.name_ar.includes(districtSearchQuery),
+        );
+
+  const selectedDistrict = districtKey
+    ? districts.find((d) => d.key === districtKey) ?? null
+    : null;
+
+  const openDistrictPicker = () => {
+    setDistrictPickerOpen(true);
+    setDistrictSearch('');
+  };
+
+  const onPickDistrict = (key: string) => {
+    setDistrictKey(key);
+    setDistrictPickerOpen(false);
+    clearFieldError('district');
+  };
 
   // Reset district when city changes — a slug from one city is not
   // valid for another, so the picker must restart.
@@ -221,39 +259,42 @@ export default function NewListingScreen() {
           </View>
         </Field>
 
-        {/* District picker (Bucket B) — vertical list of single-tap
-            rows. Selected row gets the moss border + whisper-bg
-            treatment to match the boolean-toggle visual language.
-            Scrolls within the parent ScrollView. */}
+        {/* District picker (Bucket B revision) — tappable trigger row
+            collapses to a single line; tap opens a full-screen modal
+            with a search-as-you-type list. Selection writes back the
+            district SLUG; trigger shows the selected name (or the
+            placeholder). The form stays compact while the picker UI
+            lives behind the modal. */}
         <Field
           label={t('listings.form.district_label')}
           required
           error={fieldErrors.district}
         >
-          <View style={styles.districtList}>
-            {districts.map((d) => (
-              <Pressable
-                key={d.key}
-                onPress={() => {
-                  setDistrictKey(d.key);
-                  clearFieldError('district');
-                }}
-                style={[
-                  styles.districtRow,
-                  districtKey === d.key && styles.districtRowActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.districtRowText,
-                    districtKey === d.key && styles.districtRowTextActive,
-                  ]}
-                >
-                  {pickLocalized(d.name_ar, d.name_en, locale)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <Pressable
+            onPress={openDistrictPicker}
+            style={[
+              styles.pickerTrigger,
+              fieldErrors.district && styles.inputError,
+            ]}
+          >
+            <Text
+              style={[
+                styles.pickerTriggerText,
+                !selectedDistrict && styles.pickerTriggerPlaceholder,
+              ]}
+            >
+              {selectedDistrict
+                ? pickLocalized(
+                    selectedDistrict.name_ar,
+                    selectedDistrict.name_en,
+                    locale,
+                  )
+                : t('listings.form.district_placeholder')}
+            </Text>
+            <Text style={styles.pickerTriggerChevron}>
+              {locale === 'ar' ? '‹' : '›'}
+            </Text>
+          </Pressable>
         </Field>
 
         <Field
@@ -449,6 +490,66 @@ export default function NewListingScreen() {
           fullWidth
         />
       </ScrollView>
+
+      {/* District modal picker. Sits as a sibling of the ScrollView;
+          renders on top of the form when visible, invisible otherwise.
+          onRequestClose handles Android hardware-back. */}
+      <Modal
+        visible={districtPickerOpen}
+        animationType="slide"
+        onRequestClose={() => setDistrictPickerOpen(false)}
+      >
+        <SafeAreaView style={styles.modalSafe} edges={['top', 'bottom']}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {t('listings.form.district_picker_title')}
+            </Text>
+            <Pressable
+              onPress={() => setDistrictPickerOpen(false)}
+              style={styles.modalClose}
+              accessibilityLabel={t('listings.form.cancel_button')}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            value={districtSearch}
+            onChangeText={setDistrictSearch}
+            placeholder={t('listings.form.district_search_placeholder')}
+            placeholderTextColor={colors.inkSoft}
+            autoFocus
+            style={[styles.input, styles.modalSearch]}
+          />
+          <ScrollView contentContainerStyle={styles.modalList}>
+            {filteredDistricts.length === 0 ? (
+              <Text style={styles.modalNoMatches}>
+                {t('listings.form.district_no_matches')}
+              </Text>
+            ) : (
+              filteredDistricts.map((d) => (
+                <Pressable
+                  key={d.key}
+                  onPress={() => onPickDistrict(d.key)}
+                  style={[
+                    styles.districtRow,
+                    districtKey === d.key && styles.districtRowActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.districtRowText,
+                      districtKey === d.key &&
+                        styles.districtRowTextActive,
+                    ]}
+                  >
+                    {pickLocalized(d.name_ar, d.name_en, locale)}
+                  </Text>
+                </Pressable>
+              ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -579,12 +680,85 @@ const styles = StyleSheet.create({
     color: colors.cream,
     fontFamily: fonts.bodyBold,
   },
-  // Vertical district list (Bucket B). Visual treatment matches
-  // toggleRow / toggleRowActive so the active selection reads the
-  // same way as the boolean toggles below it.
-  districtList: {
-    gap: spacing.xs,
+  // Picker trigger row — looks like a single-line tappable field;
+  // shows the selected district name OR the placeholder. Chevron
+  // direction is locale-flipped in the JSX (‹ / ›) so the visual
+  // points outward in both LTR and RTL.
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.paper,
+    borderColor: colors.whisper,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
+  pickerTriggerText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.ink,
+  },
+  pickerTriggerPlaceholder: {
+    color: colors.inkSoft,
+  },
+  pickerTriggerChevron: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 20,
+    color: colors.inkSoft,
+    marginLeft: spacing.sm,
+  },
+  // Modal styles — used by the district search-as-you-type picker.
+  // Cream background matches the form's owner-mode look; in host
+  // persona the AppShell wrapper already supplies honey so the
+  // explicit cream here is fine (the modal is its own surface).
+  modalSafe: {
+    flex: 1,
+    backgroundColor: colors.cream,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.whisper,
+  },
+  modalTitle: {
+    flex: 1,
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.mossDeep,
+  },
+  modalClose: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  modalCloseText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 22,
+    color: colors.inkSoft,
+    lineHeight: 24,
+  },
+  modalSearch: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+  },
+  modalList: {
+    padding: spacing.xl,
+    gap: spacing.xs,
+    paddingBottom: spacing.xxl,
+  },
+  modalNoMatches: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.inkSoft,
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
+  },
+  // Existing district-row style — still used inside the modal's
+  // scrollable list. Same visual treatment as the toggle rows.
   districtRow: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
