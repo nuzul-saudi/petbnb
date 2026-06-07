@@ -152,8 +152,11 @@ export default function ListingDetailScreen() {
           </View>
         </View>
 
-        {/* Photos as secondary evidence */}
-        <PhotoGallery photos={listing.photos} />
+        {/* Photos as secondary evidence. 4:3 (taller than the 5:2
+            card thumbnail) so the customer can actually see the home
+            on the detail screen; PhotoGallery's height cap keeps it
+            from dominating the page on a wide desktop browser. */}
+        <PhotoGallery photos={listing.photos} aspectRatio={4 / 3} />
 
         <View style={styles.body}>
           <Text style={styles.title}>
