@@ -3,7 +3,7 @@
 
 import type { CityKey } from '@/lib/cities';
 import { supabase } from '@/lib/supabase';
-import type { Tables } from '@/types/database';
+import type { Tables, TablesUpdate } from '@/types/database';
 
 export type ListingFilter = {
   /**
@@ -343,4 +343,84 @@ export async function createListing(input: {
 
   if (error) throw error;
   return { id: data.id };
+}
+
+/**
+ * Patch shape accepted by updateListing (Step 7.5b). Every property is
+ * optional — the edit screen always sends the full form, but the
+ * deactivate/reactivate path sends just `{ is_active }`.
+ *
+ * Text fields target the _ar columns (same as createListing); the _en
+ * columns stay NULL until a translation step lands. Display uses
+ * pickLocalized which falls back to _ar.
+ *
+ * is_active is included here on purpose: the edit screen flips a
+ * currently-live listing back to is_active=false on save, returning it
+ * to the admin queue (the "saving edits to a live listing drops it from
+ * the public feed until re-approval" rule from CLAUDE.md / 7.5 spec).
+ * The host-side deactivate/reactivate control writes the same field
+ * directly without re-running the admin gate, per the settled spec.
+ */
+export type UpdateListingPatch = {
+  city?: CityKey;
+  neighborhood?: string;
+  title?: string;
+  description?: string;
+  nightlyPrice?: number;
+  maxConcurrentPets?: number;
+  hasResidentPets?: boolean;
+  residentPetsNote?: string | null;
+  offersGrooming?: boolean;
+  hostGender?: 'female' | 'male';
+  is_active?: boolean;
+};
+
+/**
+ * Update an existing listing. RLS (listings_update_host, migration 0004)
+ * permits the call when the caller is the row's host AND is not
+ * suspended; an admin caller is also allowed. The row id is the only
+ * identifier we send — host_id is read server-side from auth.uid().
+ *
+ * Throws on supabase error. Returns nothing — the edit screen re-routes
+ * to home on success and the deactivate/reactivate buttons re-fetch
+ * locally to refresh their on-screen state.
+ */
+export async function updateListing(
+  id: string,
+  patch: UpdateListingPatch,
+): Promise<void> {
+  if (!supabase) throw new Error('supabase not configured');
+
+  // Build the column-shaped patch. Only include keys the caller
+  // actually supplied — otherwise we'd write `null` over a value the
+  // caller never intended to touch. Typed as TablesUpdate<'listings'>
+  // so supabase-js's typed .update() accepts it.
+  const row: TablesUpdate<'listings'> = {};
+  if (patch.city !== undefined) row.city = patch.city;
+  if (patch.neighborhood !== undefined) row.neighborhood = patch.neighborhood;
+  if (patch.title !== undefined) row.title_ar = patch.title;
+  if (patch.description !== undefined) row.description_ar = patch.description;
+  if (patch.nightlyPrice !== undefined) {
+    row.nightly_price_sar = patch.nightlyPrice;
+  }
+  if (patch.maxConcurrentPets !== undefined) {
+    row.max_concurrent_pets = patch.maxConcurrentPets;
+  }
+  if (patch.hasResidentPets !== undefined) {
+    row.has_resident_pets = patch.hasResidentPets;
+  }
+  if (patch.residentPetsNote !== undefined) {
+    row.resident_pets_note = patch.residentPetsNote;
+  }
+  if (patch.offersGrooming !== undefined) {
+    row.offers_grooming = patch.offersGrooming;
+  }
+  if (patch.hostGender !== undefined) row.host_gender = patch.hostGender;
+  if (patch.is_active !== undefined) row.is_active = patch.is_active;
+
+  const { error } = await supabase
+    .from('listings')
+    .update(row)
+    .eq('id', id);
+  if (error) throw error;
 }
