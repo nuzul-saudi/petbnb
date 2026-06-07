@@ -1,0 +1,51 @@
+<!-- @dsCard group="Colors" viewport="700x230" name="Persona re-skin" subtitle="Owner = cream/moss · Host = honey/gold" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="card.css">
+<style>
+  .personas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .lens {
+    border-radius: var(--radius-xl);
+    padding: 18px;
+    background: var(--surface-screen);
+    box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .lens .tag {
+    font-family: var(--font-heading); font-weight: 700; font-size: 15px;
+    color: var(--accent);
+  }
+  .lens .demo-btn {
+    align-self: flex-start;
+    background: var(--accent); color: var(--text-on-accent);
+    font-family: var(--font-body); font-weight: 700; font-size: 13px;
+    padding: 9px 18px; border-radius: var(--radius-lg);
+  }
+  .lens .demo-pill {
+    align-self: flex-start;
+    border: 1px solid var(--accent-ink); color: var(--accent-ink);
+    font-family: var(--font-body); font-weight: 700; font-size: 12px;
+    padding: 5px 14px; border-radius: var(--radius-pill);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="personas">
+    <div class="lens" data-persona="owner">
+      <span class="tag">owner · مالك</span>
+      <span class="demo-btn">اطلب الحجز</span>
+      <span class="demo-pill">مضيفات فقط</span>
+    </div>
+    <div class="lens" data-persona="host">
+      <span class="tag">host · مضيف</span>
+      <span class="demo-btn">قبول الطلب</span>
+      <span class="demo-pill">تعديل الإعلان</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

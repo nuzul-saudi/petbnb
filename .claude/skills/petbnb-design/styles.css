@@ -1,0 +1,10 @@
+/* ============================================================
+   Petbnb Design System — global entry point.
+   Consumers link THIS file. It is a manifest of @import lines
+   only; every token + @font-face lives in the files below.
+   ============================================================ */
+
+@import url('tokens/typography.css');
+@import url('tokens/colors.css');
+@import url('tokens/themes.css');
+@import url('tokens/spacing.css');

@@ -1,0 +1,68 @@
+/* Shared chrome for foundation specimen cards. Cards link
+   ../../styles.css (tokens) + this file. The card NAME renders
+   outside the frame, so cards show specimens directly. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--paper);
+}
+
+.card {
+  font-family: var(--font-body);
+  color: var(--text-body);
+  background: var(--paper);
+  padding: 22px 24px;
+  direction: rtl;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Swatch grid */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 92px;
+}
+.swatch .chip {
+  height: 60px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raise);
+  border: 1px solid rgba(31, 42, 29, 0.06);
+}
+.swatch .name {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-body);
+  letter-spacing: 0;
+  direction: ltr;
+  text-align: right;
+}
+.swatch .hex {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  direction: ltr;
+  text-align: right;
+}
+
+/* Token rows */
+.rows { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; align-items: center; gap: 16px; }
+.row .label {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  direction: ltr;
+  width: 110px;
+  flex-shrink: 0;
+  text-align: right;
+}

@@ -1,0 +1,25 @@
+<!-- @dsCard group="Type" viewport="700x190" name="Numerals & currency" subtitle="Arabic-Indic digits · ر.س never $" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="card.css">
+<style>
+  .nums { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; }
+  .num { display: flex; flex-direction: column; gap: 4px; }
+  .num .v { font-family: var(--font-body); font-weight: 700; color: var(--text-strong); }
+  .num .c { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--text-muted); direction: ltr; text-align: right; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="nums">
+    <div class="num"><span class="v" style="font-size:34px">٤٥٠ ر.س</span><span class="c">price · /night</span></div>
+    <div class="num"><span class="v" style="font-size:22px">٠١٢٣٤٥٦٧٨٩</span><span class="c">Arabic-Indic 0–9</span></div>
+    <div class="num"><span class="v" style="font-size:18px;direction:ltr">+966 5X XXX XXXX</span><span class="c">phone (E.164)</span></div>
+    <div class="num"><span class="v" style="font-size:18px">٣ ليالٍ</span><span class="c">count</span></div>
+  </div>
+</div>
+</body>
+</html>

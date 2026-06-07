@@ -1,0 +1,31 @@
+/* ============================================================
+   Petbnb — Persona theming
+   The app re-skins per persona via a theme hook (theme/theme.tsx).
+   Owner mode  → cream/moss.   Host mode → honey/deep-gold.
+   The accent ALWAYS resolves through these scopes; components
+   read --accent / --accent-ink / --surface-screen, never a
+   hardcoded moss or gold.
+
+   Usage: put data-persona="owner" (default) or "host" on a
+   container (the AppShell wrapper / <html>). Owner values are
+   identical to the :root defaults so an un-scoped tree renders
+   as owner.
+   ============================================================ */
+
+/* Owner — the default lens (also used for admin, signed-out, both-as-owner) */
+[data-persona="owner"] {
+  --accent: var(--moss);
+  --accent-muted: var(--moss-light);
+  --accent-ink: var(--moss);
+  --surface-screen: var(--cream);
+}
+
+/* Host — warmer honey background + deep-gold accent so the
+   persona shift is unmistakable at a glance. accent-ink deepens
+   to gold-ink because gold-deep on honey falls below WCAG AA. */
+[data-persona="host"] {
+  --accent: var(--gold-deep);
+  --accent-muted: var(--gold);
+  --accent-ink: var(--gold-ink);
+  --surface-screen: var(--honey);
+}

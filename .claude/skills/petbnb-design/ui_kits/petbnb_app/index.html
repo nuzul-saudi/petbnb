@@ -1,0 +1,104 @@
+<!-- @dsCard group="App" viewport="1040x780" name="Petbnb App" subtitle="Owner flow — feed → listing → booking → confirm" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petbnb — App UI Kit</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--sand);
+    font-family: var(--font-body);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 18px; padding: 28px 16px; min-height: 100%;
+    -webkit-font-smoothing: antialiased;
+  }
+  .controls { display: flex; align-items: center; gap: 12px; }
+  .seg { display: inline-flex; background: var(--surface-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-pill); padding: 3px; }
+  .seg button {
+    border: none; background: none; cursor: pointer; padding: 7px 18px;
+    border-radius: var(--radius-pill); font-family: var(--font-body); font-weight: 700;
+    font-size: var(--text-body-sm); color: var(--text-muted);
+  }
+  .seg button.on { color: var(--text-on-accent); }
+  .seg button.on.owner { background: var(--moss); }
+  .seg button.on.host { background: var(--gold-deep); }
+  .reset {
+    background: none; border: 1px solid var(--border-hairline); cursor: pointer;
+    border-radius: var(--radius-pill); padding: 8px 16px;
+    font-family: var(--font-body); font-weight: 700; font-size: var(--text-body-sm); color: var(--text-muted);
+  }
+  .phone {
+    width: 390px; height: 760px; background: var(--surface-screen);
+    border-radius: 44px; padding: 12px;
+    box-shadow: var(--shadow-lift), 0 0 0 10px #15110c, 0 0 0 11px #2c2519;
+    flex-shrink: 0;
+  }
+  .screen {
+    width: 100%; height: 100%; background: var(--surface-screen);
+    border-radius: 33px; overflow: hidden;
+    display: flex; flex-direction: column; position: relative;
+  }
+  .notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 130px; height: 26px; background: #15110c; border-radius: 0 0 16px 16px; z-index: 5; }
+  .hint { font-family: var(--font-body); font-size: 12px; color: var(--text-muted); max-width: 390px; text-align: center; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { Onboarding, Feed, Listing, Request, Confirm, TopBar } = window;
+
+function App() {
+  const [persona, setPersona] = React.useState('owner');
+  const [screen, setScreen] = React.useState('onboarding');
+  const [host, setHost] = React.useState(null);
+  const [info, setInfo] = React.useState(null);
+
+  let body, bar = null;
+  if (screen === 'onboarding') {
+    body = <Onboarding onPick={() => setScreen('feed')} />;
+  } else if (screen === 'feed') {
+    bar = <TopBar locale="ar" />;
+    body = <Feed greeting="أهلاً، نورة" onOpen={(h) => { setHost(h); setScreen('listing'); }} />;
+  } else if (screen === 'listing') {
+    bar = <TopBar locale="ar" onBack={() => setScreen('feed')} />;
+    body = <Listing host={host} onBack={() => setScreen('feed')} onRequest={() => setScreen('request')} />;
+  } else if (screen === 'request') {
+    bar = <TopBar title="طلب حجز" locale="ar" onBack={() => setScreen('listing')} />;
+    body = <Request host={host} onBack={() => setScreen('listing')} onSubmit={(i) => { setInfo(i); setScreen('confirm'); }} />;
+  } else {
+    body = <Confirm host={host} info={info} onHome={() => setScreen('feed')} />;
+  }
+
+  return (
+    <React.Fragment>
+      <div className="controls">
+        <div className="seg">
+          <button className={'owner ' + (persona === 'owner' ? 'on' : '')} onClick={() => setPersona('owner')}>مالك · Owner</button>
+          <button className={'host ' + (persona === 'host' ? 'on' : '')} onClick={() => setPersona('host')}>مضيف · Host</button>
+        </div>
+        <button className="reset" onClick={() => { setScreen('onboarding'); }}>ابدئي من جديد</button>
+      </div>
+      <div className="phone" data-persona={persona}>
+        <div className="screen">
+          <div className="notch"></div>
+          {bar}
+          {body}
+        </div>
+      </div>
+      <div className="hint">عرض تجريبي تفاعلي · بدّلي بين عدسة المالك (moss/cream) وعدسة المضيف (gold/honey) من الأعلى. تدفّق المالك: التصفح ← التفاصيل ← الحجز ← التأكيد.</div>
+    </React.Fragment>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

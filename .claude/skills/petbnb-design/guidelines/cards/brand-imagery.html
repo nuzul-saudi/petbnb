@@ -1,0 +1,46 @@
+<!-- @dsCard group="Brand" viewport="700x260" name="Imagery & card anatomy" subtitle="Paper card · 22px radius · soft shadow · warm photos" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="card.css">
+<style>
+  .card { background: var(--cream); }
+  .demo {
+    background: var(--surface-card);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+    max-width: 320px;
+  }
+  .demo .head { display: flex; align-items: center; gap: 12px; padding: 16px; }
+  .demo .av { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--whisper); }
+  .demo .nm { font-family: var(--font-heading); font-weight: 700; font-size: 16px; color: var(--moss-deep); display: flex; align-items: center; gap: 6px; }
+  .demo .nm .tk { color: var(--verified); font-size: 13px; }
+  .demo .meta { font-family: var(--font-body); font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .demo .photo { width: 100%; aspect-ratio: 5/2; object-fit: cover; background: var(--whisper); display: block; }
+  .demo .foot { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; }
+  .demo .price { font-family: var(--font-body); font-weight: 700; font-size: 16px; color: var(--moss-deep); }
+  .demo .cap { font-family: var(--font-body); font-size: 13px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="demo">
+    <div class="head">
+      <img class="av" src="../../assets/breeds/ragdoll.jpg" alt="">
+      <div>
+        <div class="nm">نورة العتيبي <span class="tk">✓</span></div>
+        <div class="meta">مضيفة • 📍 الملقا، الرياض</div>
+      </div>
+    </div>
+    <img class="photo" src="../../assets/breeds/maine_coon.jpg" alt="">
+    <div class="foot">
+      <span class="price">٤٥٠ ر.س <span style="font-weight:400;font-size:12px;color:var(--text-muted)">/ ليلة</span></span>
+      <span class="cap">🐈 ٢</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

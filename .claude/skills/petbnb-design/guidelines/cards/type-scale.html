@@ -1,0 +1,30 @@
+<!-- @dsCard group="Type" viewport="700x320" name="Type scale" subtitle="Display 28 → micro 10" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="card.css">
+<style>
+  .ladder { display: flex; flex-direction: column; gap: 10px; }
+  .step { display: flex; align-items: baseline; gap: 16px; }
+  .step .t { color: var(--text-strong); }
+  .step .lbl { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--text-muted); direction: ltr; margin-inline-start: auto; }
+  .h { font-family: var(--font-heading); font-weight: 500; }
+  .b { font-family: var(--font-body); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="ladder">
+    <div class="step"><span class="t h" style="font-size:var(--text-display)">أهلاً، نورة</span><span class="lbl">display · 28 · Reem Kufi</span></div>
+    <div class="step"><span class="t h" style="font-size:var(--text-title)">المضيفون في الرياض</span><span class="lbl">title · 24 · Reem Kufi</span></div>
+    <div class="step"><span class="t h" style="font-size:var(--text-heading)">منزل دافئ لقطتك</span><span class="lbl">heading · 18 · Reem Kufi</span></div>
+    <div class="step"><span class="t b" style="font-size:var(--text-subhead);font-weight:700">اطلب الحجز</span><span class="lbl">subhead · 16 · Tajawal 700</span></div>
+    <div class="step"><span class="t b" style="font-size:var(--text-body-md);color:var(--text-body)">تفاصيل الإقامة والخدمات</span><span class="lbl">body · 14 · Tajawal</span></div>
+    <div class="step"><span class="t b" style="font-size:var(--text-caption);color:var(--text-muted)">مضيفة • 📍 الملقا، الرياض</span><span class="lbl">caption · 12 · Tajawal</span></div>
+    <div class="step"><span class="t b" style="font-size:var(--text-micro);font-weight:700;letter-spacing:.5px;color:var(--text-muted)">جديد</span><span class="lbl">micro · 10 · Tajawal 700</span></div>
+  </div>
+</div>
+</body>
+</html>

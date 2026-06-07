@@ -1,0 +1,25 @@
+<!-- @dsCard group="Spacing" viewport="700x200" name="Elevation" subtitle="Soft, layered, warm-ink shadows" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="card.css">
+<style>
+  .card { background: var(--cream); }
+  .shadows { display: flex; gap: 30px; align-items: center; padding: 8px 0 14px; }
+  .sh { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .sh .box { width: 96px; height: 64px; background: var(--paper); border-radius: var(--radius-lg); }
+  .sh .lbl { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--text-muted); direction: ltr; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="shadows">
+    <div class="sh"><div class="box" style="box-shadow:var(--shadow-raise)"></div><span class="lbl">raise</span></div>
+    <div class="sh"><div class="box" style="box-shadow:var(--shadow-card)"></div><span class="lbl">card</span></div>
+    <div class="sh"><div class="box" style="box-shadow:var(--shadow-lift)"></div><span class="lbl">lift</span></div>
+  </div>
+</div>
+</body>
+</html>

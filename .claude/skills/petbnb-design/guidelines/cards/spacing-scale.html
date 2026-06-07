@@ -1,0 +1,27 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Spacing scale" subtitle="4px base step · xs → xxl" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="card.css">
+<style>
+  .steps { display: flex; align-items: flex-end; gap: 18px; }
+  .sp { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .sp .box { background: var(--moss); border-radius: 3px; }
+  .sp .lbl { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--text-muted); direction: ltr; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="steps">
+    <div class="sp"><div class="box" style="width:4px;height:4px"></div><span class="lbl">xs 4</span></div>
+    <div class="sp"><div class="box" style="width:8px;height:8px"></div><span class="lbl">sm 8</span></div>
+    <div class="sp"><div class="box" style="width:12px;height:12px"></div><span class="lbl">md 12</span></div>
+    <div class="sp"><div class="box" style="width:16px;height:16px"></div><span class="lbl">lg 16</span></div>
+    <div class="sp"><div class="box" style="width:24px;height:24px"></div><span class="lbl">xl 24</span></div>
+    <div class="sp"><div class="box" style="width:32px;height:32px"></div><span class="lbl">xxl 32</span></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Tier & status badges" subtitle="Host tiers + the honest 'new' pill" -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="card.css">
+<style>
+  .badges { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .badge {
+    font-family: var(--font-body); font-weight: 700;
+    font-size: var(--text-micro); letter-spacing: var(--tracking-badge);
+    color: var(--cream); padding: 4px 12px; border-radius: var(--radius-pill);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="badges">
+    <span class="badge" style="background:var(--tier-gold)">ذهبي</span>
+    <span class="badge" style="background:var(--tier-silver)">فضي</span>
+    <span class="badge" style="background:var(--tier-bronze)">برونزي</span>
+    <span class="badge" style="background:var(--gold)">جديد</span>
+    <span class="badge" style="background:var(--terracotta)">موقوف</span>
+  </div>
+</div>
+</body>
+</html>

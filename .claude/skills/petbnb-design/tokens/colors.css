@@ -1,0 +1,68 @@
+/* ============================================================
+   Petbnb — Color tokens
+   Source of truth: theme/tokens.ts + CLAUDE.md §8.
+   Warm, premium, trust-conveying. Deep moss primary,
+   sand/cream surfaces, gold accents. Never bright/cartoonish.
+   ============================================================ */
+
+:root {
+  /* ---- Base palette (1:1 with tokens.ts) ---- */
+
+  /* Surfaces — warm sand/cream family, lightest at the top */
+  --paper: #FFFCF5;   /* card / sheet surface, the lightest */
+  --cream: #FAF6EE;   /* owner-mode screen background */
+  --sand: #F5EFE6;    /* deeper warm neutral, section fills */
+  --whisper: #E8DFCC; /* hairline borders, inert chips, avatar wells */
+  --honey: #D4BC78;   /* host-mode screen background (persona shift) */
+
+  /* Ink — warm near-black greens for text */
+  --ink: #1F2A1D;      /* primary body text */
+  --ink-soft: #3D4A3A; /* secondary / meta text */
+
+  /* Moss — the primary brand green (owner accent) */
+  --moss: #2D4A2F;       /* primary actions, owner accent */
+  --moss-deep: #1A3018;  /* headings, deepest brand green */
+  --moss-light: #4A6B4A; /* muted owner accent, disabled-ish */
+
+  /* Gold — warm metallic accent + host persona */
+  --gold: #C4A464;       /* accent details, "new"/gold tier */
+  --gold-deep: #8C7340;  /* host accent, bronze tier */
+  --gold-ink: #5A4926;   /* host-mode secondary button text (AA on honey) */
+
+  /* Expressive — used sparingly */
+  --terracotta: #B45842; /* destructive / decline / suspend */
+  --rose: #D49389;       /* soft warm tint, gentle highlights */
+
+  /* ---- Semantic aliases (reference these in components) ---- */
+
+  /* Text */
+  --text-strong: var(--moss-deep);  /* headings */
+  --text-body: var(--ink);          /* body copy */
+  --text-muted: var(--ink-soft);    /* meta, captions, hints */
+  --text-on-accent: var(--cream);   /* label on a moss/gold fill */
+  --text-link: var(--moss);
+
+  /* Surfaces */
+  --surface-screen: var(--cream);   /* default screen bg (owner) */
+  --surface-card: var(--paper);     /* elevated card */
+  --surface-sunken: var(--sand);    /* recessed section */
+  --surface-inert: var(--whisper);  /* chips, wells, placeholders */
+
+  /* Lines */
+  --border-hairline: var(--whisper);
+  --border-strong: var(--ink-soft);
+
+  /* Accent — DEFAULT (owner). Persona scopes override these. */
+  --accent: var(--moss);
+  --accent-muted: var(--moss-light);
+  --accent-ink: var(--moss);        /* deepened accent for outlined controls */
+
+  /* Status */
+  --danger: var(--terracotta);
+  --verified: var(--moss);          /* the trust ✓ */
+
+  /* Tier badges */
+  --tier-bronze: var(--gold-deep);
+  --tier-silver: var(--ink-soft);
+  --tier-gold: var(--gold);
+}

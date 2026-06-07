@@ -1,0 +1,301 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "components/core/**",
+              "components/forms/**",
+              "components/listings/**",
+              "components/navigation/**",
+              "ui_kits/petbnb_app/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      },
+      {
+        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Tajawal|Reem Kufi))/i]",
+        "message": "Font not provided by the design system. Available: Tajawal, Reem Kufi."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AppHeader'] > JSXAttribute > JSXIdentifier[name!=/^(?:items|locale|onLanguageToggle|personaToggleLabel|onPersonaToggle|pendingCount|key|ref|className|style|children)$/]",
+        "message": "<AppHeader> doesn't accept that prop. Declared props: items, locale, onLanguageToggle, personaToggleLabel, onPersonaToggle, pendingCount."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AppHeader'] > JSXAttribute[name.name='locale'] > Literal[value!=/^(?:ar|en)$/]",
+        "message": "<AppHeader> locale must be one of 'ar' | 'en'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Avatar'] > JSXAttribute > JSXIdentifier[name!=/^(?:photoUrl|name|glyph|size|rounded|key|ref|className|style|children)$/]",
+        "message": "<Avatar> doesn't accept that prop. Declared props: photoUrl, name, glyph, size, rounded."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Badge'] > JSXAttribute > JSXIdentifier[name!=/^(?:label|tone|color|icon|key|ref|className|style|children)$/]",
+        "message": "<Badge> doesn't accept that prop. Declared props: label, tone, color, icon."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Badge'] > JSXAttribute[name.name='tone'] > Literal[value!=/^(?:gold|silver|bronze|new|accent|danger|neutral)$/]",
+        "message": "<Badge> tone must be one of 'gold' | 'silver' | 'bronze' | 'new' | 'accent' | 'danger' | 'neutral'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute > JSXIdentifier[name!=/^(?:label|onPress|variant|size|disabled|loading|fullWidth|icon|type|key|ref|className|style|children)$/]",
+        "message": "<Button> doesn't accept that prop. Declared props: label, onPress, variant, size, disabled, loading, fullWidth, icon, type."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='variant'] > Literal[value!=/^(?:primary|secondary|destructive)$/]",
+        "message": "<Button> variant must be one of 'primary' | 'secondary' | 'destructive'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='size'] > Literal[value!=/^(?:normal|compact)$/]",
+        "message": "<Button> size must be one of 'normal' | 'compact'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='type'] > Literal[value!=/^(?:button|submit|reset)$/]",
+        "message": "<Button> type must be one of 'button' | 'submit' | 'reset'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Card'] > JSXAttribute > JSXIdentifier[name!=/^(?:children|pad|interactive|sunken|style|key|ref|className|style|children)$/]",
+        "message": "<Card> doesn't accept that prop. Declared props: children, pad, interactive, sunken, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='FilterChip'] > JSXAttribute > JSXIdentifier[name!=/^(?:label|active|onPress|key|ref|className|style|children)$/]",
+        "message": "<FilterChip> doesn't accept that prop. Declared props: label, active, onPress."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Input'] > JSXAttribute > JSXIdentifier[name!=/^(?:label|value|onChange|placeholder|helper|error|type|disabled|id|key|ref|className|style|children)$/]",
+        "message": "<Input> doesn't accept that prop. Declared props: label, value, onChange, placeholder, helper, error, type, disabled, id."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ListingCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:hostName|hostPhoto|verified|tier|gender|district|city|distanceKm|title|price|maxPets|coverPhoto|isNew|statusBadge|onPress|key|ref|className|style|children)$/]",
+        "message": "<ListingCard> doesn't accept that prop. Declared props: hostName, hostPhoto, verified, tier, gender, district, city, distanceKm, title, price, maxPets, coverPhoto, isNew, statusBadge, onPress."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ListingCard'] > JSXAttribute[name.name='tier'] > Literal[value!=/^(?:gold|silver|bronze)$/]",
+        "message": "<ListingCard> tier must be one of 'gold' | 'silver' | 'bronze'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ListingCard'] > JSXAttribute[name.name='gender'] > Literal[value!=/^(?:female|male)$/]",
+        "message": "<ListingCard> gender must be one of 'female' | 'male'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='RoleCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:role|title|desc|icon|selected|onPress|key|ref|className|style|children)$/]",
+        "message": "<RoleCard> doesn't accept that prop. Declared props: role, title, desc, icon, selected, onPress."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='RoleCard'] > JSXAttribute[name.name='role'] > Literal[value!=/^(?:owner|host|both)$/]",
+        "message": "<RoleCard> role must be one of 'owner' | 'host' | 'both'."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {
+      "AppHeader": {
+        "replaces": []
+      },
+      "Avatar": {
+        "replaces": []
+      },
+      "Badge": {
+        "replaces": []
+      },
+      "Button": {
+        "replaces": []
+      },
+      "Card": {
+        "replaces": []
+      },
+      "FilterChip": {
+        "replaces": []
+      },
+      "Input": {
+        "replaces": []
+      },
+      "ListingCard": {
+        "replaces": []
+      },
+      "RoleCard": {
+        "replaces": []
+      }
+    },
+    "tokens": [
+      "--accent",
+      "--accent-ink",
+      "--accent-muted",
+      "--border-hairline",
+      "--border-strong",
+      "--cream",
+      "--danger",
+      "--font-body",
+      "--font-heading",
+      "--gold",
+      "--gold-deep",
+      "--gold-ink",
+      "--hairline",
+      "--honey",
+      "--ink",
+      "--ink-soft",
+      "--leading-body",
+      "--leading-snug",
+      "--leading-tight",
+      "--moss",
+      "--moss-deep",
+      "--moss-light",
+      "--paper",
+      "--radius-lg",
+      "--radius-md",
+      "--radius-pill",
+      "--radius-sm",
+      "--radius-xl",
+      "--rose",
+      "--sand",
+      "--shadow-card",
+      "--shadow-lift",
+      "--shadow-raise",
+      "--space-lg",
+      "--space-md",
+      "--space-sm",
+      "--space-xl",
+      "--space-xs",
+      "--space-xxl",
+      "--surface-card",
+      "--surface-inert",
+      "--surface-screen",
+      "--surface-sunken",
+      "--tap-compact",
+      "--tap-min",
+      "--terracotta",
+      "--text-body",
+      "--text-body-lg",
+      "--text-body-md",
+      "--text-body-sm",
+      "--text-caption",
+      "--text-display",
+      "--text-heading",
+      "--text-link",
+      "--text-micro",
+      "--text-muted",
+      "--text-on-accent",
+      "--text-strong",
+      "--text-subhead",
+      "--text-title",
+      "--tier-bronze",
+      "--tier-gold",
+      "--tier-silver",
+      "--tracking-badge",
+      "--verified",
+      "--weight-bold",
+      "--weight-medium",
+      "--weight-regular",
+      "--whisper"
+    ],
+    "tokenKinds": {
+      "--font-heading": "font",
+      "--font-body": "font",
+      "--weight-regular": "font",
+      "--weight-medium": "font",
+      "--weight-bold": "font",
+      "--text-display": "font",
+      "--text-title": "font",
+      "--text-heading": "font",
+      "--text-subhead": "font",
+      "--text-body-lg": "font",
+      "--text-body-md": "font",
+      "--text-body-sm": "font",
+      "--text-caption": "font",
+      "--text-micro": "font",
+      "--leading-tight": "font",
+      "--leading-snug": "font",
+      "--leading-body": "font",
+      "--tracking-badge": "font",
+      "--paper": "color",
+      "--cream": "color",
+      "--sand": "color",
+      "--whisper": "color",
+      "--honey": "color",
+      "--ink": "color",
+      "--ink-soft": "color",
+      "--moss": "color",
+      "--moss-deep": "color",
+      "--moss-light": "color",
+      "--gold": "color",
+      "--gold-deep": "color",
+      "--gold-ink": "color",
+      "--terracotta": "color",
+      "--rose": "color",
+      "--text-strong": "font",
+      "--text-body": "font",
+      "--text-muted": "font",
+      "--text-on-accent": "font",
+      "--text-link": "font",
+      "--surface-screen": "color",
+      "--surface-card": "color",
+      "--surface-sunken": "color",
+      "--surface-inert": "color",
+      "--border-hairline": "color",
+      "--border-strong": "color",
+      "--accent": "color",
+      "--accent-muted": "color",
+      "--accent-ink": "color",
+      "--danger": "color",
+      "--verified": "color",
+      "--tier-bronze": "color",
+      "--tier-silver": "color",
+      "--tier-gold": "color",
+      "--space-xs": "spacing",
+      "--space-sm": "spacing",
+      "--space-md": "spacing",
+      "--space-lg": "spacing",
+      "--space-xl": "spacing",
+      "--space-xxl": "spacing",
+      "--radius-sm": "radius",
+      "--radius-md": "radius",
+      "--radius-lg": "radius",
+      "--radius-xl": "radius",
+      "--radius-pill": "radius",
+      "--shadow-raise": "shadow",
+      "--shadow-card": "shadow",
+      "--shadow-lift": "shadow",
+      "--tap-min": "spacing",
+      "--tap-compact": "spacing",
+      "--hairline": "spacing"
+    },
+    "fontFamilies": [
+      "Reem Kufi",
+      "Tajawal"
+    ]
+  }
+}

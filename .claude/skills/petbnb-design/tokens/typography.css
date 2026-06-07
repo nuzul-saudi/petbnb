@@ -1,0 +1,123 @@
+/* ============================================================
+   Petbnb — Typography tokens + webfonts
+   Tajawal (body) + Reem Kufi (headings). Arabic-first.
+   Files are self-hosted woff2 (arabic + latin subsets) under
+   ../assets/fonts. Both families are the genuine fonts named in
+   CLAUDE.md §7 — not substitutes.
+   ============================================================ */
+
+/* ---- Tajawal — body. weights 400 / 500 / 700 ---- */
+@font-face {
+  font-family: 'Tajawal';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/tajawal-400-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0898-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+1EC71-1ECB4, U+1ED01-1ED3D, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: 'Tajawal';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/tajawal-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Tajawal';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/tajawal-500-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0898-08E1, U+08E3-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: 'Tajawal';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/tajawal-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Tajawal';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/tajawal-700-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0898-08E1, U+08E3-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: 'Tajawal';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/tajawal-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+FEFF, U+FFFD;
+}
+
+/* ---- Reem Kufi — headings. weights 500 / 700 ---- */
+@font-face {
+  font-family: 'Reem Kufi';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/reem-kufi-500-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0898-08E1, U+08E3-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: 'Reem Kufi';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/reem-kufi-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+20AC, U+2122, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Reem Kufi';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/reem-kufi-700-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0898-08E1, U+08E3-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+1EE00-1EEFF;
+}
+@font-face {
+  font-family: 'Reem Kufi';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/reem-kufi-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+20AC, U+2122, U+FEFF, U+FFFD;
+}
+
+:root {
+  /* ---- Families ---- */
+  --font-heading: 'Reem Kufi', system-ui, sans-serif;
+  --font-body: 'Tajawal', system-ui, sans-serif;
+
+  /* ---- Weights ---- */
+  --weight-regular: 400;
+  --weight-medium: 500;   /* Reem Kufi heading default */
+  --weight-bold: 700;
+
+  /* ---- Type scale (px) ----
+     Mirrors the in-app fontSize ladder. Headings use Reem Kufi;
+     body/labels use Tajawal. */
+  --text-display: 28px;   /* signed-in greeting, hero */
+  --text-title: 24px;     /* screen titles, listing title */
+  --text-heading: 18px;   /* card host name, section heads */
+  --text-subhead: 16px;   /* button label, emphasised body */
+  --text-body-lg: 15px;   /* description body, inputs */
+  --text-body-md: 14px;   /* default body, nav, list copy */
+  --text-body-sm: 13px;   /* compact button, secondary meta */
+  --text-caption: 12px;   /* meta line, hints, captions */
+  --text-micro: 10px;     /* badge / pill text, letter-spaced */
+
+  /* ---- Line heights ---- */
+  --leading-tight: 1.15;  /* display + headings */
+  --leading-snug: 1.35;   /* subheads */
+  --leading-body: 1.6;    /* paragraph copy (lineHeight 24 on 15px) */
+
+  /* ---- Tracking ---- */
+  --tracking-badge: 0.5px; /* uppercase-ish micro pills */
+}
