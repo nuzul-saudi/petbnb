@@ -267,13 +267,20 @@ export async function reorderListingPhotos(args: {
 
   // The Database type in src/types/database.ts is hand-maintained and
   // doesn't yet list migration 0020's reorder_listing_photos RPC.
-  // Cast through the untyped overload here — the hand-typed wrapper
-  // signature above is the contract every caller sees. Adding the RPC
-  // to the Database type is a one-line follow-up in the same commit
-  // as the next typed-RPC addition.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rpc = supabase.rpc as unknown as (name: string, params: Record<string, unknown>) => Promise<{ error: unknown }>;
-  const { error } = await rpc('reorder_listing_photos', {
+  // We cast the supabase client to a permissive type instead of
+  // detaching its rpc method into a local — detaching loses `this`
+  // and supabase-js crashes inside rpc() when it tries to read
+  // `this.rest`. Keeping method-call syntax preserves the binding.
+  // The hand-typed wrapper signature above is the contract every
+  // caller sees. Adding the RPC to the Database type is a one-line
+  // follow-up in the same commit as the next typed-RPC addition.
+  const client = supabase as unknown as {
+    rpc: (
+      name: string,
+      params: Record<string, unknown>,
+    ) => Promise<{ error: unknown }>;
+  };
+  const { error } = await client.rpc('reorder_listing_photos', {
     p_listing_id: args.listingId,
     p_order: args.orderedIds,
   });

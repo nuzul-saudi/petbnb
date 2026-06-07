@@ -74,9 +74,13 @@ export function AppHeader({
       {/* Persona toggle — visible only for role='both'. Single
           destination-labeled button: its label names the OTHER persona
           (the one you'd switch TO). Tapping calls setPersona(the other
-          persona). Not gated by confirmLeave because switching persona
-          doesn't navigate (it changes which home renders later, when
-          the user taps Home in the nav).
+          persona) AND routes to '/', so the user lands on the new
+          persona's home immediately instead of staying on a screen
+          whose CTAs (e.g. listing-detail's "Edit listing" only renders
+          for hosts) read oddly in the new lens. Gated by confirmLeave
+          because the toggle is now real navigation — a dirty form on
+          the current screen should get the same leave-prompt it would
+          get from any other nav item.
 
           Pending-host attention badge placement is mode-dependent:
             • Owner mode → badge sits ON the toggle (the toggle IS the
@@ -89,7 +93,10 @@ export function AppHeader({
       {profile?.role === 'both' ? (
         <View style={styles.personaSwitch}>
           <Pressable
-            onPress={() => setPersona(persona === 'host' ? 'owner' : 'host')}
+            onPress={safeNav(() => {
+              setPersona(persona === 'host' ? 'owner' : 'host');
+              router.replace('/');
+            })}
             style={[styles.personaToggle, { borderColor: theme.accent }]}
           >
             <Text style={[styles.personaToggleText, { color: theme.accent }]}>
