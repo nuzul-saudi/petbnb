@@ -156,7 +156,14 @@ export default function ListingPhotosScreen() {
 
   const goBack = () => {
     if (!confirmLeaveIfDirty()) return;
-    router.replace('/');
+    // 7.5d: prefer history back so detail → edit → photos → back lands
+    // on edit (the new sensible flow). For a host who deep-linked to
+    // /photos directly there's no history, so fall back to '/'.
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
   };
 
   // ----- early returns -----

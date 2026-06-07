@@ -201,14 +201,12 @@ export default function ListingDetailScreen() {
 
           {/* Host viewing their own listing sees Edit instead of
               Request booking — a host can't book their own place.
-              The Edit screen is Step 7.5; until it ships, the button
-              routes back to the host home so the host isn't stuck.
-              Owners (and any non-host viewer) still see Request. */}
+              The Edit screen (Step 7.5) now exists; the CTA routes
+              there. Owners (and any non-host viewer) still see
+              Request booking. */}
           {!!user && listing.host_id === user.id ? (
             <Pressable
-              // TODO 7.5: repoint at /listings/[id]/edit when that
-              // screen exists.
-              onPress={() => router.replace('/')}
+              onPress={() => router.push(`/listings/${listing.id}/edit`)}
               style={styles.cta}
             >
               <Text style={styles.ctaText}>{t('listing.edit_button')}</Text>
