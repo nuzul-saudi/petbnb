@@ -103,6 +103,27 @@
       "delete_failed": "Couldn't remove the photo. Please try again.",
       "leave_confirm": "You have unsaved photos. Leave without saving?",
       "empty": "You haven't added any photos yet. Add at least 3 before publishing."
+    },
+    "edit": {
+      "title": "Edit listing",
+      "back": "← Back",
+      "loading": "Loading…",
+      "load_failed": "Couldn't load listing. Please try again.",
+      "not_available": "This listing isn't available to you.",
+      "manage_photos": "Manage photos",
+      "photo_count": "{count} photos",
+      "photo_count_one": "1 photo",
+      "no_photos": "No photos yet",
+      "save_button": "Save changes",
+      "saving": "Saving…",
+      "live_save_confirm": "Saving will hide your listing until it's re-approved. Continue?",
+      "deactivate": "Deactivate listing",
+      "deactivating": "Deactivating…",
+      "deactivate_confirm": "Hide this listing from the public feed?",
+      "deactivate_failed": "Couldn't deactivate. Please try again.",
+      "reactivate": "Reactivate listing",
+      "reactivating": "Reactivating…",
+      "reactivate_failed": "Couldn't reactivate. Please try again."
     }
   },
   "booking": {
