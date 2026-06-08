@@ -1,17 +1,26 @@
-// Listing edit screen (Step 7.5). Host-only.
+// Listing edit screen (Step 7.5 + 8d two-copy rework). Host-only.
 //
-// Behaviour rules (settled 7.5 spec, do not re-litigate):
-//   • Edits the WHOLE listing (all 10 form fields). Photos are reached
+// Behaviour rules:
+//   • Edits the WHOLE listing (10 form fields). Photos are reached
 //     via a "Manage photos" link — managed on the existing
 //     /listings/[id]/photos screen, NOT embedded.
-//   • Editing a pending listing (status='pending') stays pending.
-//   • Editing a LIVE listing (status='approved') → on save, set status
-//     back to 'pending' (drops from the public feed until admin re-
-//     approves). A confirm dialog gates the destructive flip first.
-//   • Deactivate / Reactivate are direct host actions — no admin gate
-//     yet (richer 4-state semantics land in 8d). Direct flip between
-//     'approved' and 'pending', with a confirm for the destructive
-//     direction only.
+//   • Editing a never-approved listing (status='pending') saves
+//     IN-PLACE on the listings row — there's no public copy to
+//     protect. No confirm.
+//   • Editing an approved or paused listing creates / updates a
+//     draft (listing_drafts) — the LIVE row stays untouched and the
+//     public feed keeps showing the approved copy. A confirm dialog
+//     informs the host their changes go to admin review.
+//   • Dirty-check: Save is disabled until at least one field differs
+//     from the loaded values. Prevents an empty draft from a
+//     no-change Save.
+//   • Deactivate / Reactivate are direct status flips via
+//     setListingStatus (not via updateListing). 8d still produces
+//     only 'pending' or 'approved' here; the proper paused vs
+//     pending semantics arrive in a follow-up.
+//   • Discard pending changes — visible only when has_pending_edit
+//     is true. Deletes both draft tables for the listing; the form
+//     re-fetches and reverts to the live values.
 
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -25,9 +34,11 @@ import { ListingForm, type ListingFormValues } from '@/components/ListingForm';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import {
-  getListingWithPhotos,
+  discardListingDraft,
+  getListingForEdit,
+  setListingStatus,
   updateListing,
-  type ListingDetail,
+  type ListingEditData,
 } from '@/lib/listings';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
@@ -40,24 +51,25 @@ export default function EditListingScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
 
-  const [listing, setListing] = useState<ListingDetail | null>(null);
+  const [data, setData] = useState<ListingEditData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // The deactivate/reactivate flow is conceptually separate from the
-  // main form save — disable both pathways while either is running so
-  // a host can't fire deactivate mid-save (which would also race the
-  // status='pending' flip).
+  // Status toggle (deactivate / reactivate) and discard share the
+  // "busy with a status-side mutation" lane so the host can't fire
+  // two of them concurrently. Either also blocks the form save.
   const [togglingActive, setTogglingActive] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     if (!id) return;
-    const data = await getListingWithPhotos(id);
-    setListing(data);
+    const next = await getListingForEdit(id);
+    setData(next);
   }, [id]);
 
   useEffect(() => {
@@ -95,7 +107,7 @@ export default function EditListingScreen() {
     );
   }
 
-  if (loadError || !listing) {
+  if (loadError || !data) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
@@ -114,11 +126,11 @@ export default function EditListingScreen() {
   }
 
   // Ownership: must be the listing's host. Defense in depth — RLS
-  // would reject any update from a non-host, but we don't even render
-  // the form. Mirrors the photos-screen guard from 7.3b. Both the
-  // not-found and not-yours branches show the same panel so URL
-  // probing doesn't leak which listing IDs exist.
-  if (listing.host_id !== user.id) {
+  // would reject any update from a non-host, but we don't even
+  // render the form. Mirrors the photos-screen guard from 7.3b.
+  // Both the not-found and not-yours branches show the same panel
+  // so URL probing doesn't leak which listing IDs exist.
+  if (data.hostId !== user.id) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
@@ -136,7 +148,7 @@ export default function EditListingScreen() {
     );
   }
 
-  // ---- helpers (post-guard so we know the listing belongs to user) ----
+  // ---- helpers (post-guard) ----
 
   const confirm = (key: string): boolean => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -146,24 +158,25 @@ export default function EditListingScreen() {
     return true;
   };
 
-  // The form's submit. If the listing is currently live, gate behind
-  // a confirm and include status='pending' in the patch (live→pending
-  // flip). If pending, just save the fields.
-  //
-  // 8b note: behaviour is byte-equivalent to pre-8b. The proper
-  // two-copy edit model (live edits create a draft instead of
-  // flipping the live row back to pending) lands in 8d.
+  const isDraftPath =
+    data.status === 'approved' || data.status === 'paused';
+
+  // Save handler. Two paths:
+  //   • status='pending' → in-place; no confirm; routes home.
+  //   • status='approved' or 'paused' → confirm "your changes go to
+  //     admin review; your live listing stays up"; updateListing
+  //     upserts the draft; routes home.
+  // updateListing reads the live status server-side and chooses the
+  // right path itself — this screen's branch is only for the
+  // confirm copy.
   const onSave = async (values: ListingFormValues) => {
-    if (listing.status === 'approved') {
+    if (isDraftPath) {
       if (!confirm('listings.edit.live_save_confirm')) return;
     }
     setSaveError(null);
     setSaving(true);
     try {
-      await updateListing(id, {
-        ...values,
-        ...(listing.status === 'approved' ? { status: 'pending' } : {}),
-      });
+      await updateListing(id, values);
       router.replace('/');
     } catch (e) {
       console.warn('[listings.edit.save_failed]', e);
@@ -175,26 +188,28 @@ export default function EditListingScreen() {
 
   const onCancel = () => router.replace(`/listings/${id}`);
 
+  // Deactivate (approved → pending) / Reactivate (pending/paused →
+  // approved). 8d still produces only 'pending' or 'approved' here;
+  // the proper 'paused' transition arrives in a follow-up that
+  // distinguishes "host turned this off" from "never been live."
   const onToggleActive = async () => {
-    if (togglingActive || saving) return;
-    if (listing.status === 'approved') {
+    if (togglingActive || saving || discarding) return;
+    if (data.status === 'approved') {
       if (!confirm('listings.edit.deactivate_confirm')) return;
     }
     setToggleError(null);
     setTogglingActive(true);
     try {
-      // 8b: 2-state toggle preserved — approved ↔ pending. 8d
-      // distinguishes host-pause ('paused') from "saving edits"
-      // ('pending') and rewires this button accordingly.
-      await updateListing(id, {
-        status: listing.status === 'approved' ? 'pending' : 'approved',
-      });
+      await setListingStatus(
+        id,
+        data.status === 'approved' ? 'pending' : 'approved',
+      );
       await refetch();
     } catch (e) {
       console.warn('[listings.edit.toggle_failed]', e);
       setToggleError(
         t(
-          listing.status === 'approved'
+          data.status === 'approved'
             ? 'listings.edit.deactivate_failed'
             : 'listings.edit.reactivate_failed',
         ),
@@ -204,24 +219,27 @@ export default function EditListingScreen() {
     }
   };
 
-  // Prefill the form from the loaded listing. Text fields read _ar
-  // (which is what createListing writes); display elsewhere falls
-  // back via pickLocalized when _en is null.
-  const initialValues = {
-    city: listing.city as 'riyadh' | 'dammam',
-    neighborhood: listing.neighborhood,
-    title: listing.title_ar ?? '',
-    description: listing.description_ar ?? '',
-    nightlyPrice: listing.nightly_price_sar,
-    maxConcurrentPets: listing.max_concurrent_pets,
-    hasResidentPets: listing.has_resident_pets,
-    residentPetsNote: listing.resident_pets_note,
-    offersGrooming: listing.offers_grooming,
-    hostGender: listing.host_gender as 'female' | 'male',
+  // Discard the pending edit. RLS DELETE policies on the draft
+  // tables permit the host to do this directly. 8f replaces the
+  // raw deletes with an atomic discard_listing_draft RPC.
+  const onDiscardDraft = async () => {
+    if (togglingActive || saving || discarding) return;
+    if (!confirm('listings.edit.discard_confirm')) return;
+    setDiscardError(null);
+    setDiscarding(true);
+    try {
+      await discardListingDraft(id);
+      await refetch();
+    } catch (e) {
+      console.warn('[listings.edit.discard_failed]', e);
+      setDiscardError(t('listings.edit.discard_failed'));
+    } finally {
+      setDiscarding(false);
+    }
   };
 
-  const photoCount = listing.photos.length;
-  const coverPhoto = photoCount > 0 ? listing.photos[0].photo_url : null;
+  const photoCount = data.photos.length;
+  const coverPhoto = photoCount > 0 ? data.photos[0].photo_url : null;
 
   const photoCountLabel =
     photoCount === 0
@@ -229,6 +247,8 @@ export default function EditListingScreen() {
       : photoCount === 1
         ? t('listings.edit.photo_count_one')
         : t('listings.edit.photo_count', { count: String(photoCount) });
+
+  const busy = saving || togglingActive || discarding;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -247,7 +267,7 @@ export default function EditListingScreen() {
         <Pressable
           onPress={() => router.push(`/listings/${id}/photos`)}
           style={styles.photosLink}
-          disabled={saving || togglingActive}
+          disabled={busy}
         >
           {coverPhoto ? (
             <Image
@@ -273,25 +293,50 @@ export default function EditListingScreen() {
         </Pressable>
 
         <ListingForm
-          initialValues={initialValues}
+          initialValues={data.values}
           saving={saving}
           saveError={saveError}
           saveLabel={t('listings.edit.save_button')}
           savingLabel={t('listings.edit.saving')}
           cancelLabel={t('listings.form.cancel_button')}
+          requireDirty
           onSave={onSave}
           onCancel={onCancel}
         />
 
+        {/* Discard pending changes — only when a draft exists.
+            Sits in its own block above the deactivate/reactivate
+            row so a host scanning bottom-up sees the destructive
+            actions grouped, with the most-context-sensitive one
+            (Discard) first. */}
+        {data.hasPendingEdit ? (
+          <View style={styles.discardBlock}>
+            {discardError ? (
+              <Text style={styles.error}>{discardError}</Text>
+            ) : null}
+            <Button
+              label={
+                discarding
+                  ? t('listings.edit.discarding')
+                  : t('listings.edit.discard_draft')
+              }
+              onPress={onDiscardDraft}
+              variant="destructive"
+              loading={discarding}
+              disabled={busy}
+              fullWidth
+            />
+          </View>
+        ) : null}
+
         {/* Deactivate / Reactivate — bottom of the screen so it's a
             deliberate action, not something a host can hit by accident
-            while scanning the form. Destructive variant for the
-            deactivate direction, secondary for reactivate. */}
+            while scanning the form. */}
         <View style={styles.statusBlock}>
           {toggleError ? (
             <Text style={styles.error}>{toggleError}</Text>
           ) : null}
-          {listing.status === 'approved' ? (
+          {data.status === 'approved' ? (
             <Button
               label={
                 togglingActive
@@ -301,7 +346,7 @@ export default function EditListingScreen() {
               onPress={onToggleActive}
               variant="destructive"
               loading={togglingActive}
-              disabled={saving || togglingActive}
+              disabled={busy}
               fullWidth
             />
           ) : (
@@ -314,7 +359,7 @@ export default function EditListingScreen() {
               onPress={onToggleActive}
               variant="secondary"
               loading={togglingActive}
-              disabled={saving || togglingActive}
+              disabled={busy}
               fullWidth
             />
           )}
@@ -413,6 +458,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.inkSoft,
     marginLeft: spacing.sm,
+  },
+  discardBlock: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
   statusBlock: {
     gap: spacing.sm,

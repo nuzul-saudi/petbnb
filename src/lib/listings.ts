@@ -3,7 +3,7 @@
 
 import type { CityKey } from '@/lib/cities';
 import { supabase } from '@/lib/supabase';
-import type { Tables, TablesUpdate } from '@/types/database';
+import type { Tables, TablesInsert, TablesUpdate } from '@/types/database';
 
 export type ListingFilter = {
   /**
@@ -347,33 +347,28 @@ export async function createListing(input: {
   return { id: data.id };
 }
 
-/**
- * Patch shape accepted by updateListing (Step 7.5b, 8b rework). Every
- * property is optional — the edit screen always sends the full form,
- * but the deactivate/reactivate path sends just `{ status }`.
- *
- * Text fields target the _ar columns (same as createListing); the _en
- * columns stay NULL until a translation step lands. Display uses
- * pickLocalized which falls back to _ar.
- *
- * status is included here on purpose: the edit screen flips a
- * currently-live listing back to 'pending' on save, returning it to
- * the admin queue (the "saving edits to a live listing drops it from
- * the public feed until re-approval" rule from CLAUDE.md / 7.5 spec).
- * The host-side deactivate/reactivate control writes the same field
- * directly without re-running the admin gate, per the settled spec.
- *
- * 8b NOTE: while we now write status (not is_active), the
- * deactivate/reactivate buttons still produce only 'pending' or
- * 'approved' — the 4-state semantics (paused vs admin_disabled) land
- * in 8d/8g. Behaviour is byte-equivalent to pre-8b at the user level.
- */
+// Four-state visibility for a listing — the canonical signal after
+// migration 0021 (is_active is a passive shadow column until 8i).
 export type ListingStatus =
   | 'pending'
   | 'approved'
   | 'paused'
   | 'admin_disabled';
 
+/**
+ * Patch shape accepted by updateListing (Step 7.5b → 8d rework).
+ * 10 editable field properties, all optional — the edit screen
+ * always sends the full form, callers may send a subset.
+ *
+ * 8d: `status` is NO LONGER part of this patch. Status flips
+ * (deactivate / reactivate, admin take-offline) go through the
+ * dedicated setListingStatus(id, status) helper. updateListing is
+ * purely the field-editing path.
+ *
+ * Text fields target the _ar columns (same as createListing); the
+ * _en columns stay NULL until a translation step lands. Display
+ * uses pickLocalized which falls back to _ar.
+ */
 export type UpdateListingPatch = {
   city?: CityKey;
   neighborhood?: string;
@@ -385,18 +380,72 @@ export type UpdateListingPatch = {
   residentPetsNote?: string | null;
   offersGrooming?: boolean;
   hostGender?: 'female' | 'male';
-  status?: ListingStatus;
 };
 
 /**
- * Update an existing listing. RLS (listings_update_host, migration 0004)
- * permits the call when the caller is the row's host AND is not
- * suspended; an admin caller is also allowed. The row id is the only
- * identifier we send — host_id is read server-side from auth.uid().
+ * Status writer for the listings row. The host-side
+ * deactivate/reactivate controls and the admin approve/take-offline
+ * controls all funnel through here. RLS lets the host write status
+ * on their own row (listings_update_host, migration 0004) and admins
+ * are bypassed via is_admin().
  *
- * Throws on supabase error. Returns nothing — the edit screen re-routes
- * to home on success and the deactivate/reactivate buttons re-fetch
- * locally to refresh their on-screen state.
+ * 8d note: setting status to 'approved' or 'pending' is the only
+ * direct flip the host can produce today (paused / admin_disabled
+ * arrive in later commits). The helper accepts all four for forward
+ * compatibility — RLS rejects nothing here, the UX gates which
+ * transitions are reachable.
+ *
+ * Lived in src/lib/admin.ts through 8b; moved here in 8d so the
+ * host-side edit screen can import it without taking an admin
+ * dependency.
+ */
+export async function setListingStatus(
+  id: string,
+  status: ListingStatus,
+): Promise<void> {
+  if (!supabase) throw new Error('supabase not configured');
+  const { error } = await supabase
+    .from('listings')
+    .update({ status })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Update an existing listing's editable fields. Two paths based on
+ * the listing's current status (read server-side, not trusted from
+ * the caller):
+ *
+ *   • status === 'pending'         → in-place UPDATE on listings.
+ *     Never-approved listings have no public-facing copy to protect;
+ *     edits land directly.
+ *
+ *   • status in ('approved','paused') → upsert into listing_drafts.
+ *     The host's edits go into a separate draft row that admin
+ *     reviews. The live row stays untouched until 8f's
+ *     promote_listing_draft RPC copies the draft over.
+ *
+ *     On FIRST edit (no draft row yet) we INSERT a FULL SNAPSHOT of
+ *     the current listing values, then layer the patch on top. The
+ *     draft therefore holds a complete, valid copy of every editable
+ *     column — 8f's promote step copies all draft columns onto the
+ *     parent listing, so a sparse draft would overwrite untouched
+ *     fields with nulls.
+ *
+ *     On SECOND+ edit (draft exists) we UPDATE the existing draft
+ *     row with just the supplied patch fields. UNIQUE(listing_id)
+ *     on listing_drafts enforces two-copies-max; subsequent edits
+ *     accumulate on the same row. The host edits on top of their
+ *     in-progress draft because getListingForEdit returns draft
+ *     values as the prefill.
+ *
+ * RLS:
+ *   - listings_update_host permits the in-place path.
+ *   - listing_drafts_insert_host / listing_drafts_update_host
+ *     permit the draft path. Both require is_active_user() (a
+ *     suspended host can read drafts but can't mutate them).
+ *
+ * Throws on supabase error.
  */
 export async function updateListing(
   id: string,
@@ -404,36 +453,248 @@ export async function updateListing(
 ): Promise<void> {
   if (!supabase) throw new Error('supabase not configured');
 
-  // Build the column-shaped patch. Only include keys the caller
-  // actually supplied — otherwise we'd write `null` over a value the
-  // caller never intended to touch. Typed as TablesUpdate<'listings'>
-  // so supabase-js's typed .update() accepts it.
-  const row: TablesUpdate<'listings'> = {};
-  if (patch.city !== undefined) row.city = patch.city;
-  if (patch.neighborhood !== undefined) row.neighborhood = patch.neighborhood;
-  if (patch.title !== undefined) row.title_ar = patch.title;
-  if (patch.description !== undefined) row.description_ar = patch.description;
-  if (patch.nightlyPrice !== undefined) {
-    row.nightly_price_sar = patch.nightlyPrice;
-  }
-  if (patch.maxConcurrentPets !== undefined) {
-    row.max_concurrent_pets = patch.maxConcurrentPets;
-  }
-  if (patch.hasResidentPets !== undefined) {
-    row.has_resident_pets = patch.hasResidentPets;
-  }
-  if (patch.residentPetsNote !== undefined) {
-    row.resident_pets_note = patch.residentPetsNote;
-  }
-  if (patch.offersGrooming !== undefined) {
-    row.offers_grooming = patch.offersGrooming;
-  }
-  if (patch.hostGender !== undefined) row.host_gender = patch.hostGender;
-  if (patch.status !== undefined) row.status = patch.status;
-
-  const { error } = await supabase
+  // Read the current listing for status + (potentially) the
+  // full-snapshot source. One round-trip; safe because all current
+  // callers of updateListing immediately re-route or re-fetch
+  // afterwards.
+  const { data: current, error: readErr } = await supabase
     .from('listings')
-    .update(row)
-    .eq('id', id);
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (readErr) throw readErr;
+  if (!current) throw new Error('listing not found');
+
+  // ---- pending: in-place on listings ----
+  if (current.status === 'pending') {
+    const row: TablesUpdate<'listings'> = {};
+    if (patch.city !== undefined) row.city = patch.city;
+    if (patch.neighborhood !== undefined) row.neighborhood = patch.neighborhood;
+    if (patch.title !== undefined) row.title_ar = patch.title;
+    if (patch.description !== undefined) row.description_ar = patch.description;
+    if (patch.nightlyPrice !== undefined) {
+      row.nightly_price_sar = patch.nightlyPrice;
+    }
+    if (patch.maxConcurrentPets !== undefined) {
+      row.max_concurrent_pets = patch.maxConcurrentPets;
+    }
+    if (patch.hasResidentPets !== undefined) {
+      row.has_resident_pets = patch.hasResidentPets;
+    }
+    if (patch.residentPetsNote !== undefined) {
+      row.resident_pets_note = patch.residentPetsNote;
+    }
+    if (patch.offersGrooming !== undefined) {
+      row.offers_grooming = patch.offersGrooming;
+    }
+    if (patch.hostGender !== undefined) row.host_gender = patch.hostGender;
+
+    const { error } = await supabase
+      .from('listings')
+      .update(row)
+      .eq('id', id);
+    if (error) throw error;
+    return;
+  }
+
+  // ---- approved or paused: upsert listing_drafts ----
+  // Look for an existing draft row.
+  const { data: existingDraft, error: draftReadErr } = await supabase
+    .from('listing_drafts')
+    .select('id')
+    .eq('listing_id', id)
+    .maybeSingle();
+  if (draftReadErr) throw draftReadErr;
+
+  if (existingDraft) {
+    // Second+ edit — UPDATE the existing draft with just the patch.
+    const draftPatch: TablesUpdate<'listing_drafts'> = {};
+    if (patch.city !== undefined) draftPatch.city = patch.city;
+    if (patch.neighborhood !== undefined) {
+      draftPatch.neighborhood = patch.neighborhood;
+    }
+    if (patch.title !== undefined) draftPatch.title_ar = patch.title;
+    if (patch.description !== undefined) {
+      draftPatch.description_ar = patch.description;
+    }
+    if (patch.nightlyPrice !== undefined) {
+      draftPatch.nightly_price_sar = patch.nightlyPrice;
+    }
+    if (patch.maxConcurrentPets !== undefined) {
+      draftPatch.max_concurrent_pets = patch.maxConcurrentPets;
+    }
+    if (patch.hasResidentPets !== undefined) {
+      draftPatch.has_resident_pets = patch.hasResidentPets;
+    }
+    if (patch.residentPetsNote !== undefined) {
+      draftPatch.resident_pets_note = patch.residentPetsNote;
+    }
+    if (patch.offersGrooming !== undefined) {
+      draftPatch.offers_grooming = patch.offersGrooming;
+    }
+    if (patch.hostGender !== undefined) {
+      draftPatch.host_gender = patch.hostGender;
+    }
+
+    const { error } = await supabase
+      .from('listing_drafts')
+      .update(draftPatch)
+      .eq('listing_id', id);
+    if (error) throw error;
+    return;
+  }
+
+  // First edit — INSERT a FULL SNAPSHOT initialized from current,
+  // then layer the patch on top. Every editable column ends up
+  // populated; 8f's promote RPC can safely copy them all back onto
+  // the listings row without risk of nulling untouched fields.
+  const snapshot: TablesInsert<'listing_drafts'> = {
+    listing_id: id,
+    city: (patch.city ?? current.city) as 'riyadh' | 'dammam',
+    neighborhood: patch.neighborhood ?? current.neighborhood,
+    title_ar: patch.title ?? current.title_ar,
+    title_en: current.title_en,
+    description_ar:
+      patch.description !== undefined
+        ? patch.description
+        : current.description_ar,
+    description_en: current.description_en,
+    nightly_price_sar: patch.nightlyPrice ?? current.nightly_price_sar,
+    max_concurrent_pets:
+      patch.maxConcurrentPets ?? current.max_concurrent_pets,
+    has_resident_pets: patch.hasResidentPets ?? current.has_resident_pets,
+    resident_pets_note:
+      patch.residentPetsNote !== undefined
+        ? patch.residentPetsNote
+        : current.resident_pets_note,
+    offers_grooming: patch.offersGrooming ?? current.offers_grooming,
+    host_gender: patch.hostGender ?? current.host_gender,
+  };
+
+  const { error: insertErr } = await supabase
+    .from('listing_drafts')
+    .insert(snapshot);
+  if (insertErr) throw insertErr;
+}
+
+/**
+ * Data shape consumed by the edit screen (Step 8d). Returns the
+ * VALUES the form should prefill — from the draft if a draft exists,
+ * else from the approved listing — plus parent listing metadata
+ * (status + has_pending_edit) so the screen can branch its UI.
+ *
+ * Photos are still returned from listing_photos here (the approved
+ * set). The photo manager's draft-aware behaviour ships in 8e; once
+ * that lands this helper can also pull from listing_photo_drafts.
+ */
+export type ListingEditData = {
+  listingId: string;
+  hostId: string;
+  status: ListingStatus;
+  hasPendingEdit: boolean;
+  values: {
+    city: 'riyadh' | 'dammam';
+    neighborhood: string;
+    title: string;
+    description: string;
+    nightlyPrice: number;
+    maxConcurrentPets: number;
+    hasResidentPets: boolean;
+    residentPetsNote: string | null;
+    offersGrooming: boolean;
+    hostGender: 'female' | 'male';
+  };
+  photos: PhotoSummary[];
+};
+
+export async function getListingForEdit(
+  id: string,
+): Promise<ListingEditData | null> {
+  if (!supabase) return null;
+
+  // Embed listing_drafts (one-to-one via UNIQUE(listing_id)) +
+  // listing_photos (one-to-many) so a single round-trip returns
+  // everything the edit screen needs to render. RLS on
+  // listing_drafts restricts the draft branch to admin + host of
+  // parent — a non-host viewer would get null for that nested
+  // relation.
+  const { data, error } = await supabase
+    .from('listings')
+    .select(
+      `
+      *,
+      listing_drafts(*),
+      listing_photos(id, photo_url, sort_order)
+    `,
+    )
+    .eq('id', id)
+    .maybeSingle();
   if (error) throw error;
+  if (!data) return null;
+
+  // listing_drafts is typed as either an array OR a single object
+  // depending on the Database type's isOneToOne flag. We added it
+  // as isOneToOne:true in database.ts so we get an object or null.
+  const draft = (data.listing_drafts ?? null) as
+    | Tables<'listing_drafts'>
+    | null;
+  const photos = ((data.listing_photos ?? []) as PhotoSummary[]).sort(
+    (a, b) => a.sort_order - b.sort_order,
+  );
+
+  // Prefill source: draft wins if present, else approved listing.
+  const src = draft ?? data;
+
+  return {
+    listingId: data.id,
+    hostId: data.host_id,
+    status: data.status,
+    hasPendingEdit: draft !== null,
+    values: {
+      city: src.city as 'riyadh' | 'dammam',
+      neighborhood: src.neighborhood,
+      title: src.title_ar,
+      description: src.description_ar ?? '',
+      nightlyPrice: src.nightly_price_sar,
+      maxConcurrentPets: src.max_concurrent_pets,
+      hasResidentPets: src.has_resident_pets,
+      residentPetsNote: src.resident_pets_note,
+      offersGrooming: src.offers_grooming,
+      hostGender: src.host_gender as 'female' | 'male',
+    },
+    photos,
+  };
+}
+
+/**
+ * Delete a listing's pending draft (both fields and photos). Reachable
+ * by the host via RLS DELETE policies on listing_drafts and
+ * listing_photo_drafts. Two separate DELETEs — not atomic, but the
+ * failure mode is benign: a leftover listing_photo_drafts row will be
+ * cleaned up by the next successful Discard or by 8f's
+ * discard_listing_draft RPC (which replaces this helper).
+ *
+ * 8d uses this helper from the edit screen's "Discard draft" button.
+ */
+export async function discardListingDraft(
+  listingId: string,
+): Promise<void> {
+  if (!supabase) throw new Error('supabase not configured');
+
+  // Delete photo drafts first — orphan-tolerable order. If the
+  // listing_drafts delete fails afterward, the host can retry and
+  // we'll just re-issue an empty no-op DELETE on photo_drafts. If
+  // photo_drafts delete fails, the listing_drafts row stays so the
+  // host's edits are preserved and a retry can clean both.
+  const { error: photoErr } = await supabase
+    .from('listing_photo_drafts')
+    .delete()
+    .eq('listing_id', listingId);
+  if (photoErr) throw photoErr;
+
+  const { error: draftErr } = await supabase
+    .from('listing_drafts')
+    .delete()
+    .eq('listing_id', listingId);
+  if (draftErr) throw draftErr;
 }

@@ -268,6 +268,76 @@ export type Database = {
       };
 
       // ---------------------------------------------------------------------
+      // listing_drafts — the pending field-edit copy. Added in 8c
+      // (migration 0022). Two-copies-max via UNIQUE(listing_id).
+      // RLS restricts visibility to admin + host of the parent listing.
+      listing_drafts: {
+        Row: {
+          id: string;
+          listing_id: string;
+          city: 'riyadh' | 'dammam';
+          neighborhood: string;
+          title_ar: string;
+          title_en: string | null;
+          description_ar: string | null;
+          description_en: string | null;
+          nightly_price_sar: number;
+          max_concurrent_pets: number;
+          has_resident_pets: boolean;
+          resident_pets_note: string | null;
+          offers_grooming: boolean;
+          host_gender: 'female' | 'male';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          city: 'riyadh' | 'dammam';
+          neighborhood: string;
+          title_ar: string;
+          title_en?: string | null;
+          description_ar?: string | null;
+          description_en?: string | null;
+          nightly_price_sar: number;
+          max_concurrent_pets: number;
+          has_resident_pets: boolean;
+          resident_pets_note?: string | null;
+          offers_grooming: boolean;
+          host_gender: 'female' | 'male';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          listing_id?: string;
+          city?: 'riyadh' | 'dammam';
+          neighborhood?: string;
+          title_ar?: string;
+          title_en?: string | null;
+          description_ar?: string | null;
+          description_en?: string | null;
+          nightly_price_sar?: number;
+          max_concurrent_pets?: number;
+          has_resident_pets?: boolean;
+          resident_pets_note?: string | null;
+          offers_grooming?: boolean;
+          host_gender?: 'female' | 'male';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'listing_drafts_listing_id_fkey';
+            columns: ['listing_id'];
+            isOneToOne: true;
+            referencedRelation: 'listings';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+
+      // ---------------------------------------------------------------------
       bookings: {
         Row: {
           id: string;

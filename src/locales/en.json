@@ -116,14 +116,18 @@
       "no_photos": "No photos yet",
       "save_button": "Save changes",
       "saving": "Saving…",
-      "live_save_confirm": "Saving will hide your listing until it's re-approved. Continue?",
+      "live_save_confirm": "Your changes will be submitted for admin review. Your live listing stays visible until they're approved.",
       "deactivate": "Deactivate listing",
       "deactivating": "Deactivating…",
       "deactivate_confirm": "Hide this listing from the public feed?",
       "deactivate_failed": "Couldn't deactivate. Please try again.",
       "reactivate": "Reactivate listing",
       "reactivating": "Reactivating…",
-      "reactivate_failed": "Couldn't reactivate. Please try again."
+      "reactivate_failed": "Couldn't reactivate. Please try again.",
+      "discard_draft": "Discard pending changes",
+      "discarding": "Discarding…",
+      "discard_confirm": "Discard your pending edits? This can't be undone.",
+      "discard_failed": "Couldn't discard pending edits. Please try again."
     }
   },
   "booking": {

@@ -82,6 +82,14 @@ export type ListingFormProps = {
   saveLabel: string;
   savingLabel: string;
   cancelLabel: string;
+  /**
+   * When true, the Save button is disabled until at least one field
+   * value differs from the initialValues snapshot. The edit screen
+   * uses this so a no-change Save never creates an empty draft.
+   * The create screen leaves it off (default false) — Save is
+   * enabled from the first valid render.
+   */
+  requireDirty?: boolean;
   onSave: (values: ListingFormValues) => void | Promise<void>;
   onCancel: () => void;
 };
@@ -93,6 +101,7 @@ export function ListingForm({
   saveLabel,
   savingLabel,
   cancelLabel,
+  requireDirty = false,
   onSave,
   onCancel,
 }: ListingFormProps) {
@@ -247,6 +256,40 @@ export function ListingForm({
 
     await onSave(values);
   };
+
+  // Dirty-check: any current field value differs from the snapshot the
+  // form mounted with. Uses the same defaults the useState calls used
+  // so an untouched form correctly reads as clean. The edit screen
+  // turns this on via requireDirty so a no-change Save can't create
+  // an empty draft. The create screen leaves it off.
+  const initialCity = initialValues?.city ?? 'riyadh';
+  const initialDistrict = initialValues?.neighborhood ?? null;
+  const initialTitleValue = initialValues?.title ?? '';
+  const initialDescription = initialValues?.description ?? '';
+  const initialNightlyPrice =
+    initialValues?.nightlyPrice != null
+      ? String(initialValues.nightlyPrice)
+      : DEFAULT_NIGHTLY_PRICE;
+  const initialMaxCats =
+    initialValues?.maxConcurrentPets ?? MAX_CATS_FLOOR;
+  const initialHasResident = initialValues?.hasResidentPets ?? false;
+  const initialResidentNote = initialValues?.residentPetsNote ?? '';
+  const initialOffersGrooming = initialValues?.offersGrooming ?? false;
+  const initialHostGender = initialValues?.hostGender ?? null;
+
+  const isDirty =
+    city !== initialCity ||
+    districtKey !== initialDistrict ||
+    listingTitle !== initialTitleValue ||
+    description !== initialDescription ||
+    nightlyPrice !== initialNightlyPrice ||
+    maxCats !== initialMaxCats ||
+    hasResidentPets !== initialHasResident ||
+    residentNote !== initialResidentNote ||
+    offersGrooming !== initialOffersGrooming ||
+    hostGender !== initialHostGender;
+
+  const saveDisabled = saving || (requireDirty && !isDirty);
 
   return (
     <>
@@ -490,7 +533,7 @@ export function ListingForm({
         onPress={onSubmit}
         variant="primary"
         loading={saving}
-        disabled={saving}
+        disabled={saveDisabled}
         fullWidth
       />
       <Button

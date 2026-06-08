@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { PhotoGallery } from '@/components/PhotoGallery';
-import { setListingStatus } from '@/lib/admin';
+import { setListingStatus } from '@/lib/listings';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
