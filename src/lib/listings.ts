@@ -78,7 +78,7 @@ export async function listActiveListings(
       listing_photos(id, photo_url, sort_order)
     `,
     )
-    .eq('is_active', true)
+    .eq('status', 'approved')
     .order('created_at', { ascending: false });
 
   if (filter.city) query = query.eq('city', filter.city);
@@ -166,9 +166,9 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
 
 /**
  * Returns a host's own listings — every row where host_id matches,
- * regardless of is_active. Hosts need to see their inactive listings
- * on their host home to manage them. RLS already permits a host to
- * SELECT their own listing rows without further policy work.
+ * regardless of status. Hosts need to see their not-yet-approved
+ * listings on their host home to manage them. RLS already permits a
+ * host to SELECT their own listing rows without further policy work.
  *
  * Shape mirrors listActiveListings (same nested select + cover-photo
  * extraction), so callers can reuse ListingCard. distance_km is always
@@ -290,9 +290,11 @@ export async function countPendingHostBookings(
 
 /**
  * Insert a new host-created listing (Step 7.2d) — the first
- * listings INSERT path in the codebase. Sets is_active=false
- * EXPLICITLY (the migration 0019 default is also false, but writing
- * it in code makes the approval-gate intent clear at the callsite).
+ * listings INSERT path in the codebase. Sets status='pending'
+ * EXPLICITLY (the migration 0021 default is also 'pending', but
+ * writing it in code makes the approval-gate intent clear at the
+ * callsite). The bridge trigger from 0021 keeps is_active in sync
+ * until 8i drops the legacy column.
  *
  * Title and description are written to the _ar columns regardless of
  * the host's typing language. We have no language detection or
@@ -336,7 +338,7 @@ export async function createListing(input: {
       resident_pets_note: input.residentPetsNote,
       offers_grooming: input.offersGrooming,
       host_gender: input.hostGender,
-      is_active: false,
+      status: 'pending',
     })
     .select('id')
     .single();
@@ -346,21 +348,32 @@ export async function createListing(input: {
 }
 
 /**
- * Patch shape accepted by updateListing (Step 7.5b). Every property is
- * optional — the edit screen always sends the full form, but the
- * deactivate/reactivate path sends just `{ is_active }`.
+ * Patch shape accepted by updateListing (Step 7.5b, 8b rework). Every
+ * property is optional — the edit screen always sends the full form,
+ * but the deactivate/reactivate path sends just `{ status }`.
  *
  * Text fields target the _ar columns (same as createListing); the _en
  * columns stay NULL until a translation step lands. Display uses
  * pickLocalized which falls back to _ar.
  *
- * is_active is included here on purpose: the edit screen flips a
- * currently-live listing back to is_active=false on save, returning it
- * to the admin queue (the "saving edits to a live listing drops it from
+ * status is included here on purpose: the edit screen flips a
+ * currently-live listing back to 'pending' on save, returning it to
+ * the admin queue (the "saving edits to a live listing drops it from
  * the public feed until re-approval" rule from CLAUDE.md / 7.5 spec).
  * The host-side deactivate/reactivate control writes the same field
  * directly without re-running the admin gate, per the settled spec.
+ *
+ * 8b NOTE: while we now write status (not is_active), the
+ * deactivate/reactivate buttons still produce only 'pending' or
+ * 'approved' — the 4-state semantics (paused vs admin_disabled) land
+ * in 8d/8g. Behaviour is byte-equivalent to pre-8b at the user level.
  */
+export type ListingStatus =
+  | 'pending'
+  | 'approved'
+  | 'paused'
+  | 'admin_disabled';
+
 export type UpdateListingPatch = {
   city?: CityKey;
   neighborhood?: string;
@@ -372,7 +385,7 @@ export type UpdateListingPatch = {
   residentPetsNote?: string | null;
   offersGrooming?: boolean;
   hostGender?: 'female' | 'male';
-  is_active?: boolean;
+  status?: ListingStatus;
 };
 
 /**
@@ -416,7 +429,7 @@ export async function updateListing(
     row.offers_grooming = patch.offersGrooming;
   }
   if (patch.hostGender !== undefined) row.host_gender = patch.hostGender;
-  if (patch.is_active !== undefined) row.is_active = patch.is_active;
+  if (patch.status !== undefined) row.status = patch.status;
 
   const { error } = await supabase
     .from('listings')

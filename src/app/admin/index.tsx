@@ -35,7 +35,12 @@ export default function AdminHome() {
           !u.is_verified &&
           !u.is_suspended,
       ).length;
-      const pendingListings = listings.filter((l) => !l.is_active).length;
+      // 8b: "not live" — every status that isn't 'approved' counts as
+      // pending review here. Same semantics as the old !is_active read.
+      // 8g splits this into separate counters per status.
+      const pendingListings = listings.filter(
+        (l) => l.status !== 'approved',
+      ).length;
       setPendingHostsCount(pendingHosts);
       setPendingListingsCount(pendingListings);
     } catch (e) {

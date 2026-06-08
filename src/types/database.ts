@@ -164,6 +164,10 @@ export type Database = {
           has_resident_pets: boolean;
           resident_pets_note: string | null;
           is_active: boolean;
+          // Step 8a (migration 0021) — four-state visibility column.
+          // is_active is kept in sync via the listings_sync_is_active
+          // bridge trigger until 8i drops the legacy column.
+          status: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier: Database['public']['Enums']['listing_tier'];
           offers_grooming: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
@@ -186,6 +190,7 @@ export type Database = {
           has_resident_pets?: boolean;
           resident_pets_note?: string | null;
           is_active?: boolean;
+          status?: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
@@ -208,6 +213,7 @@ export type Database = {
           has_resident_pets?: boolean;
           resident_pets_note?: string | null;
           is_active?: boolean;
+          status?: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender?: Database['public']['Enums']['host_gender'];
@@ -674,6 +680,12 @@ export type Database = {
       is_active_user: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      // Step 7.3a (migration 0020) — atomic reorder of listing photos
+      // under the unique(listing_id, sort_order) constraint.
+      reorder_listing_photos: {
+        Args: { p_listing_id: string; p_order: string[] };
+        Returns: void;
       };
     };
 

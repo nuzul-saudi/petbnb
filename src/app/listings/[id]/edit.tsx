@@ -1,16 +1,17 @@
 // Listing edit screen (Step 7.5). Host-only.
 //
-// Behaviour rules (settled spec, do not re-litigate):
+// Behaviour rules (settled 7.5 spec, do not re-litigate):
 //   • Edits the WHOLE listing (all 10 form fields). Photos are reached
 //     via a "Manage photos" link — managed on the existing
 //     /listings/[id]/photos screen, NOT embedded.
-//   • Editing a pending listing (is_active=false) stays pending.
-//   • Editing a LIVE listing (is_active=true) → on save, set is_active
-//     back to false (drops from the public feed until admin re-
+//   • Editing a pending listing (status='pending') stays pending.
+//   • Editing a LIVE listing (status='approved') → on save, set status
+//     back to 'pending' (drops from the public feed until admin re-
 //     approves). A confirm dialog gates the destructive flip first.
 //   • Deactivate / Reactivate are direct host actions — no admin gate
-//     yet (a richer status model is the next step). Direct flip of
-//     is_active, with a confirm for the destructive direction only.
+//     yet (richer 4-state semantics land in 8d). Direct flip between
+//     'approved' and 'pending', with a confirm for the destructive
+//     direction only.
 
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -49,7 +50,7 @@ export default function EditListingScreen() {
   // The deactivate/reactivate flow is conceptually separate from the
   // main form save — disable both pathways while either is running so
   // a host can't fire deactivate mid-save (which would also race the
-  // is_active=false flip).
+  // status='pending' flip).
   const [togglingActive, setTogglingActive] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
@@ -146,10 +147,14 @@ export default function EditListingScreen() {
   };
 
   // The form's submit. If the listing is currently live, gate behind
-  // a confirm and include is_active=false in the patch (live→pending
+  // a confirm and include status='pending' in the patch (live→pending
   // flip). If pending, just save the fields.
+  //
+  // 8b note: behaviour is byte-equivalent to pre-8b. The proper
+  // two-copy edit model (live edits create a draft instead of
+  // flipping the live row back to pending) lands in 8d.
   const onSave = async (values: ListingFormValues) => {
-    if (listing.is_active) {
+    if (listing.status === 'approved') {
       if (!confirm('listings.edit.live_save_confirm')) return;
     }
     setSaveError(null);
@@ -157,7 +162,7 @@ export default function EditListingScreen() {
     try {
       await updateListing(id, {
         ...values,
-        ...(listing.is_active ? { is_active: false } : {}),
+        ...(listing.status === 'approved' ? { status: 'pending' } : {}),
       });
       router.replace('/');
     } catch (e) {
@@ -172,19 +177,24 @@ export default function EditListingScreen() {
 
   const onToggleActive = async () => {
     if (togglingActive || saving) return;
-    if (listing.is_active) {
+    if (listing.status === 'approved') {
       if (!confirm('listings.edit.deactivate_confirm')) return;
     }
     setToggleError(null);
     setTogglingActive(true);
     try {
-      await updateListing(id, { is_active: !listing.is_active });
+      // 8b: 2-state toggle preserved — approved ↔ pending. 8d
+      // distinguishes host-pause ('paused') from "saving edits"
+      // ('pending') and rewires this button accordingly.
+      await updateListing(id, {
+        status: listing.status === 'approved' ? 'pending' : 'approved',
+      });
       await refetch();
     } catch (e) {
       console.warn('[listings.edit.toggle_failed]', e);
       setToggleError(
         t(
-          listing.is_active
+          listing.status === 'approved'
             ? 'listings.edit.deactivate_failed'
             : 'listings.edit.reactivate_failed',
         ),
@@ -281,7 +291,7 @@ export default function EditListingScreen() {
           {toggleError ? (
             <Text style={styles.error}>{toggleError}</Text>
           ) : null}
-          {listing.is_active ? (
+          {listing.status === 'approved' ? (
             <Button
               label={
                 togglingActive

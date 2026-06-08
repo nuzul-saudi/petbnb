@@ -155,11 +155,19 @@ export async function setUserName(id: string, full_name: string): Promise<void> 
   if (error) throw error;
 }
 
-export async function setListingActive(id: string, value: boolean): Promise<void> {
+// Admin-side status setter. 8b replaced setListingActive(id, boolean)
+// with the explicit status form so the column we actually write maps
+// 1:1 to the column we read in the rest of the codebase. The 4-state
+// semantics (paused / admin_disabled) ride the same helper; 8g rewires
+// the admin caller to use them.
+export async function setListingStatus(
+  id: string,
+  status: 'pending' | 'approved' | 'paused' | 'admin_disabled',
+): Promise<void> {
   if (!supabase) throw new Error('No Supabase client');
   const { error } = await supabase
     .from('listings')
-    .update({ is_active: value })
+    .update({ status })
     .eq('id', id);
   if (error) throw error;
 }

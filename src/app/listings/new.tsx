@@ -7,9 +7,10 @@
 //   • the screen scaffolding (SafeArea + AppHeader + ScrollView)
 //   • the back-link + page title row
 //   • the create-specific save handler: calls createListing then
-//     routes home. is_active defaults to false at the DB layer
-//     (migration 0019) so new listings land in the admin queue;
-//     this screen never touches is_active.
+//     routes home. status='pending' is written explicitly by
+//     createListing (and is the column default after migration 0021)
+//     so new listings land in the admin queue; this screen never
+//     touches status directly.
 //
 // What moved out: the form body, the validation logic, the district
 // picker, the stepper, the toggle rows, the gender chip row, the

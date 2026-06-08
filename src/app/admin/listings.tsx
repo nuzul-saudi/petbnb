@@ -58,8 +58,11 @@ export default function AdminListingsScreen() {
 
   const filtered = useMemo(() => {
     return listings.filter((l) => {
-      if (filter === 'pending') return !l.is_active;
-      if (filter === 'active') return l.is_active;
+      // 8b: 'pending' filter means "not live" — every status except
+      // approved. Preserved from the pre-8b !is_active semantics.
+      // 8g splits this into per-status queues.
+      if (filter === 'pending') return l.status !== 'approved';
+      if (filter === 'active') return l.status === 'approved';
       return true;
     });
   }, [listings, filter]);
@@ -138,7 +141,7 @@ export default function AdminListingsScreen() {
                   <Text style={styles.rowTitle} numberOfLines={1}>
                     {item.title_ar}
                   </Text>
-                  <StatusPill active={item.is_active} />
+                  <StatusPill active={item.status === 'approved'} />
                 </View>
                 <Text style={styles.rowMeta}>
                   {item.neighborhood} • {item.host?.full_name ?? '—'}

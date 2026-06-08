@@ -149,7 +149,12 @@ function HostHome() {
               listing={item}
               onPress={() => router.push(`/listings/${item.id}`)}
               statusBadge={
-                item.is_active
+                // 8b: 2-state badge preserved. 8h replaces this with
+                // the 5-state version (pending_new / approved_live /
+                // approved_with_draft / paused / paused_with_draft /
+                // admin_disabled) once the draft table lands and we
+                // know whether the listing has a pending edit.
+                item.status === 'approved'
                   ? {
                       label: t('admin.listing_status_active'),
                       color: colors.moss,

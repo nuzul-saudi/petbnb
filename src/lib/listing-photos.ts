@@ -265,22 +265,7 @@ export async function reorderListingPhotos(args: {
 }): Promise<void> {
   if (!supabase) throw new Error('No Supabase client');
 
-  // The Database type in src/types/database.ts is hand-maintained and
-  // doesn't yet list migration 0020's reorder_listing_photos RPC.
-  // We cast the supabase client to a permissive type instead of
-  // detaching its rpc method into a local — detaching loses `this`
-  // and supabase-js crashes inside rpc() when it tries to read
-  // `this.rest`. Keeping method-call syntax preserves the binding.
-  // The hand-typed wrapper signature above is the contract every
-  // caller sees. Adding the RPC to the Database type is a one-line
-  // follow-up in the same commit as the next typed-RPC addition.
-  const client = supabase as unknown as {
-    rpc: (
-      name: string,
-      params: Record<string, unknown>,
-    ) => Promise<{ error: unknown }>;
-  };
-  const { error } = await client.rpc('reorder_listing_photos', {
+  const { error } = await supabase.rpc('reorder_listing_photos', {
     p_listing_id: args.listingId,
     p_order: args.orderedIds,
   });

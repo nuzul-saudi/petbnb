@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { PhotoGallery } from '@/components/PhotoGallery';
-import { setListingActive } from '@/lib/admin';
+import { setListingStatus } from '@/lib/admin';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -150,7 +150,12 @@ export default function AdminListingDetailScreen() {
     setTogglingActive(true);
     setError(null);
     try {
-      await setListingActive(listing.id, !listing.is_active);
+      // 8b: 2-state toggle preserved as-is — approved ↔ pending.
+      // 8g rewires this into the full approve/reject/admin_disable flow.
+      await setListingStatus(
+        listing.id,
+        listing.status === 'approved' ? 'pending' : 'approved',
+      );
       await load();
     } catch (e) {
       console.warn('[admin.listing.toggle_active_failed]', e);
@@ -217,11 +222,16 @@ export default function AdminListingDetailScreen() {
               <Text
                 style={[
                   styles.statusValue,
-                  { color: listing.is_active ? colors.moss : colors.gold },
+                  {
+                    color:
+                      listing.status === 'approved'
+                        ? colors.moss
+                        : colors.gold,
+                  },
                 ]}
               >
                 {t(
-                  listing.is_active
+                  listing.status === 'approved'
                     ? 'admin.listing_status_active'
                     : 'admin.listing_status_inactive',
                 )}
@@ -231,20 +241,22 @@ export default function AdminListingDetailScreen() {
               onPress={onToggleActive}
               disabled={togglingActive}
               style={[
-                listing.is_active ? styles.dangerButton : styles.primaryButton,
+                listing.status === 'approved'
+                  ? styles.dangerButton
+                  : styles.primaryButton,
                 togglingActive && styles.buttonDisabled,
               ]}
             >
               <Text
                 style={
-                  listing.is_active
+                  listing.status === 'approved'
                     ? styles.dangerButtonText
                     : styles.primaryButtonText
                 }
               >
                 {togglingActive
                   ? t('admin.saving')
-                  : listing.is_active
+                  : listing.status === 'approved'
                     ? t('admin.listing_deactivate')
                     : t('admin.listing_approve')}
               </Text>

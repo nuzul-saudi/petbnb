@@ -13,7 +13,7 @@
 // validates, then if-and-only-if valid calls onSave(values). The
 // parent flips `saving` to true around its own API call and surfaces
 // the result as `saveError`. ListingForm never sees the supabase
-// client; it never knows about hostId, listing.id, or is_active.
+// client; it never knows about hostId, listing.id, or status.
 
 import { useState } from 'react';
 import {
@@ -53,8 +53,8 @@ const DEFAULT_NIGHTLY_PRICE = '150';
 /**
  * The clean value shape produced by a successful submit. Matches the
  * createListing input minus hostId, and updateListing's patch shape
- * minus is_active — the parent screens add those two API-specific
- * extras when calling their respective lib functions.
+ * minus status — the parent screens add those two API-specific extras
+ * when calling their respective lib functions.
  */
 export type ListingFormValues = {
   city: CityKey;
