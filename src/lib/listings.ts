@@ -2,6 +2,7 @@
 // Inserts/updates land in Step 7 (host create-listing flow).
 
 import type { CityKey } from '@/lib/cities';
+import { listingPhotoStoragePathFromUrl } from '@/lib/listing-photos';
 import { supabase } from '@/lib/supabase';
 import type { Tables, TablesInsert, TablesUpdate } from '@/types/database';
 
@@ -693,34 +694,56 @@ export async function getListingForEdit(
 }
 
 /**
- * Delete a listing's pending draft (both fields and photos). Reachable
- * by the host via RLS DELETE policies on listing_drafts and
- * listing_photo_drafts. Two separate DELETEs — not atomic, but the
- * failure mode is benign: a leftover listing_photo_drafts row will be
- * cleaned up by the next successful Discard or by 8f's
- * discard_listing_draft RPC (which replaces this helper).
+ * Storage cleanup for orphan photo URLs returned by a draft RPC.
+ * Both promote_listing_draft and discard_listing_draft return text[]
+ * arrays of URLs whose storage objects are now unreferenced; this
+ * helper iterates them, derives in-bucket paths, and asks Supabase
+ * Storage to remove them. Best-effort: a failure to delete a file
+ * doesn't roll back the RPC (the rows are already gone). Future cron
+ * sweeps can mop up any survivors.
+ */
+export async function cleanupOrphanListingPhotos(
+  urls: string[] | null,
+): Promise<void> {
+  if (!supabase) return;
+  if (!urls || urls.length === 0) return;
+
+  const paths: string[] = [];
+  for (const url of urls) {
+    const path = listingPhotoStoragePathFromUrl(url);
+    if (path) paths.push(path);
+  }
+  if (paths.length === 0) return;
+
+  try {
+    await supabase.storage.from('listing-photos').remove(paths);
+  } catch (e) {
+    if (__DEV__) {
+      console.warn('[listings.cleanupOrphanListingPhotos]', e);
+    }
+  }
+}
+
+/**
+ * Delete a listing's pending draft (both fields and photos) via the
+ * 8f discard_listing_draft RPC, then best-effort cleanup of the
+ * storage objects for any draft photos that are NOT also referenced
+ * by live (the RPC returns a filtered list).
  *
- * 8d uses this helper from the edit screen's "Discard draft" button.
+ * The RPC permits admin OR (host of listing AND is_active_user) — so
+ * this helper is callable from both the host edit screen and the
+ * admin reject-edit button. Replaces the 8d two-sequential-DELETEs
+ * helper with a single atomic call.
  */
 export async function discardListingDraft(
   listingId: string,
 ): Promise<void> {
   if (!supabase) throw new Error('supabase not configured');
 
-  // Delete photo drafts first — orphan-tolerable order. If the
-  // listing_drafts delete fails afterward, the host can retry and
-  // we'll just re-issue an empty no-op DELETE on photo_drafts. If
-  // photo_drafts delete fails, the listing_drafts row stays so the
-  // host's edits are preserved and a retry can clean both.
-  const { error: photoErr } = await supabase
-    .from('listing_photo_drafts')
-    .delete()
-    .eq('listing_id', listingId);
-  if (photoErr) throw photoErr;
+  const { data, error } = await supabase.rpc('discard_listing_draft', {
+    p_listing_id: listingId,
+  });
+  if (error) throw error;
 
-  const { error: draftErr } = await supabase
-    .from('listing_drafts')
-    .delete()
-    .eq('listing_id', listingId);
-  if (draftErr) throw draftErr;
+  await cleanupOrphanListingPhotos(data ?? null);
 }

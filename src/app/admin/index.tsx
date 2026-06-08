@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { listAllListings, listAllUsers } from '@/lib/admin';
+import { listAllUsers, listPendingReviews } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -28,21 +28,22 @@ export default function AdminHome() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [users, listings] = await Promise.all([listAllUsers(), listAllListings()]);
+      const [users, reviews] = await Promise.all([
+        listAllUsers(),
+        listPendingReviews(),
+      ]);
       const pendingHosts = users.filter(
         (u) =>
           (u.role === 'host' || u.role === 'both') &&
           !u.is_verified &&
           !u.is_suspended,
       ).length;
-      // 8b: "not live" — every status that isn't 'approved' counts as
-      // pending review here. Same semantics as the old !is_active read.
-      // 8g splits this into separate counters per status.
-      const pendingListings = listings.filter(
-        (l) => l.status !== 'approved',
-      ).length;
+      // 8g: the listings counter now reflects the unified review
+      // queue (new pendings + pending edits to approved/paused/
+      // admin_disabled listings). Approved-no-drafts listings are
+      // not in the queue and don't inflate this counter anymore.
       setPendingHostsCount(pendingHosts);
-      setPendingListingsCount(pendingListings);
+      setPendingListingsCount(reviews.length);
     } catch (e) {
       console.warn('[admin.load_failed]', e);
       setError(t('admin.load_failed'));

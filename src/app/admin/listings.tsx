@@ -1,39 +1,43 @@
-import { useCallback, useMemo, useState } from 'react';
+// Admin listings queue. 8g reshape: the old active/pending/all
+// filter chips and listAllListings are gone. This is now the
+// unified REVIEW QUEUE — both new pending listings AND hosts'
+// pending edits sit in one list, each row labeled with a review
+// type.
+//
+// Items in this queue:
+//   - new_listing: status='pending', no drafts. Brand-new awaiting
+//     admin approval.
+//   - pending_edit: status IN ('approved','paused','admin_disabled')
+//     AND a draft exists (field-side, photo-side, or both). Host is
+//     proposing changes to a live (or paused / admin-disabled)
+//     listing.
+//
+// Items NOT in this queue: live listings with no pending edits.
+// Admin reaches those via direct URL (e.g. from a user's profile)
+// or via a future "all listings" admin tab — not in 8g scope.
+
+import { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
-import { listAllListings, type AdminListing } from '@/lib/admin';
+import { listPendingReviews, type AdminReview } from '@/lib/admin';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
-type FilterValue = 'all' | 'pending' | 'active';
-
-const FILTERS: { value: FilterValue; i18nKey: string }[] = [
-  { value: 'all', i18nKey: 'admin.listings_filter_all' },
-  { value: 'pending', i18nKey: 'admin.listings_filter_pending' },
-  { value: 'active', i18nKey: 'admin.listings_filter_active' },
-];
-
 export default function AdminListingsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const params = useLocalSearchParams<{ filter?: string }>();
 
-  const initialFilter: FilterValue =
-    FILTERS.some((f) => f.value === params.filter) ? (params.filter as FilterValue) : 'all';
-
-  const [filter, setFilter] = useState<FilterValue>(initialFilter);
-  const [listings, setListings] = useState<AdminListing[]>([]);
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +45,7 @@ export default function AdminListingsScreen() {
     setLoading(true);
     setError(null);
     try {
-      setListings(await listAllListings());
+      setReviews(await listPendingReviews());
     } catch (e) {
       console.warn('[admin.listings.load_failed]', e);
       setError(t('admin.load_failed'));
@@ -56,48 +60,14 @@ export default function AdminListingsScreen() {
     }, [load]),
   );
 
-  const filtered = useMemo(() => {
-    return listings.filter((l) => {
-      // 8b: 'pending' filter means "not live" — every status except
-      // approved. Preserved from the pre-8b !is_active semantics.
-      // 8g splits this into per-status queues.
-      if (filter === 'pending') return l.status !== 'approved';
-      if (filter === 'active') return l.status === 'approved';
-      return true;
-    });
-  }, [listings, filter]);
-
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Pressable onPress={() => router.replace('/admin')} style={styles.backLink}>
           <Text style={styles.backText}>{t('admin.back')}</Text>
         </Pressable>
-        <Text style={styles.title}>{t('admin.listings_title')}</Text>
+        <Text style={styles.title}>{t('admin.review_queue_title')}</Text>
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {FILTERS.map((f) => (
-          <Pressable
-            key={f.value}
-            onPress={() => setFilter(f.value)}
-            style={[styles.filterChip, filter === f.value && styles.filterChipActive]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                filter === f.value && styles.filterChipTextActive,
-              ]}
-            >
-              {t(f.i18nKey)}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -105,13 +75,13 @@ export default function AdminListingsScreen() {
         <View style={styles.centered}>
           <Text style={styles.muted}>{t('admin.loading')}</Text>
         </View>
-      ) : filtered.length === 0 ? (
+      ) : reviews.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.muted}>{t('admin.listings_empty')}</Text>
+          <Text style={styles.muted}>{t('admin.review_queue_empty')}</Text>
         </View>
       ) : (
         <FlatList
-          data={filtered}
+          data={reviews}
           keyExtractor={(l) => l.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
@@ -141,13 +111,15 @@ export default function AdminListingsScreen() {
                   <Text style={styles.rowTitle} numberOfLines={1}>
                     {item.title_ar}
                   </Text>
-                  <StatusPill active={item.status === 'approved'} />
+                  <ReviewTypePill type={item.reviewType} />
                 </View>
                 <Text style={styles.rowMeta}>
                   {item.neighborhood} • {item.host?.full_name ?? '—'}
                   {item.host?.is_verified ? ' ✓' : ''}
                 </Text>
-                <Text style={styles.rowPrice}>{formatSAR(item.nightly_price_sar)}</Text>
+                <Text style={styles.rowPrice}>
+                  {formatSAR(item.nightly_price_sar)}
+                </Text>
               </View>
             </Pressable>
           )}
@@ -157,17 +129,28 @@ export default function AdminListingsScreen() {
   );
 }
 
-function StatusPill({ active }: { active: boolean }) {
+function ReviewTypePill({
+  type,
+}: {
+  type: AdminReview['reviewType'];
+}) {
   const { t } = useTranslation();
   return (
     <View
       style={[
         styles.pill,
-        { backgroundColor: active ? colors.moss : colors.gold },
+        {
+          backgroundColor:
+            type === 'new_listing' ? colors.moss : colors.gold,
+        },
       ]}
     >
       <Text style={styles.pillText}>
-        {t(active ? 'admin.listing_status_active' : 'admin.listing_status_inactive')}
+        {t(
+          type === 'new_listing'
+            ? 'admin.review_type_new_listing'
+            : 'admin.review_type_pending_edit',
+        )}
       </Text>
     </View>
   );
@@ -200,33 +183,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: colors.mossDeep,
     textAlign: 'right',
-  },
-  filterRow: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-    gap: spacing.xs,
-  },
-  filterChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.whisper,
-    backgroundColor: colors.paper,
-    marginEnd: spacing.xs,
-  },
-  filterChipActive: {
-    backgroundColor: colors.moss,
-    borderColor: colors.moss,
-  },
-  filterChipText: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.inkSoft,
-  },
-  filterChipTextActive: {
-    color: colors.cream,
-    fontFamily: fonts.bodyBold,
   },
   error: {
     fontFamily: fonts.body,

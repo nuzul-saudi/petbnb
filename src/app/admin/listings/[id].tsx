@@ -1,5 +1,24 @@
+// Admin listing detail. 8g reshape:
+//
+//   - new_listing → existing editable form + an "Approve" button that
+//     flips status='approved'. Admin can refine fields before
+//     approving (the host's first-draft listing might need a tweak).
+//
+//   - pending_edit → read-only display of the DRAFT content + Approve
+//     edit / Reject edit buttons. Approve calls promote_listing_draft
+//     RPC (atomic copy of drafts onto live + storage cleanup); reject
+//     calls discard_listing_draft RPC.
+//
+//   - none (status approved/paused/admin_disabled with no drafts) →
+//     existing editable form. Admin can directly edit the live row.
+//
+//   Always visible when status applies:
+//     - "Take offline" when status='approved'. Sets 'admin_disabled'.
+//     - "Restore" when status='admin_disabled'. Sets 'approved'.
+
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,19 +30,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { PhotoGallery } from '@/components/PhotoGallery';
-import { setListingStatus } from '@/lib/listings';
+import {
+  adminRestoreListing,
+  adminTakeOffline,
+  approveNewListing,
+  getAdminListingReview,
+  promoteListingDraft,
+  rejectListingDraft,
+  type AdminReviewDetail,
+} from '@/lib/admin';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
-import type { Enums, Tables } from '@/types/database';
-
-type ListingRow = Tables<'listings'>;
-type HostInfo = Pick<
-  Tables<'profiles'>,
-  'id' | 'full_name' | 'is_verified' | 'is_suspended'
->;
-type PhotoRow = Pick<Tables<'listing_photos'>, 'id' | 'photo_url' | 'sort_order'>;
+import type { Enums } from '@/types/database';
 
 const TIERS: Enums<'listing_tier'>[] = ['bronze', 'silver', 'gold'];
 const GENDERS: Enums<'host_gender'>[] = ['female', 'male'];
@@ -34,15 +54,12 @@ export default function AdminListingDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
 
-  const [listing, setListing] = useState<ListingRow | null>(null);
-  const [host, setHost] = useState<HostInfo | null>(null);
-  const [photos, setPhotos] = useState<PhotoRow[]>([]);
+  const [detail, setDetail] = useState<AdminReviewDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [togglingActive, setTogglingActive] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  // Editable form state — initialized from the loaded listing.
+  // Editable form state — only used in non-pending_edit modes.
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
@@ -52,9 +69,11 @@ export default function AdminListingDetailScreen() {
   const [hasResidentPets, setHasResidentPets] = useState(false);
   const [offersGrooming, setOffersGrooming] = useState(false);
   const [tier, setTier] = useState<Enums<'listing_tier'>>('bronze');
-  const [hostGender, setHostGender] = useState<Enums<'host_gender'>>('female');
+  const [hostGender, setHostGender] =
+    useState<Enums<'host_gender'>>('female');
 
-  const hydrateForm = (row: ListingRow) => {
+  const hydrateForm = useCallback((d: AdminReviewDetail) => {
+    const row = d.listing;
     setTitle(row.title_ar);
     setDescription(row.description_ar ?? '');
     setNeighborhood(row.neighborhood);
@@ -65,58 +84,48 @@ export default function AdminListingDetailScreen() {
     setOffersGrooming(row.offers_grooming);
     setTier(row.tier);
     setHostGender(row.host_gender);
-  };
+  }, []);
 
   const load = useCallback(async () => {
-    if (!supabase || !id) return;
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      const { data, error: e } = await supabase
-        .from('listings')
-        .select(
-          `
-          *,
-          host:profiles(id, full_name, is_verified, is_suspended),
-          listing_photos(id, photo_url, sort_order)
-        `,
-        )
-        .eq('id', id)
-        .maybeSingle();
-      if (e) throw e;
-      if (!data) {
-        setListing(null);
+      const d = await getAdminListingReview(id);
+      if (!d) {
+        setDetail(null);
         return;
       }
-      const { listing_photos: lp, host: h, ...rest } = data as typeof data & {
-        listing_photos?: PhotoRow[];
-        host?: HostInfo;
-      };
-      const row = rest as ListingRow;
-      setListing(row);
-      setHost(h ?? null);
-      setPhotos(((lp ?? []) as PhotoRow[]).sort((a, b) => a.sort_order - b.sort_order));
-      hydrateForm(row);
+      setDetail(d);
+      hydrateForm(d);
     } catch (e) {
       console.warn('[admin.listing.load_failed]', e);
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
     }
-  }, [id, t]);
+  }, [id, t, hydrateForm]);
 
   useEffect(() => {
     if (id) load();
   }, [id, load]);
 
-  const onSave = async () => {
-    if (!supabase || !listing) return;
-    setSaving(true);
+  const confirm = (key: string): boolean => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return window.confirm(t(key));
+    }
+    return true;
+  };
+
+  const onSaveDirect = async () => {
+    if (!supabase || !detail) return;
+    setBusy('save');
     setError(null);
     try {
       const priceNum = Number(price);
       const maxPetsNum = Number(maxPets);
-      if (!Number.isFinite(priceNum) || priceNum < 0) throw new Error('Invalid price');
+      if (!Number.isFinite(priceNum) || priceNum < 0)
+        throw new Error('Invalid price');
       if (!Number.isInteger(maxPetsNum) || maxPetsNum < 1)
         throw new Error('Invalid max pets');
 
@@ -134,34 +143,93 @@ export default function AdminListingDetailScreen() {
           tier,
           host_gender: hostGender,
         })
-        .eq('id', listing.id);
+        .eq('id', detail.listing.id);
       if (e) throw e;
       await load();
     } catch (e) {
       console.warn('[admin.listing.save_failed]', e);
       setError(t('admin.save_failed'));
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
   };
 
-  const onToggleActive = async () => {
-    if (!listing) return;
-    setTogglingActive(true);
+  const onApproveNew = async () => {
+    if (!detail) return;
+    if (!confirm('admin.approve_new_confirm')) return;
+    setBusy('approve');
     setError(null);
     try {
-      // 8b: 2-state toggle preserved as-is — approved ↔ pending.
-      // 8g rewires this into the full approve/reject/admin_disable flow.
-      await setListingStatus(
-        listing.id,
-        listing.status === 'approved' ? 'pending' : 'approved',
-      );
+      await approveNewListing(detail.listing.id);
       await load();
     } catch (e) {
-      console.warn('[admin.listing.toggle_active_failed]', e);
-      setError(t('admin.save_failed'));
+      console.warn('[admin.listing.approve_new_failed]', e);
+      setError(t('admin.approve_new_failed'));
     } finally {
-      setTogglingActive(false);
+      setBusy(null);
+    }
+  };
+
+  const onApproveEdit = async () => {
+    if (!detail) return;
+    if (!confirm('admin.approve_edit_confirm')) return;
+    setBusy('approve_edit');
+    setError(null);
+    try {
+      await promoteListingDraft(detail.listing.id);
+      await load();
+    } catch (e) {
+      console.warn('[admin.listing.approve_edit_failed]', e);
+      setError(t('admin.approve_edit_failed'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onRejectEdit = async () => {
+    if (!detail) return;
+    if (!confirm('admin.reject_edit_confirm')) return;
+    setBusy('reject_edit');
+    setError(null);
+    try {
+      await rejectListingDraft(detail.listing.id);
+      await load();
+    } catch (e) {
+      console.warn('[admin.listing.reject_edit_failed]', e);
+      setError(t('admin.reject_edit_failed'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onTakeOffline = async () => {
+    if (!detail) return;
+    if (!confirm('admin.take_offline_confirm')) return;
+    setBusy('take_offline');
+    setError(null);
+    try {
+      await adminTakeOffline(detail.listing.id);
+      await load();
+    } catch (e) {
+      console.warn('[admin.listing.take_offline_failed]', e);
+      setError(t('admin.take_offline_failed'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onRestore = async () => {
+    if (!detail) return;
+    setBusy('restore');
+    setError(null);
+    try {
+      await adminRestoreListing(detail.listing.id);
+      await load();
+    } catch (e) {
+      console.warn('[admin.listing.restore_failed]', e);
+      setError(t('admin.restore_failed'));
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -175,12 +243,15 @@ export default function AdminListingDetailScreen() {
     );
   }
 
-  if (!listing) {
+  if (!detail) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
           <Text style={styles.error}>{t('admin.load_failed')}</Text>
-          <Pressable onPress={() => router.replace('/admin/listings')} style={styles.backPill}>
+          <Pressable
+            onPress={() => router.replace('/admin/listings')}
+            style={styles.backPill}
+          >
             <Text style={styles.backPillText}>{t('admin.back')}</Text>
           </Pressable>
         </View>
@@ -188,13 +259,18 @@ export default function AdminListingDetailScreen() {
     );
   }
 
-  const hostUnverified = host && !host.is_verified;
+  const { listing, reviewType, draftFields, photos, hasFieldDraft, hasPhotoDraft } =
+    detail;
+  const hostUnverified = listing.host && !listing.host.is_verified;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.replace('/admin/listings')} style={styles.backLink}>
+          <Pressable
+            onPress={() => router.replace('/admin/listings')}
+            style={styles.backLink}
+          >
             <Text style={styles.backText}>{t('admin.back')}</Text>
           </Pressable>
           <Text style={styles.title}>{t('admin.listing_detail_title')}</Text>
@@ -213,7 +289,7 @@ export default function AdminListingDetailScreen() {
         <View style={styles.bodyPad}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {/* Activate / deactivate (primary action) */}
+          {/* Status pill — what state the listing is currently in. */}
           <View style={styles.statusCard}>
             <View style={styles.statusLeft}>
               <Text style={styles.statusLabel}>
@@ -226,174 +302,403 @@ export default function AdminListingDetailScreen() {
                     color:
                       listing.status === 'approved'
                         ? colors.moss
-                        : colors.gold,
+                        : listing.status === 'admin_disabled'
+                          ? colors.terracotta
+                          : colors.gold,
                   },
                 ]}
               >
-                {t(
-                  listing.status === 'approved'
-                    ? 'admin.listing_status_active'
-                    : 'admin.listing_status_inactive',
-                )}
+                {t(`admin.status_${listing.status}`)}
               </Text>
             </View>
-            <Pressable
-              onPress={onToggleActive}
-              disabled={togglingActive}
-              style={[
-                listing.status === 'approved'
-                  ? styles.dangerButton
-                  : styles.primaryButton,
-                togglingActive && styles.buttonDisabled,
-              ]}
-            >
-              <Text
-                style={
-                  listing.status === 'approved'
-                    ? styles.dangerButtonText
-                    : styles.primaryButtonText
-                }
-              >
-                {togglingActive
-                  ? t('admin.saving')
-                  : listing.status === 'approved'
-                    ? t('admin.listing_deactivate')
-                    : t('admin.listing_approve')}
-              </Text>
-            </Pressable>
           </View>
 
           {/* Host info */}
           <View style={styles.metaCard}>
             <Text style={styles.metaLine}>
-              {t('admin.listing_host_label')}: {host?.full_name ?? '—'}
-              {host?.is_verified ? '  ✓' : '  ✗ غير موثّق'}
+              {t('admin.listing_host_label')}:{' '}
+              {listing.host?.full_name ?? '—'}
+              {listing.host?.is_verified ? '  ✓' : '  ✗ غير موثّق'}
             </Text>
           </View>
 
-          {/* Editable fields */}
-          <Section label="العنوان">
-            <TextInput value={title} onChangeText={setTitle} style={styles.input} />
-          </Section>
+          {/* === Branch by review type === */}
 
-          <Section label="الوصف">
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              style={[styles.input, styles.multiline]}
+          {reviewType === 'pending_edit' ? (
+            <PendingEditPanel
+              draftFields={draftFields}
+              hasFieldDraft={hasFieldDraft}
+              hasPhotoDraft={hasPhotoDraft}
+              busy={busy}
+              onApprove={onApproveEdit}
+              onReject={onRejectEdit}
             />
-          </Section>
-
-          <Section label="الحي">
-            <TextInput
-              value={neighborhood}
-              onChangeText={setNeighborhood}
-              style={styles.input}
+          ) : (
+            <EditableForm
+              title={title}
+              setTitle={setTitle}
+              description={description}
+              setDescription={setDescription}
+              neighborhood={neighborhood}
+              setNeighborhood={setNeighborhood}
+              price={price}
+              setPrice={setPrice}
+              maxPets={maxPets}
+              setMaxPets={setMaxPets}
+              residentNote={residentNote}
+              setResidentNote={setResidentNote}
+              hasResidentPets={hasResidentPets}
+              setHasResidentPets={setHasResidentPets}
+              offersGrooming={offersGrooming}
+              setOffersGrooming={setOffersGrooming}
+              tier={tier}
+              setTier={setTier}
+              hostGender={hostGender}
+              setHostGender={setHostGender}
             />
-          </Section>
+          )}
 
-          <View style={styles.row2}>
-            <Section label={`السعر / ليلة (${formatSAR(Number(price || 0))})`}>
-              <TextInput
-                value={price}
-                onChangeText={setPrice}
-                inputMode="numeric"
-                style={styles.input}
-              />
-            </Section>
-            <Section label="حد القطط">
-              <TextInput
-                value={maxPets}
-                onChangeText={setMaxPets}
-                inputMode="numeric"
-                style={styles.input}
-              />
-            </Section>
-          </View>
-
-          <Section label="المستوى (Tier)">
-            <View style={styles.chipRow}>
-              {TIERS.map((tk) => (
-                <Pressable
-                  key={tk}
-                  onPress={() => setTier(tk)}
-                  style={[styles.chip, tier === tk && styles.chipActive]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      tier === tk && styles.chipTextActive,
-                    ]}
-                  >
-                    {t(`listing.tier_${tk}`)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Section>
-
-          <Section label="جنس المضيف">
-            <View style={styles.chipRow}>
-              {GENDERS.map((g) => (
-                <Pressable
-                  key={g}
-                  onPress={() => setHostGender(g)}
-                  style={[styles.chip, hostGender === g && styles.chipActive]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      hostGender === g && styles.chipTextActive,
-                    ]}
-                  >
-                    {t(g === 'female' ? 'listing.host_female' : 'listing.host_male')}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Section>
-
-          <Pressable
-            onPress={() => setHasResidentPets((v) => !v)}
-            style={[styles.toggleRow, hasResidentPets && styles.toggleRowActive]}
-          >
-            <Text style={styles.toggleText}>
-              {hasResidentPets ? '✓' : '○'} يوجد حيوانات مقيمة
-            </Text>
-          </Pressable>
-
-          {hasResidentPets ? (
-            <Section label="ملاحظة عن الحيوانات المقيمة">
-              <TextInput
-                value={residentNote}
-                onChangeText={setResidentNote}
-                style={styles.input}
-              />
-            </Section>
+          {/* Approve button for brand-new pending listings. */}
+          {reviewType === 'new_listing' ? (
+            <Pressable
+              onPress={onApproveNew}
+              disabled={busy !== null}
+              style={[
+                styles.primaryButton,
+                styles.fullWidthButton,
+                busy !== null && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.primaryButtonText}>
+                {busy === 'approve'
+                  ? t('admin.approving')
+                  : t('admin.approve_new')}
+              </Text>
+            </Pressable>
           ) : null}
 
-          <Pressable
-            onPress={() => setOffersGrooming((v) => !v)}
-            style={[styles.toggleRow, offersGrooming && styles.toggleRowActive]}
-          >
-            <Text style={styles.toggleText}>
-              {offersGrooming ? '✓' : '○'} خدمة الاستحمام
-            </Text>
-          </Pressable>
+          {/* Save (direct edit) — only when there's an editable form. */}
+          {reviewType !== 'pending_edit' ? (
+            <Pressable
+              onPress={onSaveDirect}
+              disabled={busy !== null}
+              style={[
+                styles.saveButton,
+                busy !== null && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.saveButtonText}>
+                {busy === 'save' ? t('admin.saving') : t('admin.save')}
+              </Text>
+            </Pressable>
+          ) : null}
 
-          <Pressable
-            onPress={onSave}
-            disabled={saving}
-            style={[styles.saveButton, saving && styles.buttonDisabled]}
-          >
-            <Text style={styles.saveButtonText}>
-              {saving ? t('admin.saving') : t('admin.save')}
-            </Text>
-          </Pressable>
+          {/* Override actions — Take offline / Restore. */}
+          {listing.status === 'approved' ? (
+            <Pressable
+              onPress={onTakeOffline}
+              disabled={busy !== null}
+              style={[
+                styles.dangerButton,
+                styles.fullWidthButton,
+                busy !== null && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.dangerButtonText}>
+                {busy === 'take_offline'
+                  ? t('admin.take_offline_in_flight')
+                  : t('admin.take_offline')}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {listing.status === 'admin_disabled' ? (
+            <Pressable
+              onPress={onRestore}
+              disabled={busy !== null}
+              style={[
+                styles.primaryButton,
+                styles.fullWidthButton,
+                busy !== null && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={styles.primaryButtonText}>
+                {busy === 'restore'
+                  ? t('admin.restoring')
+                  : t('admin.restore')}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function PendingEditPanel({
+  draftFields,
+  hasFieldDraft,
+  hasPhotoDraft,
+  busy,
+  onApprove,
+  onReject,
+}: {
+  draftFields: AdminReviewDetail['draftFields'];
+  hasFieldDraft: boolean;
+  hasPhotoDraft: boolean;
+  busy: string | null;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.draftPanel}>
+      <Text style={styles.draftPanelTitle}>
+        {t('admin.pending_edit_panel_title')}
+      </Text>
+      <Text style={styles.draftPanelMeta}>
+        {hasFieldDraft && hasPhotoDraft
+          ? t('admin.pending_edit_both')
+          : hasFieldDraft
+            ? t('admin.pending_edit_fields_only')
+            : t('admin.pending_edit_photos_only')}
+      </Text>
+
+      {hasFieldDraft && draftFields ? (
+        <View style={styles.draftFields}>
+          <DraftRow
+            label={t('admin.draft_field_title')}
+            value={draftFields.title_ar}
+          />
+          <DraftRow
+            label={t('admin.draft_field_description')}
+            value={draftFields.description_ar ?? '—'}
+          />
+          <DraftRow
+            label={t('admin.draft_field_city')}
+            value={draftFields.city}
+          />
+          <DraftRow
+            label={t('admin.draft_field_neighborhood')}
+            value={draftFields.neighborhood}
+          />
+          <DraftRow
+            label={t('admin.draft_field_price')}
+            value={formatSAR(draftFields.nightly_price_sar)}
+          />
+          <DraftRow
+            label={t('admin.draft_field_max_cats')}
+            value={String(draftFields.max_concurrent_pets)}
+          />
+          <DraftRow
+            label={t('admin.draft_field_has_resident_pets')}
+            value={draftFields.has_resident_pets ? '✓' : '✗'}
+          />
+          {draftFields.has_resident_pets && draftFields.resident_pets_note ? (
+            <DraftRow
+              label={t('admin.draft_field_resident_note')}
+              value={draftFields.resident_pets_note}
+            />
+          ) : null}
+          <DraftRow
+            label={t('admin.draft_field_offers_grooming')}
+            value={draftFields.offers_grooming ? '✓' : '✗'}
+          />
+          <DraftRow
+            label={t('admin.draft_field_host_gender')}
+            value={draftFields.host_gender}
+          />
+        </View>
+      ) : null}
+
+      <Pressable
+        onPress={onApprove}
+        disabled={busy !== null}
+        style={[
+          styles.primaryButton,
+          styles.fullWidthButton,
+          busy !== null && styles.buttonDisabled,
+        ]}
+      >
+        <Text style={styles.primaryButtonText}>
+          {busy === 'approve_edit'
+            ? t('admin.approving')
+            : t('admin.approve_edit')}
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={onReject}
+        disabled={busy !== null}
+        style={[
+          styles.dangerButton,
+          styles.fullWidthButton,
+          busy !== null && styles.buttonDisabled,
+        ]}
+      >
+        <Text style={styles.dangerButtonText}>
+          {busy === 'reject_edit'
+            ? t('admin.rejecting')
+            : t('admin.reject_edit')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function DraftRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.draftRow}>
+      <Text style={styles.draftRowLabel}>{label}</Text>
+      <Text style={styles.draftRowValue}>{value}</Text>
+    </View>
+  );
+}
+
+function EditableForm(props: {
+  title: string;
+  setTitle: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  neighborhood: string;
+  setNeighborhood: (v: string) => void;
+  price: string;
+  setPrice: (v: string) => void;
+  maxPets: string;
+  setMaxPets: (v: string) => void;
+  residentNote: string;
+  setResidentNote: (v: string) => void;
+  hasResidentPets: boolean;
+  setHasResidentPets: (v: boolean | ((p: boolean) => boolean)) => void;
+  offersGrooming: boolean;
+  setOffersGrooming: (v: boolean | ((p: boolean) => boolean)) => void;
+  tier: Enums<'listing_tier'>;
+  setTier: (v: Enums<'listing_tier'>) => void;
+  hostGender: Enums<'host_gender'>;
+  setHostGender: (v: Enums<'host_gender'>) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Section label="العنوان">
+        <TextInput
+          value={props.title}
+          onChangeText={props.setTitle}
+          style={styles.input}
+        />
+      </Section>
+
+      <Section label="الوصف">
+        <TextInput
+          value={props.description}
+          onChangeText={props.setDescription}
+          multiline
+          style={[styles.input, styles.multiline]}
+        />
+      </Section>
+
+      <Section label="الحي">
+        <TextInput
+          value={props.neighborhood}
+          onChangeText={props.setNeighborhood}
+          style={styles.input}
+        />
+      </Section>
+
+      <View style={styles.row2}>
+        <Section label={`السعر / ليلة (${formatSAR(Number(props.price || 0))})`}>
+          <TextInput
+            value={props.price}
+            onChangeText={props.setPrice}
+            inputMode="numeric"
+            style={styles.input}
+          />
+        </Section>
+        <Section label="حد القطط">
+          <TextInput
+            value={props.maxPets}
+            onChangeText={props.setMaxPets}
+            inputMode="numeric"
+            style={styles.input}
+          />
+        </Section>
+      </View>
+
+      <Section label="المستوى (Tier)">
+        <View style={styles.chipRow}>
+          {TIERS.map((tk) => (
+            <Pressable
+              key={tk}
+              onPress={() => props.setTier(tk)}
+              style={[styles.chip, props.tier === tk && styles.chipActive]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  props.tier === tk && styles.chipTextActive,
+                ]}
+              >
+                {t(`listing.tier_${tk}`)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </Section>
+
+      <Section label="جنس المضيف">
+        <View style={styles.chipRow}>
+          {GENDERS.map((g) => (
+            <Pressable
+              key={g}
+              onPress={() => props.setHostGender(g)}
+              style={[styles.chip, props.hostGender === g && styles.chipActive]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  props.hostGender === g && styles.chipTextActive,
+                ]}
+              >
+                {t(g === 'female' ? 'listing.host_female' : 'listing.host_male')}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </Section>
+
+      <Pressable
+        onPress={() => props.setHasResidentPets((v) => !v)}
+        style={[
+          styles.toggleRow,
+          props.hasResidentPets && styles.toggleRowActive,
+        ]}
+      >
+        <Text style={styles.toggleText}>
+          {props.hasResidentPets ? '✓' : '○'} يوجد حيوانات مقيمة
+        </Text>
+      </Pressable>
+
+      {props.hasResidentPets ? (
+        <Section label="ملاحظة عن الحيوانات المقيمة">
+          <TextInput
+            value={props.residentNote}
+            onChangeText={props.setResidentNote}
+            style={styles.input}
+          />
+        </Section>
+      ) : null}
+
+      <Pressable
+        onPress={() => props.setOffersGrooming((v) => !v)}
+        style={[
+          styles.toggleRow,
+          props.offersGrooming && styles.toggleRowActive,
+        ]}
+      >
+        <Text style={styles.toggleText}>
+          {props.offersGrooming ? '✓' : '○'} خدمة الاستحمام
+        </Text>
+      </Pressable>
+    </>
   );
 }
 
@@ -597,6 +902,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     color: colors.cream,
+    textAlign: 'center',
+  },
+  fullWidthButton: {
+    alignSelf: 'stretch',
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
   },
   dangerButton: {
     paddingVertical: spacing.sm,
@@ -608,6 +919,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     color: colors.cream,
+    textAlign: 'center',
   },
   saveButton: {
     marginTop: spacing.lg,
@@ -635,5 +947,51 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.inkSoft,
+  },
+  draftPanel: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    ...shadows.card,
+  },
+  draftPanelTitle: {
+    fontFamily: fonts.headingBold,
+    fontSize: 16,
+    color: colors.mossDeep,
+    textAlign: 'right',
+  },
+  draftPanelMeta: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    textAlign: 'right',
+  },
+  draftFields: {
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.whisper,
+  },
+  draftRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  draftRowLabel: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    textAlign: 'right',
+    minWidth: 120,
+  },
+  draftRowValue: {
+    flex: 1,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+    textAlign: 'right',
   },
 });

@@ -435,68 +435,29 @@ export async function reorderListingPhotos(args: {
 }): Promise<void> {
   if (!supabase) throw new Error('No Supabase client');
 
-  if (!args.useDrafts) {
-    const { error } = await supabase.rpc('reorder_listing_photos', {
-      p_listing_id: args.listingId,
-      p_order: args.orderedIds,
-    });
-    if (error) {
-      if (__DEV__) {
-        console.warn('[listing-photos.reorder] rpc failed', error);
-      }
-      throw new Error('reorder_failed', { cause: error });
-    }
-    return;
+  // 8g — both paths now go through atomic SECURITY DEFINER RPCs.
+  // The live path uses reorder_listing_photos (migration 0020); the
+  // draft path uses reorder_listing_photo_drafts (migration 0023).
+  // Same auth shape (admin or host-of-listing), same two-phase
+  // negative-sentinel write under the unique constraint.
+  if (args.useDrafts) {
+    await ensureDraftPhotoSnapshot(args.listingId);
   }
 
-  // ---- draft path ----
-  await ensureDraftPhotoSnapshot(args.listingId);
+  const rpcName = args.useDrafts
+    ? 'reorder_listing_photo_drafts'
+    : 'reorder_listing_photos';
 
-  try {
-    await reorderDraftPhotosTwoPhase(args.listingId, args.orderedIds);
-  } catch (e) {
+  const { error } = await supabase.rpc(rpcName, {
+    p_listing_id: args.listingId,
+    p_order: args.orderedIds,
+  });
+  if (error) {
     if (__DEV__) {
-      console.warn('[listing-photos.reorder] draft two-phase failed', e);
+      console.warn(`[listing-photos.reorder] ${rpcName} failed`, error);
     }
-    throw new Error('reorder_failed', { cause: e });
+    throw new Error('reorder_failed', { cause: error });
   }
-}
-
-async function reorderDraftPhotosTwoPhase(
-  listingId: string,
-  orderedIds: string[],
-): Promise<void> {
-  if (!supabase) throw new Error('No Supabase client');
-  const s = supabase;
-
-  // Phase 1 — park every targeted row at a sentinel negative
-  // sort_order, unique per row via the array index. The unique
-  // constraint check at end-of-statement passes because no two
-  // updates target the same value. Parallel firing is safe.
-  await Promise.all(
-    orderedIds.map(async (id, i) => {
-      const { error } = await s
-        .from('listing_photo_drafts')
-        .update({ sort_order: -1000000 - i })
-        .eq('id', id)
-        .eq('listing_id', listingId);
-      if (error) throw error;
-    }),
-  );
-
-  // Phase 2 — write final 0..N-1. Between phases NO row holds any
-  // of the target positive values (they're all parked in the
-  // negative range), so each statement lands cleanly.
-  await Promise.all(
-    orderedIds.map(async (id, i) => {
-      const { error } = await s
-        .from('listing_photo_drafts')
-        .update({ sort_order: i })
-        .eq('id', id)
-        .eq('listing_id', listingId);
-      if (error) throw error;
-    }),
-  );
 }
 
 /**

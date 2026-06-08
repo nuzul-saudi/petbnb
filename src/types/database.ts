@@ -794,6 +794,25 @@ export type Database = {
         Args: { p_listing_id: string; p_order: string[] };
         Returns: void;
       };
+      // Step 8f (migration 0023) — admin promotes drafts to live.
+      // Returns the array of orphan photo URLs that USED to live but
+      // aren't in the new (promoted) photo set. Admin client cleans
+      // up the corresponding storage objects best-effort.
+      promote_listing_draft: {
+        Args: { p_listing_id: string };
+        Returns: string[];
+      };
+      // Step 8f — admin or host wipes drafts. Returns draft photo URLs
+      // that are NOT referenced by live (safe-to-remove from storage).
+      discard_listing_draft: {
+        Args: { p_listing_id: string };
+        Returns: string[];
+      };
+      // Step 8f — atomic draft reorder, mirror of reorder_listing_photos.
+      reorder_listing_photo_drafts: {
+        Args: { p_listing_id: string; p_order: string[] };
+        Returns: void;
+      };
     };
 
     // These mirror the CHECK constraints in 0001_initial_schema.sql. They
