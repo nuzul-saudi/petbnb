@@ -268,6 +268,43 @@ export type Database = {
       };
 
       // ---------------------------------------------------------------------
+      // listing_photo_drafts — the pending photo-set copy. Added in 8c
+      // (migration 0022). Same shape as listing_photos. RLS restricts
+      // visibility to admin + host of the parent listing.
+      listing_photo_drafts: {
+        Row: {
+          id: string;
+          listing_id: string;
+          photo_url: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          photo_url: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          listing_id?: string;
+          photo_url?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'listing_photo_drafts_listing_id_fkey';
+            columns: ['listing_id'];
+            isOneToOne: false;
+            referencedRelation: 'listings';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+
+      // ---------------------------------------------------------------------
       // listing_drafts — the pending field-edit copy. Added in 8c
       // (migration 0022). Two-copies-max via UNIQUE(listing_id).
       // RLS restricts visibility to admin + host of the parent listing.

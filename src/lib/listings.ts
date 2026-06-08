@@ -578,20 +578,24 @@ export async function updateListing(
 }
 
 /**
- * Data shape consumed by the edit screen (Step 8d). Returns the
- * VALUES the form should prefill — from the draft if a draft exists,
- * else from the approved listing — plus parent listing metadata
- * (status + has_pending_edit) so the screen can branch its UI.
+ * Data shape consumed by the edit screen and the photo manager screen
+ * (Step 8d + 8e). Returns the VALUES the form should prefill (from
+ * the field draft if it exists, else from the approved listing) plus
+ * the photo set the photo manager should edit (from the photo draft
+ * if it exists, else from the live photos).
  *
- * Photos are still returned from listing_photos here (the approved
- * set). The photo manager's draft-aware behaviour ships in 8e; once
- * that lands this helper can also pull from listing_photo_drafts.
+ * hasFieldDraft and hasPhotoDraft are tracked independently — a host
+ * can edit only fields, only photos, or both, and the two draft
+ * tables populate on their respective first touches. hasPendingEdit
+ * is the OR of the two for the edit screen's combined Discard button.
  */
 export type ListingEditData = {
   listingId: string;
   hostId: string;
   status: ListingStatus;
   hasPendingEdit: boolean;
+  hasFieldDraft: boolean;
+  hasPhotoDraft: boolean;
   values: {
     city: 'riyadh' | 'dammam';
     neighborhood: string;
@@ -604,6 +608,12 @@ export type ListingEditData = {
     offersGrooming: boolean;
     hostGender: 'female' | 'male';
   };
+  /**
+   * The photo set the host should edit. Routes to
+   * listing_photo_drafts when a draft exists (the host's in-progress
+   * draft set), else listing_photos (the live set, ready to be
+   * snapshot on the first draft-side mutation). Sorted by sort_order.
+   */
   photos: PhotoSummary[];
 };
 
@@ -613,18 +623,19 @@ export async function getListingForEdit(
   if (!supabase) return null;
 
   // Embed listing_drafts (one-to-one via UNIQUE(listing_id)) +
-  // listing_photos (one-to-many) so a single round-trip returns
-  // everything the edit screen needs to render. RLS on
-  // listing_drafts restricts the draft branch to admin + host of
-  // parent — a non-host viewer would get null for that nested
-  // relation.
+  // listing_photos (one-to-many) + listing_photo_drafts
+  // (one-to-many) in a single round-trip. RLS on both draft tables
+  // restricts visibility to admin + host of parent — non-host
+  // viewers would get an empty array / null for the nested draft
+  // branches.
   const { data, error } = await supabase
     .from('listings')
     .select(
       `
       *,
       listing_drafts(*),
-      listing_photos(id, photo_url, sort_order)
+      listing_photos(id, photo_url, sort_order),
+      listing_photo_drafts(id, photo_url, sort_order)
     `,
     )
     .eq('id', id)
@@ -633,23 +644,38 @@ export async function getListingForEdit(
   if (!data) return null;
 
   // listing_drafts is typed as either an array OR a single object
-  // depending on the Database type's isOneToOne flag. We added it
-  // as isOneToOne:true in database.ts so we get an object or null.
+  // depending on the Database type's isOneToOne flag. We added it as
+  // isOneToOne:true in database.ts so we get an object or null.
   const draft = (data.listing_drafts ?? null) as
     | Tables<'listing_drafts'>
     | null;
-  const photos = ((data.listing_photos ?? []) as PhotoSummary[]).sort(
+  const livePhotos = (data.listing_photos ?? []) as PhotoSummary[];
+  const draftPhotos = (data.listing_photo_drafts ?? []) as PhotoSummary[];
+
+  const hasFieldDraft = draft !== null;
+  const hasPhotoDraft = draftPhotos.length > 0;
+
+  // Route the returned photo set: draft if any draft rows exist,
+  // otherwise live. The photo manager screen mutates whichever it
+  // received; an approved/paused listing with no draft yet starts
+  // editing the live photos *displayed*, and the first mutation
+  // triggers ensureDraftPhotoSnapshot in listing-photos.ts to copy
+  // live → draft before applying the change.
+  const sourcePhotos = hasPhotoDraft ? draftPhotos : livePhotos;
+  const photos = [...sourcePhotos].sort(
     (a, b) => a.sort_order - b.sort_order,
   );
 
-  // Prefill source: draft wins if present, else approved listing.
+  // Prefill source for fields: draft wins if present, else live row.
   const src = draft ?? data;
 
   return {
     listingId: data.id,
     hostId: data.host_id,
     status: data.status,
-    hasPendingEdit: draft !== null,
+    hasPendingEdit: hasFieldDraft || hasPhotoDraft,
+    hasFieldDraft,
+    hasPhotoDraft,
     values: {
       city: src.city as 'riyadh' | 'dammam',
       neighborhood: src.neighborhood,

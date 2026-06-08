@@ -102,7 +102,8 @@
       "reorder_failed": "Couldn't update the order. Please try again.",
       "delete_failed": "Couldn't remove the photo. Please try again.",
       "leave_confirm": "You have unsaved photos. Leave without saving?",
-      "empty": "You haven't added any photos yet. Add at least 3 before publishing."
+      "empty": "You haven't added any photos yet. Add at least 3 before publishing.",
+      "draft_banner": "These are your draft photos. They'll be reviewed before going live. Your published listing keeps showing its current photos until then."
     },
     "edit": {
       "title": "Edit listing",

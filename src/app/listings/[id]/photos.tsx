@@ -1,4 +1,4 @@
-// Host-only photo manager for a single listing (Step 7.3b).
+// Host-only photo manager for a single listing.
 //
 // Two distinct states the host needs to understand at a glance:
 //   • CURRENT — photos that exist on the server. Reorder / cover / remove
@@ -7,17 +7,18 @@
 //     only land on Save. Removing one drops it from local state with no
 //     server work.
 //
-// Why two sections, not one merged list with a "saved/unsaved" badge:
-// the operations are different (reorder/cover apply to saved photos via
-// the RPC; pending photos have no row to point at), and bundling them
-// would make the cover-picking story confusing — a host could "make
-// cover" something that hasn't uploaded yet, then Save would have to
-// retro-fit the order. Keeping them physically separate makes the model
-// match the user's intuition.
+// Two-copy model (Step 8e). The screen reads the listing's status and
+// branches the WHOLE photo flow:
+//   • status='pending' (never approved) → photos target listing_photos
+//     directly. Nothing live to protect, no banner.
+//   • status in ('approved','paused') → photos target listing_photo_drafts.
+//     The first mutation triggers ensureDraftPhotoSnapshot inside the
+//     lib helpers, copying the live photo set into drafts so the host's
+//     edits start from a faithful copy. A small banner explains the
+//     pending-review state. Live photos stay visible on the public feed.
 //
-// SCOPE: this screen only. The "Edit listing" CTA on the detail screen
-// is still pointed at /, and HostHome shortcuts are unchanged — wiring
-// is 7.3c.
+// The screen passes useDrafts to every helper; the helpers do the
+// actual table routing + snapshot work in src/lib/listing-photos.ts.
 
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -36,7 +37,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
-import { getListingWithPhotos } from '@/lib/listings';
+import { getListingForEdit, type ListingStatus } from '@/lib/listings';
 import {
   LISTING_PHOTO_CAP,
   addListingPhoto,
@@ -76,10 +77,10 @@ export default function ListingPhotosScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
 
-  // Loaded shape: just what this screen needs. We don't keep the whole
-  // listing detail object — only host_id (for the ownership guard) and
-  // the photo rows.
+  // Loaded shape: host id (ownership guard) + status (routes photos to
+  // live vs drafts) + the photo rows.
   const [hostId, setHostId] = useState<string | null>(null);
+  const [status, setStatus] = useState<ListingStatus | null>(null);
   const [savedPhotos, setSavedPhotos] = useState<SavedPhoto[]>([]);
   const [pending, setPending] = useState<PendingPhoto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,13 +94,18 @@ export default function ListingPhotosScreen() {
 
   const refetch = useCallback(async () => {
     if (!id) return;
-    const data = await getListingWithPhotos(id);
+    // getListingForEdit returns the right photo set already (drafts if
+    // a draft exists, else live). The screen mutates whichever it
+    // received; the lib helpers handle snapshot-on-first-touch.
+    const data = await getListingForEdit(id);
     if (!data) {
       setHostId(null);
+      setStatus(null);
       setSavedPhotos([]);
       return;
     }
-    setHostId(data.host_id);
+    setHostId(data.hostId);
+    setStatus(data.status);
     setSavedPhotos(
       data.photos.map((p) => ({
         id: p.id,
@@ -182,7 +188,7 @@ export default function ListingPhotosScreen() {
     );
   }
 
-  if (loadError || hostId === null) {
+  if (loadError || hostId === null || status === null) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
@@ -225,6 +231,14 @@ export default function ListingPhotosScreen() {
   }
 
   // ----- helpers (post-guard so we know hostId === user.id) -----
+
+  // 8e: route every photo mutation to the draft tables when the
+  // listing is approved or paused (a public copy exists that we must
+  // not break). status='pending' → live photos (no draft). The
+  // 'admin_disabled' branch falls into the false case here for 8e —
+  // hosts can't reach this screen while admin-disabled anyway; the
+  // edit screen blocks them upstream.
+  const useDrafts = status === 'approved' || status === 'paused';
 
   const remainingCap =
     LISTING_PHOTO_CAP - savedPhotos.length - pending.length;
@@ -272,6 +286,7 @@ export default function ListingPhotosScreen() {
       await reorderListingPhotos({
         listingId: id,
         orderedIds: swapped.map((p) => p.id),
+        useDrafts,
       });
       await refetch();
     } catch (e) {
@@ -288,7 +303,7 @@ export default function ListingPhotosScreen() {
     setActionError(null);
     setCurrentOp('cover');
     try {
-      await setCoverPhoto({ listingId: id, photoId });
+      await setCoverPhoto({ listingId: id, photoId, useDrafts });
       await refetch();
     } catch (e) {
       console.warn('[listings.photos.cover_failed]', e);
@@ -317,6 +332,7 @@ export default function ListingPhotosScreen() {
         photoId: photo.id,
         listingId: id,
         photoUrl: photo.photo_url,
+        useDrafts,
       });
       await refetch();
     } catch (e) {
@@ -341,7 +357,7 @@ export default function ListingPhotosScreen() {
     let firstError: unknown = null;
     for (const p of pending) {
       try {
-        await addListingPhoto({ listingId: id, source: p.source });
+        await addListingPhoto({ listingId: id, source: p.source, useDrafts });
       } catch (e) {
         if (firstError === null) firstError = e;
         remainingFailures.push(p);
@@ -376,6 +392,17 @@ export default function ListingPhotosScreen() {
           </Pressable>
           <Text style={styles.title}>{t('listings.photos.title')}</Text>
         </View>
+
+        {/* 8e draft banner — visible when editing an approved or
+            paused listing. Reassures the host that the public copy
+            stays visible until admin approves their changes. */}
+        {useDrafts ? (
+          <View style={styles.draftBanner}>
+            <Text style={styles.draftBannerText}>
+              {t('listings.photos.draft_banner')}
+            </Text>
+          </View>
+        ) : null}
 
         {actionError ? (
           <Text style={styles.error}>{actionError}</Text>
@@ -724,6 +751,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
     borderWidth: 1,
     borderColor: colors.whisper,
+  },
+  draftBanner: {
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.whisper,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  draftBannerText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   emptyText: {
     fontFamily: fonts.body,
