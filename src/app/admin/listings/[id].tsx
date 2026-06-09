@@ -1,16 +1,21 @@
-// Admin listing detail. 8g reshape:
+// Admin listing detail. 8h.1 reshape — unified review:
 //
-//   - new_listing → existing editable form + an "Approve" button that
-//     flips status='approved'. Admin can refine fields before
-//     approving (the host's first-draft listing might need a tweak).
-//
-//   - pending_edit → read-only display of the DRAFT content + Approve
-//     edit / Reject edit buttons. Approve calls promote_listing_draft
-//     RPC (atomic copy of drafts onto live + storage cleanup); reject
-//     calls discard_listing_draft RPC.
+//   - new_listing AND pending_edit → SAME screen layout: a read-only
+//     review panel + Approve / Reject buttons. Only the labels and
+//     reviewed content differ:
+//       * new_listing: panel shows the listing's own fields (the
+//         live row, since there's no draft). Approve sets
+//         status='approved'; Reject sets status='admin_disabled'.
+//       * pending_edit: panel shows draft fields if a field draft
+//         exists, else the live fields (a photo-only draft has no
+//         field changes to display). Approve calls
+//         promote_listing_draft RPC; Reject calls
+//         discard_listing_draft (LIVE listing UNCHANGED).
+//     Photos render from detail.photos which already routes to draft
+//     when pending_edit + photo draft exists, else live.
 //
 //   - none (status approved/paused/admin_disabled with no drafts) →
-//     existing editable form. Admin can directly edit the live row.
+//     editable form + Save. Admin can directly edit the live row.
 //
 //   Always visible when status applies:
 //     - "Take offline" when status='approved'. Sets 'admin_disabled'.
@@ -37,6 +42,7 @@ import {
   getAdminListingReview,
   promoteListingDraft,
   rejectListingDraft,
+  rejectNewListing,
   type AdminReviewDetail,
 } from '@/lib/admin';
 import { formatSAR } from '@/lib/format';
@@ -154,49 +160,67 @@ export default function AdminListingDetailScreen() {
     }
   };
 
-  const onApproveNew = async () => {
+  // Context-aware approve. 8h.1: identical button shape for both
+  // new_listing and pending_edit; the action and confirm copy branch
+  // by reviewType.
+  const onApprove = async () => {
     if (!detail) return;
-    if (!confirm('admin.approve_new_confirm')) return;
+    const isEdit = detail.reviewType === 'pending_edit';
+    const confirmKey = isEdit
+      ? 'admin.approve_edit_confirm'
+      : 'admin.approve_new_confirm';
+    if (!confirm(confirmKey)) return;
     setBusy('approve');
     setError(null);
     try {
-      await approveNewListing(detail.listing.id);
+      if (isEdit) {
+        await promoteListingDraft(detail.listing.id);
+      } else {
+        await approveNewListing(detail.listing.id);
+      }
       await load();
     } catch (e) {
-      console.warn('[admin.listing.approve_new_failed]', e);
-      setError(t('admin.approve_new_failed'));
+      console.warn('[admin.listing.approve_failed]', e);
+      setError(
+        t(
+          isEdit ? 'admin.approve_edit_failed' : 'admin.approve_new_failed',
+        ),
+      );
     } finally {
       setBusy(null);
     }
   };
 
-  const onApproveEdit = async () => {
+  // Context-aware reject. CRITICAL CORRECTNESS POINT:
+  //   - new_listing reject → setListingStatus('admin_disabled'). Nothing
+  //     live to lose; the listing itself is what's being rejected.
+  //   - pending_edit reject → discardListingDraft RPC. The DRAFT is
+  //     discarded; the LIVE listing stays exactly where it was
+  //     (approved/paused/admin_disabled). Reject MUST NOT take a live
+  //     listing offline.
+  const onReject = async () => {
     if (!detail) return;
-    if (!confirm('admin.approve_edit_confirm')) return;
-    setBusy('approve_edit');
+    const isEdit = detail.reviewType === 'pending_edit';
+    const confirmKey = isEdit
+      ? 'admin.reject_edit_confirm'
+      : 'admin.reject_new_confirm';
+    if (!confirm(confirmKey)) return;
+    setBusy('reject');
     setError(null);
     try {
-      await promoteListingDraft(detail.listing.id);
+      if (isEdit) {
+        await rejectListingDraft(detail.listing.id);
+      } else {
+        await rejectNewListing(detail.listing.id);
+      }
       await load();
     } catch (e) {
-      console.warn('[admin.listing.approve_edit_failed]', e);
-      setError(t('admin.approve_edit_failed'));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const onRejectEdit = async () => {
-    if (!detail) return;
-    if (!confirm('admin.reject_edit_confirm')) return;
-    setBusy('reject_edit');
-    setError(null);
-    try {
-      await rejectListingDraft(detail.listing.id);
-      await load();
-    } catch (e) {
-      console.warn('[admin.listing.reject_edit_failed]', e);
-      setError(t('admin.reject_edit_failed'));
+      console.warn('[admin.listing.reject_failed]', e);
+      setError(
+        t(
+          isEdit ? 'admin.reject_edit_failed' : 'admin.reject_new_failed',
+        ),
+      );
     } finally {
       setBusy(null);
     }
@@ -322,76 +346,59 @@ export default function AdminListingDetailScreen() {
             </Text>
           </View>
 
-          {/* === Branch by review type === */}
+          {/* === Branch by review type ===
+              - new_listing / pending_edit → ReviewPanel + Approve/Reject.
+              - none → EditableForm + Save (direct admin edit). */}
 
-          {reviewType === 'pending_edit' ? (
-            <PendingEditPanel
+          {reviewType === 'new_listing' || reviewType === 'pending_edit' ? (
+            <ReviewPanel
+              reviewType={reviewType}
+              listing={detail.listing}
               draftFields={draftFields}
               hasFieldDraft={hasFieldDraft}
               hasPhotoDraft={hasPhotoDraft}
               busy={busy}
-              onApprove={onApproveEdit}
-              onReject={onRejectEdit}
+              onApprove={onApprove}
+              onReject={onReject}
             />
           ) : (
-            <EditableForm
-              title={title}
-              setTitle={setTitle}
-              description={description}
-              setDescription={setDescription}
-              neighborhood={neighborhood}
-              setNeighborhood={setNeighborhood}
-              price={price}
-              setPrice={setPrice}
-              maxPets={maxPets}
-              setMaxPets={setMaxPets}
-              residentNote={residentNote}
-              setResidentNote={setResidentNote}
-              hasResidentPets={hasResidentPets}
-              setHasResidentPets={setHasResidentPets}
-              offersGrooming={offersGrooming}
-              setOffersGrooming={setOffersGrooming}
-              tier={tier}
-              setTier={setTier}
-              hostGender={hostGender}
-              setHostGender={setHostGender}
-            />
+            <>
+              <EditableForm
+                title={title}
+                setTitle={setTitle}
+                description={description}
+                setDescription={setDescription}
+                neighborhood={neighborhood}
+                setNeighborhood={setNeighborhood}
+                price={price}
+                setPrice={setPrice}
+                maxPets={maxPets}
+                setMaxPets={setMaxPets}
+                residentNote={residentNote}
+                setResidentNote={setResidentNote}
+                hasResidentPets={hasResidentPets}
+                setHasResidentPets={setHasResidentPets}
+                offersGrooming={offersGrooming}
+                setOffersGrooming={setOffersGrooming}
+                tier={tier}
+                setTier={setTier}
+                hostGender={hostGender}
+                setHostGender={setHostGender}
+              />
+              <Pressable
+                onPress={onSaveDirect}
+                disabled={busy !== null}
+                style={[
+                  styles.saveButton,
+                  busy !== null && styles.buttonDisabled,
+                ]}
+              >
+                <Text style={styles.saveButtonText}>
+                  {busy === 'save' ? t('admin.saving') : t('admin.save')}
+                </Text>
+              </Pressable>
+            </>
           )}
-
-          {/* Approve button for brand-new pending listings. */}
-          {reviewType === 'new_listing' ? (
-            <Pressable
-              onPress={onApproveNew}
-              disabled={busy !== null}
-              style={[
-                styles.primaryButton,
-                styles.fullWidthButton,
-                busy !== null && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.primaryButtonText}>
-                {busy === 'approve'
-                  ? t('admin.approving')
-                  : t('admin.approve_new')}
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {/* Save (direct edit) — only when there's an editable form. */}
-          {reviewType !== 'pending_edit' ? (
-            <Pressable
-              onPress={onSaveDirect}
-              disabled={busy !== null}
-              style={[
-                styles.saveButton,
-                busy !== null && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.saveButtonText}>
-                {busy === 'save' ? t('admin.saving') : t('admin.save')}
-              </Text>
-            </Pressable>
-          ) : null}
 
           {/* Override actions — Take offline / Restore. */}
           {listing.status === 'approved' ? (
@@ -435,7 +442,9 @@ export default function AdminListingDetailScreen() {
   );
 }
 
-function PendingEditPanel({
+function ReviewPanel({
+  reviewType,
+  listing,
   draftFields,
   hasFieldDraft,
   hasPhotoDraft,
@@ -443,6 +452,8 @@ function PendingEditPanel({
   onApprove,
   onReject,
 }: {
+  reviewType: 'new_listing' | 'pending_edit';
+  listing: AdminReviewDetail['listing'];
   draftFields: AdminReviewDetail['draftFields'];
   hasFieldDraft: boolean;
   hasPhotoDraft: boolean;
@@ -451,62 +462,103 @@ function PendingEditPanel({
   onReject: () => void;
 }) {
   const { t } = useTranslation();
+  const isEdit = reviewType === 'pending_edit';
+
+  // What to display:
+  //   - new_listing: show the listing's OWN fields (the live row).
+  //   - pending_edit with field draft: show the DRAFT fields.
+  //   - pending_edit with only photo draft: show live fields (no
+  //     field changes to display, but admin still sees the rest of
+  //     the listing for context).
+  const showFields =
+    !isEdit || hasFieldDraft || !hasPhotoDraft; // show fields unless photo-only edit
+  const useDraft = isEdit && hasFieldDraft && draftFields !== null;
+  const fieldsSrc = useDraft && draftFields
+    ? {
+        title_ar: draftFields.title_ar,
+        description_ar: draftFields.description_ar,
+        city: draftFields.city,
+        neighborhood: draftFields.neighborhood,
+        nightly_price_sar: draftFields.nightly_price_sar,
+        max_concurrent_pets: draftFields.max_concurrent_pets,
+        has_resident_pets: draftFields.has_resident_pets,
+        resident_pets_note: draftFields.resident_pets_note,
+        offers_grooming: draftFields.offers_grooming,
+        host_gender: draftFields.host_gender,
+      }
+    : {
+        title_ar: listing.title_ar,
+        description_ar: listing.description_ar,
+        city: listing.city,
+        neighborhood: listing.neighborhood,
+        nightly_price_sar: listing.nightly_price_sar,
+        max_concurrent_pets: listing.max_concurrent_pets,
+        has_resident_pets: listing.has_resident_pets,
+        resident_pets_note: listing.resident_pets_note,
+        offers_grooming: listing.offers_grooming,
+        host_gender: listing.host_gender,
+      };
+
+  const title = isEdit
+    ? t('admin.review_panel_title_edit')
+    : t('admin.review_panel_title_new');
+
+  const meta = isEdit
+    ? hasFieldDraft && hasPhotoDraft
+      ? t('admin.pending_edit_both')
+      : hasFieldDraft
+        ? t('admin.pending_edit_fields_only')
+        : t('admin.pending_edit_photos_only')
+    : t('admin.review_panel_meta_new');
+
   return (
     <View style={styles.draftPanel}>
-      <Text style={styles.draftPanelTitle}>
-        {t('admin.pending_edit_panel_title')}
-      </Text>
-      <Text style={styles.draftPanelMeta}>
-        {hasFieldDraft && hasPhotoDraft
-          ? t('admin.pending_edit_both')
-          : hasFieldDraft
-            ? t('admin.pending_edit_fields_only')
-            : t('admin.pending_edit_photos_only')}
-      </Text>
+      <Text style={styles.draftPanelTitle}>{title}</Text>
+      <Text style={styles.draftPanelMeta}>{meta}</Text>
 
-      {hasFieldDraft && draftFields ? (
+      {showFields ? (
         <View style={styles.draftFields}>
           <DraftRow
             label={t('admin.draft_field_title')}
-            value={draftFields.title_ar}
+            value={fieldsSrc.title_ar}
           />
           <DraftRow
             label={t('admin.draft_field_description')}
-            value={draftFields.description_ar ?? '—'}
+            value={fieldsSrc.description_ar ?? '—'}
           />
           <DraftRow
             label={t('admin.draft_field_city')}
-            value={draftFields.city}
+            value={fieldsSrc.city}
           />
           <DraftRow
             label={t('admin.draft_field_neighborhood')}
-            value={draftFields.neighborhood}
+            value={fieldsSrc.neighborhood}
           />
           <DraftRow
             label={t('admin.draft_field_price')}
-            value={formatSAR(draftFields.nightly_price_sar)}
+            value={formatSAR(fieldsSrc.nightly_price_sar)}
           />
           <DraftRow
             label={t('admin.draft_field_max_cats')}
-            value={String(draftFields.max_concurrent_pets)}
+            value={String(fieldsSrc.max_concurrent_pets)}
           />
           <DraftRow
             label={t('admin.draft_field_has_resident_pets')}
-            value={draftFields.has_resident_pets ? '✓' : '✗'}
+            value={fieldsSrc.has_resident_pets ? '✓' : '✗'}
           />
-          {draftFields.has_resident_pets && draftFields.resident_pets_note ? (
+          {fieldsSrc.has_resident_pets && fieldsSrc.resident_pets_note ? (
             <DraftRow
               label={t('admin.draft_field_resident_note')}
-              value={draftFields.resident_pets_note}
+              value={fieldsSrc.resident_pets_note}
             />
           ) : null}
           <DraftRow
             label={t('admin.draft_field_offers_grooming')}
-            value={draftFields.offers_grooming ? '✓' : '✗'}
+            value={fieldsSrc.offers_grooming ? '✓' : '✗'}
           />
           <DraftRow
             label={t('admin.draft_field_host_gender')}
-            value={draftFields.host_gender}
+            value={fieldsSrc.host_gender}
           />
         </View>
       ) : null}
@@ -521,9 +573,9 @@ function PendingEditPanel({
         ]}
       >
         <Text style={styles.primaryButtonText}>
-          {busy === 'approve_edit'
+          {busy === 'approve'
             ? t('admin.approving')
-            : t('admin.approve_edit')}
+            : t(isEdit ? 'admin.approve_edit' : 'admin.approve_new')}
         </Text>
       </Pressable>
       <Pressable
@@ -536,9 +588,9 @@ function PendingEditPanel({
         ]}
       >
         <Text style={styles.dangerButtonText}>
-          {busy === 'reject_edit'
+          {busy === 'reject'
             ? t('admin.rejecting')
-            : t('admin.reject_edit')}
+            : t(isEdit ? 'admin.reject_edit' : 'admin.reject_new')}
         </Text>
       </Pressable>
     </View>

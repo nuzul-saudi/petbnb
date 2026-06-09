@@ -361,6 +361,18 @@ export async function approveNewListing(id: string): Promise<void> {
 }
 
 /**
+ * Reject a brand-new pending listing. Sets status='admin_disabled' —
+ * the host cannot republish from this state, only admin can Restore.
+ * Distinct from rejecting an EDIT (rejectListingDraft just discards
+ * the draft and leaves the live listing untouched). Nothing live to
+ * preserve for a new_listing reject; the listing itself is the thing
+ * being rejected.
+ */
+export async function rejectNewListing(id: string): Promise<void> {
+  await setListingStatus(id, 'admin_disabled');
+}
+
+/**
  * Promote a pending edit (the 8f promote_listing_draft RPC). Atomic
  * server-side: copies any field draft onto live, swaps photos if a
  * photo draft exists, sets status='approved' (regardless of prior
