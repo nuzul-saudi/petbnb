@@ -14,10 +14,12 @@
 //   • Dirty-check: Save is disabled until at least one field differs
 //     from the loaded values. Prevents an empty draft from a
 //     no-change Save.
-//   • Deactivate / Reactivate are direct status flips via
-//     setListingStatus (not via updateListing). 8d still produces
-//     only 'pending' or 'approved' here; the proper paused vs
-//     pending semantics arrive in a follow-up.
+//   • Deactivate (status='approved' only) → setListingStatus('paused').
+//     Host-controlled "I want to turn this off for now."
+//   • Reactivate (status='paused' only) → setListingStatus('approved').
+//     8h.4: button hidden when status='admin_disabled' (host has no
+//     path out — only admin Restore lifts it). Also hidden when
+//     status='pending' (nothing to reactivate to).
 //   • Discard pending changes — visible only when has_pending_edit
 //     is true. Deletes both draft tables for the listing; the form
 //     re-fetches and reverts to the live values.
@@ -188,10 +190,12 @@ export default function EditListingScreen() {
 
   const onCancel = () => router.replace(`/listings/${id}`);
 
-  // Deactivate (approved → pending) / Reactivate (pending/paused →
-  // approved). 8d still produces only 'pending' or 'approved' here;
-  // the proper 'paused' transition arrives in a follow-up that
-  // distinguishes "host turned this off" from "never been live."
+  // Deactivate (approved → paused) / Reactivate (paused → approved).
+  // 8h.4: deactivate target is now 'paused' (host-controlled pause),
+  // not 'pending'. Reactivate gates strictly to status='paused' —
+  // admin_disabled and pending listings can't be reactivated by the
+  // host (admin_disabled needs admin Restore; pending awaits first
+  // approval).
   const onToggleActive = async () => {
     if (togglingActive || saving || discarding) return;
     if (data.status === 'approved') {
@@ -202,7 +206,7 @@ export default function EditListingScreen() {
     try {
       await setListingStatus(
         id,
-        data.status === 'approved' ? 'pending' : 'approved',
+        data.status === 'approved' ? 'paused' : 'approved',
       );
       await refetch();
     } catch (e) {
@@ -331,39 +335,46 @@ export default function EditListingScreen() {
 
         {/* Deactivate / Reactivate — bottom of the screen so it's a
             deliberate action, not something a host can hit by accident
-            while scanning the form. */}
-        <View style={styles.statusBlock}>
-          {toggleError ? (
-            <Text style={styles.error}>{toggleError}</Text>
-          ) : null}
-          {data.status === 'approved' ? (
-            <Button
-              label={
-                togglingActive
-                  ? t('listings.edit.deactivating')
-                  : t('listings.edit.deactivate')
-              }
-              onPress={onToggleActive}
-              variant="destructive"
-              loading={togglingActive}
-              disabled={busy}
-              fullWidth
-            />
-          ) : (
-            <Button
-              label={
-                togglingActive
-                  ? t('listings.edit.reactivating')
-                  : t('listings.edit.reactivate')
-              }
-              onPress={onToggleActive}
-              variant="secondary"
-              loading={togglingActive}
-              disabled={busy}
-              fullWidth
-            />
-          )}
-        </View>
+            while scanning the form. 8h.4 gating:
+              - status='approved' → Deactivate (→ paused)
+              - status='paused'   → Reactivate (→ approved)
+              - status='pending' or 'admin_disabled' → render nothing
+                (host has no toggle path; pending awaits admin
+                approval, admin_disabled awaits admin Restore). */}
+        {data.status === 'approved' || data.status === 'paused' ? (
+          <View style={styles.statusBlock}>
+            {toggleError ? (
+              <Text style={styles.error}>{toggleError}</Text>
+            ) : null}
+            {data.status === 'approved' ? (
+              <Button
+                label={
+                  togglingActive
+                    ? t('listings.edit.deactivating')
+                    : t('listings.edit.deactivate')
+                }
+                onPress={onToggleActive}
+                variant="destructive"
+                loading={togglingActive}
+                disabled={busy}
+                fullWidth
+              />
+            ) : (
+              <Button
+                label={
+                  togglingActive
+                    ? t('listings.edit.reactivating')
+                    : t('listings.edit.reactivate')
+                }
+                onPress={onToggleActive}
+                variant="secondary"
+                loading={togglingActive}
+                disabled={busy}
+                fullWidth
+              />
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
