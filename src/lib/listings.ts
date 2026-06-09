@@ -71,6 +71,15 @@ export function distanceKm(
 export type ListingDetail = Tables<'listings'> & {
   host: HostSummary | null;
   photos: PhotoSummary[];
+  /**
+   * True when the listing has a pending field draft OR photo draft.
+   * Populated for any caller (RLS lets only host + admin actually
+   * read the embedded draft tables; for everyone else the JOIN
+   * returns nothing and this defaults to false). The listing detail
+   * screen uses this to show the self-view banner when the viewer
+   * is the host in host persona.
+   */
+  has_pending_edit: boolean;
 };
 
 export async function listActiveListings(
@@ -150,7 +159,9 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
       `
       *,
       host:profiles(id, full_name, full_name_en, avatar_url),
-      listing_photos(id, photo_url, sort_order)
+      listing_photos(id, photo_url, sort_order),
+      listing_drafts(id),
+      listing_photo_drafts(id)
     `,
     )
     .eq('id', id)
@@ -162,14 +173,26 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
   const photos = ((data.listing_photos ?? []) as PhotoSummary[]).sort(
     (a, b) => a.sort_order - b.sort_order,
   );
-  const { listing_photos: _drop, ...rest } = data as typeof data & {
+  const fieldDraft = (data.listing_drafts ?? null) as { id: string } | null;
+  const photoDrafts = (data.listing_photo_drafts ?? []) as { id: string }[];
+  const hasPendingEdit = fieldDraft !== null || photoDrafts.length > 0;
+
+  const {
+    listing_photos: _drop,
+    listing_drafts: _drop2,
+    listing_photo_drafts: _drop3,
+    ...rest
+  } = data as typeof data & {
     listing_photos?: PhotoSummary[];
+    listing_drafts?: unknown;
+    listing_photo_drafts?: unknown;
   };
 
   return {
     ...(rest as Tables<'listings'>),
     host: (data.host ?? null) as HostSummary | null,
     photos,
+    has_pending_edit: hasPendingEdit,
   };
 }
 

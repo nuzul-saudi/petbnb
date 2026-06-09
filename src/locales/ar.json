@@ -30,6 +30,8 @@
     "host_new_badge": "جديد",
     "loading": "جارٍ تحميل الإعلان…",
     "load_failed": "تعذّر تحميل الإعلان",
+    "self_view_banner": "لديكِ تعديل قيد المراجعة. هذا هو إعلانك المنشور كما يراه العملاء.",
+    "self_view_banner_link": "تعديل ←",
     "not_found": "الإعلان غير موجود",
     "nightly_suffix": "/ ليلة",
     "tier_bronze": "برونزي",

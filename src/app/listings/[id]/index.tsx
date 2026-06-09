@@ -10,12 +10,14 @@ import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { useAuth } from '@/lib/auth';
+import { usePersona } from '@/lib/persona';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function ListingDetailScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
+  const { persona } = usePersona();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   // Bilingual content fallback — _en field if present in current locale,
@@ -78,10 +80,45 @@ export default function ListingDetailScreen() {
     );
   }
 
+  // 8h.3 self-view banner. Shown only when:
+  //   - the viewer IS the listing's host (user.id === listing.host_id),
+  //   - the viewer is currently in host persona (browsing-as-host),
+  //   - a pending edit exists for this listing.
+  // Owner-persona viewing (or anyone who isn't the host) sees the
+  // public detail with no banner — they get the live, approved
+  // version exactly as customers do. The banner links to the host
+  // edit screen.
+  //
+  // Implementation note: we chose the "show live + banner with link"
+  // approach over "show draft + link to live" because the detail
+  // screen's query path (getListingWithPhotos) returns live data,
+  // and the edit screen already loads draft data via
+  // getListingForEdit. Keeping the detail screen on live keeps both
+  // the public path and the host-self-view path consistent — only
+  // the banner differs.
+  const isOwnListing = !!user && user.id === listing.host_id;
+  const showSelfViewBanner =
+    isOwnListing && persona === 'host' && listing.has_pending_edit;
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
+        {showSelfViewBanner ? (
+          <View style={styles.selfViewBanner}>
+            <Text style={styles.selfViewBannerText}>
+              {t('listing.self_view_banner')}
+            </Text>
+            <Pressable
+              onPress={() => router.push(`/listings/${listing.id}/edit`)}
+              style={styles.selfViewBannerLink}
+            >
+              <Text style={styles.selfViewBannerLinkText}>
+                {t('listing.self_view_banner_link')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         {/* Sitter-first header — hero of the detail screen. */}
         <View style={styles.sitterHeader}>
           {listing.host?.avatar_url ? (
@@ -267,6 +304,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.terracotta,
     textAlign: 'center',
+  },
+  selfViewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.whisper,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  selfViewBannerText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 20,
+  },
+  selfViewBannerLink: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  selfViewBannerLinkText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.mossDeep,
+    textDecorationLine: 'underline',
   },
   body: {
     padding: spacing.xl,
