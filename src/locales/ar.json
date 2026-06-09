@@ -129,6 +129,15 @@
       "discarding": "جاري التجاهل…",
       "discard_confirm": "هل تريدين تجاهل تعديلاتكِ قيد المراجعة؟ لا يمكن التراجع.",
       "discard_failed": "تعذّر تجاهل التعديلات، حاولي مرة أخرى."
+    },
+    "status": {
+      "pending_new": "بانتظار المراجعة",
+      "approved_live": "نشط",
+      "approved_with_draft": "نشط · تعديل قيد المراجعة",
+      "paused": "موقوف",
+      "paused_with_draft": "موقوف · تعديل قيد المراجعة",
+      "admin_disabled": "موقوف من الإدارة",
+      "admin_disabled_with_draft": "موقوف من الإدارة · تعديل قيد المراجعة"
     }
   },
   "booking": {

@@ -36,6 +36,14 @@ export type ListingFeedItem = Tables<'listings'> & {
   host: HostSummary | null;
   cover_photo: string | null;
   distance_km: number | null;
+  /**
+   * True when the host has a pending field draft OR photo draft for
+   * this listing. Populated by host-side reads (listOwnListings); the
+   * public-feed read (listActiveListings) leaves it undefined since
+   * RLS on the draft tables only grants SELECT to admin + host. Used
+   * by HostHome's 8h.2 5-state badge selector.
+   */
+  has_pending_edit?: boolean;
 };
 
 /**
@@ -186,7 +194,9 @@ export async function listOwnListings(
       `
       *,
       host:profiles(id, full_name, full_name_en, avatar_url),
-      listing_photos(id, photo_url, sort_order)
+      listing_photos(id, photo_url, sort_order),
+      listing_drafts(id),
+      listing_photo_drafts(id)
     `,
     )
     .eq('host_id', hostId)
@@ -195,19 +205,32 @@ export async function listOwnListings(
   if (error) throw error;
 
   // Same cover-photo + drop-join transform as listActiveListings.
+  // Adds has_pending_edit derived from the draft embeds — true when
+  // either a field draft or any photo draft exists for the listing.
   return (data ?? []).map((row) => {
     const photos = (row.listing_photos ?? []) as PhotoSummary[];
     const cover = photos.length
       ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
       : null;
-    const { listing_photos: _drop, ...rest } = row as typeof row & {
+    const fieldDraft = (row.listing_drafts ?? null) as { id: string } | null;
+    const photoDrafts = (row.listing_photo_drafts ?? []) as { id: string }[];
+    const hasPendingEdit = fieldDraft !== null || photoDrafts.length > 0;
+    const {
+      listing_photos: _drop,
+      listing_drafts: _drop2,
+      listing_photo_drafts: _drop3,
+      ...rest
+    } = row as typeof row & {
       listing_photos?: PhotoSummary[];
+      listing_drafts?: unknown;
+      listing_photo_drafts?: unknown;
     };
     return {
       ...(rest as Tables<'listings'>),
       host: (row.host ?? null) as HostSummary | null,
       cover_photo: cover,
       distance_km: null,
+      has_pending_edit: hasPendingEdit,
     };
   });
 }

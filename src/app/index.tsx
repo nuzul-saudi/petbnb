@@ -48,6 +48,70 @@ export default function HomeScreen() {
 }
 
 // ---------------------------------------------------------------------------
+// 8h.2: 7-state badge selector. Visible only on HostHome (the public feed
+// shows no badge); the listing card's statusBadge prop is the only
+// caller. Pairs every (status, has_pending_edit) combo with a label
+// from the listings.status.* i18n group and a color token.
+//
+// State table:
+//   pending             → "Pending review"          (gold)
+//   approved            → "Live"                    (moss)
+//   approved + draft    → "Live · edit pending"     (gold)
+//   paused              → "Paused"                  (inkSoft)
+//   paused + draft      → "Paused · edit pending"   (gold)
+//   admin_disabled      → "Removed by admin"        (terracotta)
+//   admin_disabled+draft→ "Removed by admin · edit pending" (gold)
+//
+// pending + draft is impossible — drafts are only created on
+// approved/paused/admin_disabled per 8d/8e.
+// ---------------------------------------------------------------------------
+function pickStatusBadge(
+  item: ListingFeedItem,
+  t: (key: string) => string,
+): { label: string; color: string } {
+  const hasDraft = item.has_pending_edit === true;
+  switch (item.status) {
+    case 'pending':
+      return {
+        label: t('listings.status.pending_new'),
+        color: colors.gold,
+      };
+    case 'approved':
+      return hasDraft
+        ? {
+            label: t('listings.status.approved_with_draft'),
+            color: colors.gold,
+          }
+        : {
+            label: t('listings.status.approved_live'),
+            color: colors.moss,
+          };
+    case 'paused':
+      return hasDraft
+        ? {
+            label: t('listings.status.paused_with_draft'),
+            color: colors.gold,
+          }
+        : {
+            label: t('listings.status.paused'),
+            color: colors.inkSoft,
+          };
+    case 'admin_disabled':
+      return hasDraft
+        ? {
+            label: t('listings.status.admin_disabled_with_draft'),
+            color: colors.gold,
+          }
+        : {
+            label: t('listings.status.admin_disabled'),
+            color: colors.terracotta,
+          };
+    default:
+      return { label: '—', color: colors.inkSoft };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Host-only home (Step 7.1a — replaces the placeholder).
 // Read-only list of the host's own listings + a Create entry point. No
 // listing writes (those start in 7.2). Persona switch, host theme, and
@@ -148,22 +212,7 @@ function HostHome() {
             <ListingCard
               listing={item}
               onPress={() => router.push(`/listings/${item.id}`)}
-              statusBadge={
-                // 8b: 2-state badge preserved. 8h replaces this with
-                // the 5-state version (pending_new / approved_live /
-                // approved_with_draft / paused / paused_with_draft /
-                // admin_disabled) once the draft table lands and we
-                // know whether the listing has a pending edit.
-                item.status === 'approved'
-                  ? {
-                      label: t('admin.listing_status_active'),
-                      color: colors.moss,
-                    }
-                  : {
-                      label: t('admin.listing_status_inactive'),
-                      color: colors.gold,
-                    }
-              }
+              statusBadge={pickStatusBadge(item, t)}
             />
           )}
           refreshControl={

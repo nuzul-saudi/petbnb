@@ -129,6 +129,15 @@
       "discarding": "Discarding…",
       "discard_confirm": "Discard your pending edits? This can't be undone.",
       "discard_failed": "Couldn't discard pending edits. Please try again."
+    },
+    "status": {
+      "pending_new": "Pending review",
+      "approved_live": "Live",
+      "approved_with_draft": "Live · edit pending",
+      "paused": "Paused",
+      "paused_with_draft": "Paused · edit pending",
+      "admin_disabled": "Removed by admin",
+      "admin_disabled_with_draft": "Removed by admin · edit pending"
     }
   },
   "booking": {
