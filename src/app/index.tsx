@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   View,
@@ -166,6 +167,47 @@ function HostHome() {
     router.push('/listings/new');
   };
 
+  // 8h.5: split into two sections.
+  //
+  //   "Live / Published" — the host's listings that are public-facing
+  //   or paused-but-still-theirs:
+  //       status in ('approved', 'paused')
+  //
+  //   "Drafts / Pending review" — the host's pipeline (awaiting first
+  //   review, taken down by admin, or has an edit awaiting review):
+  //       status in ('pending', 'admin_disabled') OR has_pending_edit
+  //
+  // Overlap: approved-with-draft and paused-with-draft appear in BOTH
+  // sections — once as the live listing, once as the pending edit.
+  // Spec calls for this intentional duplication so the host gets
+  // both perspectives ("here's what's published" + "here's what's in
+  // review"). admin_disabled-with-draft only appears in Drafts since
+  // its status is already in that section's filter.
+  //
+  // Card tap behavior unchanged: every card → /listings/[id].
+  const sections = useMemo(() => {
+    const liveItems = items.filter(
+      (it) => it.status === 'approved' || it.status === 'paused',
+    );
+    const draftItems = items.filter(
+      (it) =>
+        it.status === 'pending' ||
+        it.status === 'admin_disabled' ||
+        it.has_pending_edit === true,
+    );
+    const out: { title: string; data: ListingFeedItem[] }[] = [];
+    if (liveItems.length > 0) {
+      out.push({ title: t('home.host_home_section_live'), data: liveItems });
+    }
+    if (draftItems.length > 0) {
+      out.push({
+        title: t('home.host_home_section_drafts'),
+        data: draftItems,
+      });
+    }
+    return out;
+  }, [items, t]);
+
   return (
     <SafeAreaView style={styles.safe}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
@@ -204,10 +246,15 @@ function HostHome() {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(it) => it.id}
+        <SectionList
+          sections={sections}
+          // Same listing may appear in both sections (approved-with-draft);
+          // disambiguate the React key with the section title.
+          keyExtractor={(it, idx) => `${it.id}-${idx}`}
           contentContainerStyle={styles.list}
+          renderSectionHeader={({ section }) => (
+            <Text style={styles.sectionHeader}>{section.title}</Text>
+          )}
           renderItem={({ item }) => (
             <ListingCard
               listing={item}
@@ -215,6 +262,7 @@ function HostHome() {
               statusBadge={pickStatusBadge(item, t)}
             />
           )}
+          stickySectionHeadersEnabled={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -527,6 +575,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
+  },
+  sectionHeader: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.inkSoft,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   createButtonWrap: {
     paddingHorizontal: spacing.xl,

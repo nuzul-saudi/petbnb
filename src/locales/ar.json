@@ -11,7 +11,9 @@
     "sign_out": "تسجيل الخروج",
     "host_home_empty_title": "لم تضيفي أي إعلان بعد",
     "host_home_empty_body": "أنشئي إعلانك الأول لبدء استضافة القطط.",
-    "host_home_create_button": "إضافة إعلان جديد"
+    "host_home_create_button": "إضافة إعلان جديد",
+    "host_home_section_live": "منشور · للعملاء",
+    "host_home_section_drafts": "مسوّدات · قيد المراجعة"
   },
   "persona": {
     "owner": "مالك",

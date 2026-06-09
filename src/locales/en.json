@@ -11,7 +11,9 @@
     "sign_out": "Sign out",
     "host_home_empty_title": "You haven't listed a place yet",
     "host_home_empty_body": "Create your first listing to start hosting cats.",
-    "host_home_create_button": "Create a listing"
+    "host_home_create_button": "Create a listing",
+    "host_home_section_live": "Live · public",
+    "host_home_section_drafts": "Drafts · pending review"
   },
   "persona": {
     "owner": "Owner",
