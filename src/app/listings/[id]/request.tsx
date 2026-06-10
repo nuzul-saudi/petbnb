@@ -28,6 +28,11 @@ import {
   todayIso,
 } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import {
+  isRangeBlocked,
+  listBlockedRanges,
+  type BlockedRange,
+} from '@/lib/availability';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
 import { listPetsForOwner } from '@/lib/pets';
@@ -78,6 +83,7 @@ export default function BookingRequestScreen() {
 
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [pets, setPets] = useState<Tables<'pets'>[]>([]);
+  const [blockedRanges, setBlockedRanges] = useState<BlockedRange[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [startDate, setStartDate] = useState('');
@@ -103,11 +109,16 @@ export default function BookingRequestScreen() {
     if (!listingId || !user) return;
     let cancelled = false;
     setLoading(true);
-    Promise.all([getListingWithPhotos(listingId), listPetsForOwner(user.id)])
-      .then(([l, p]) => {
+    Promise.all([
+      getListingWithPhotos(listingId),
+      listPetsForOwner(user.id),
+      listBlockedRanges(listingId),
+    ])
+      .then(([l, p, blocks]) => {
         if (cancelled) return;
         setListing(l);
         setPets(p);
+        setBlockedRanges(blocks);
         // Only auto-select in create mode — edit mode hydrates pets from
         // the existing booking via the dedicated effect below.
         if (!editBookingId && p.length === 1)
@@ -253,6 +264,14 @@ export default function BookingRequestScreen() {
     return selectedPets.some(
       (p) => !p.rabies_vaccinated_at || !p.fvrcp_vaccinated_at,
     );
+  })();
+
+  // Milestone B: blocked-range pre-check. Client-side warning when the
+  // chosen dates overlap any of the host's blocked ranges. The DB
+  // trigger in 0027 is the hard gate; this is the friendly surface.
+  const blockedRangeWarning = (() => {
+    if (!listingId || !startDate || !endDate || nights <= 0) return false;
+    return isRangeBlocked(startDate, endDate, blockedRanges);
   })();
 
   // Same logic as the relevant branches of validate(), but available to
@@ -713,6 +732,15 @@ export default function BookingRequestScreen() {
         {vaccinationWarning ? (
           <Text style={styles.vaccinationWarning}>
             {t('booking.pet_vaccination_warning')}
+          </Text>
+        ) : null}
+
+        {/* Milestone B — dates overlap a host-blocked range. The DB
+            trigger will reject the booking on host accept anyway; this
+            surfaces it earlier so the owner picks new dates. */}
+        {blockedRangeWarning ? (
+          <Text style={styles.vaccinationWarning}>
+            {t('booking.blocked_range_warning')}
           </Text>
         ) : null}
 

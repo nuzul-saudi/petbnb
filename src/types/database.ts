@@ -316,6 +316,42 @@ export type Database = {
       };
 
       // ---------------------------------------------------------------------
+      // listing_blocked_dates — host-managed unavailable ranges
+      // (Milestone B / migration 0027). Half-open [start, end).
+      listing_blocked_dates: {
+        Row: {
+          id: string;
+          listing_id: string;
+          start_date: string;
+          end_date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          start_date: string;
+          end_date: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          listing_id?: string;
+          start_date?: string;
+          end_date?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'listing_blocked_dates_listing_id_fkey';
+            columns: ['listing_id'];
+            isOneToOne: false;
+            referencedRelation: 'listings';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+
+      // ---------------------------------------------------------------------
       // listing_drafts — the pending field-edit copy. Added in 8c
       // (migration 0022). Two-copies-max via UNIQUE(listing_id).
       // RLS restricts visibility to admin + host of the parent listing.

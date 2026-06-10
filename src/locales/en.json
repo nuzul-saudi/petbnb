@@ -134,7 +134,28 @@
       "discard_draft": "Discard pending changes",
       "discarding": "Discarding…",
       "discard_confirm": "Discard your pending edits? This can't be undone.",
-      "discard_failed": "Couldn't discard pending edits. Please try again."
+      "discard_failed": "Couldn't discard pending edits. Please try again.",
+      "manage_availability": "Manage availability",
+      "manage_availability_meta": "Block dates you can't host"
+    },
+    "availability": {
+      "title": "Availability",
+      "back": "← Back",
+      "loading": "Loading…",
+      "load_failed": "Couldn't load availability. Please try again.",
+      "not_available": "This listing isn't available to you.",
+      "body": "Block date ranges when you can't host. Pets cannot be requested for these dates. End date is exclusive (the day you're available again).",
+      "add_section": "Block a new range",
+      "start_label": "From (start)",
+      "end_label": "Until (end, exclusive)",
+      "add_button": "Block these dates",
+      "adding": "Adding…",
+      "add_invalid": "Please pick both start and end dates.",
+      "add_end_after_start": "End date must be after start date.",
+      "add_failed": "Couldn't add the range. Please try again.",
+      "list_section": "Currently blocked",
+      "empty": "No blocked ranges yet.",
+      "remove_confirm": "Remove this blocked range?"
     },
     "status": {
       "pending_new": "Pending review",
@@ -195,6 +216,7 @@
     "invalid_end_date": "Departure must be after arrival",
     "pet_required": "Please select one or more cats",
     "pet_vaccination_warning": "This sitter requires vaccinated cats only. One or more of your selected cats is missing a rabies or FVRCP date in their profile. You can still send the request — the sitter may decline if vaccination is incomplete.",
+    "blocked_range_warning": "These dates overlap a period the sitter has blocked. Please pick different dates — the request would be refused at accept.",
     "pet_care_notes_label": "Care notes",
     "pet_vaccination_label": "Vaccinations",
     "vaccine_rabies": "Rabies:",

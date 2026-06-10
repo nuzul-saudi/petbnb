@@ -296,6 +296,30 @@ export default function EditListingScreen() {
           </Text>
         </Pressable>
 
+        {/* Milestone B — Manage availability link. Same row pattern
+            as the photos link above; routes to the availability
+            screen where the host can add/remove blocked date ranges. */}
+        <Pressable
+          onPress={() => router.push(`/listings/${id}/availability`)}
+          style={styles.photosLink}
+          disabled={busy}
+        >
+          <View style={[styles.photosThumb, styles.photosThumbPlaceholder]}>
+            <Text style={styles.photosThumbPlaceholderText}>📅</Text>
+          </View>
+          <View style={styles.photosLinkBody}>
+            <Text style={styles.photosLinkTitle}>
+              {t('listings.edit.manage_availability')}
+            </Text>
+            <Text style={styles.photosLinkMeta}>
+              {t('listings.edit.manage_availability_meta')}
+            </Text>
+          </View>
+          <Text style={styles.photosLinkChevron}>
+            {locale === 'ar' ? '‹' : '›'}
+          </Text>
+        </Pressable>
+
         <ListingForm
           initialValues={data.values}
           saving={saving}
