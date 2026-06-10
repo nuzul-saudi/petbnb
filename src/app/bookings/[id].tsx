@@ -21,6 +21,7 @@ import { useBooking } from "@/hooks/useBooking";
 import { useConditionReports } from "@/hooks/useConditionReports";
 import { useDailyUpdates } from "@/hooks/useDailyUpdates";
 import { useAuth } from "@/lib/auth";
+import { usePersona } from "@/lib/persona";
 import {
   acceptBookingAsHost,
   cancelBookingAsOwner,
@@ -53,10 +54,28 @@ import { colors, fonts, radii, shadows, spacing } from "@/theme/tokens";
 export default function BookingDetailScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { initializing, session, user } = useAuth();
+  const { initializing, session, user, profile } = useAuth();
+  const { persona, refreshPendingHostCount } = usePersona();
   const toggleLocale = () => setLocale(locale === "ar" ? "en" : "ar");
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === "string" ? params.id : "";
+
+  // Test round 3 follow-up (2026-06-10): each control set on this
+  // screen is gated by PERSONA, not by ownership alone. A 'both' user
+  // who booked their own listing previously saw BOTH the owner
+  // controls (Edit / Cancel) AND the host controls (Accept / Decline)
+  // on the same screen, because ownership and host-of-listing were
+  // both true for them. Now persona decides:
+  //   • owner mode → only Edit / Cancel render (when owner of booking)
+  //   • host mode  → only Accept / Decline render (when host of listing)
+  // Pure 'owner' / pure 'host' users ignore persona — they get the
+  // mode their role implies.
+  const isOwnerMode =
+    profile?.role === "owner" ||
+    (profile?.role === "both" && persona === "owner");
+  const isHostMode =
+    profile?.role === "host" ||
+    (profile?.role === "both" && persona === "host");
 
   // Booking — loaded via useBooking. The hook owns data + loading; the
   // screen owns the translated `error` string so it can pick the right
@@ -303,14 +322,20 @@ export default function BookingDetailScreen() {
 
   // Only owners can cancel, and only while the booking is still pending
   // host acceptance. Once accepted, cancellation is out-of-band (Step 7).
+  //
+  // Plus persona gate: a 'both' user viewing their own booking on their
+  // own listing is BOTH the owner AND the host. Show owner controls
+  // only in owner persona; show host controls (below) only in host
+  // persona. Pure 'owner' users always pass isOwnerMode.
   const canCancel =
     !!booking &&
     !!user &&
     booking.owner_id === user.id &&
-    booking.status === "requested";
+    booking.status === "requested" &&
+    isOwnerMode;
 
-  // Same gating as cancel: owner + status='requested'. The two
-  // capabilities open and close together.
+  // Same gating as cancel: owner + status='requested' + owner persona.
+  // The three capabilities open and close together.
   const canEdit = canCancel;
 
   // Bookings created before migration 0009 have a null additional_pet_discount
@@ -336,10 +361,18 @@ export default function BookingDetailScreen() {
     });
   };
 
-  // Viewer-is-the-host gate. Owner ≠ host on any real booking, so this is
-  // mutually exclusive with canCancel/canEdit.
+  // Viewer-is-the-host gate. Used to render the Accept/Decline/Start/
+  // Complete buttons + the daily-update / condition-report compose forms.
+  //
+  // Plus persona gate (test round 3, 2026-06-10): a 'both' user
+  // booking their own listing is host on the listing AND owner on the
+  // booking — without the persona check, BOTH sets of buttons rendered.
+  // Pure 'host' users always pass isHostMode.
   const isHost =
-    !!booking && !!user && booking.listing?.host_id === user.id;
+    !!booking &&
+    !!user &&
+    booking.listing?.host_id === user.id &&
+    isHostMode;
 
   // Generic host transition: confirm, run the lib call, re-fetch on success
   // so the screen reflects the new status (and the now-illegal buttons hide).
@@ -360,6 +393,11 @@ export default function BookingDetailScreen() {
     try {
       await fn(booking.id);
       await refetchBooking();
+      // Refresh the AppHeader's pending-requests badge so it decrements
+      // immediately after accept/decline (both transition the row out
+      // of 'requested'). start/complete don't change the requested set
+      // but the call is a no-op, kept here for simplicity.
+      refreshPendingHostCount();
     } catch (e) {
       console.warn(`[booking.host_${action}_failed]`, e);
       setHostError(t(failedKey));

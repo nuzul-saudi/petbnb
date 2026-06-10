@@ -32,13 +32,21 @@ type PersonaContextValue = {
   /**
    * Count of host-side bookings awaiting action (status='requested')
    * across all of the current user's own listings. Refreshed on user
-   * change, role change, and persona switch — NOT realtime. AppHeader
-   * uses this to render an attention dot on the host persona pill for
-   * 'both' users so host work doesn't get missed while in owner mode.
-   * Zero for users without host capability (role='owner', 'admin') and
-   * while the count is loading.
+   * change, role change, persona switch, and explicit calls to
+   * refreshPendingHostCount() — NOT realtime. AppHeader uses this to
+   * render an attention dot on the host persona pill for 'both' users
+   * so host work doesn't get missed while in owner mode. Zero for
+   * users without host capability (role='owner', 'admin') and while
+   * the count is loading.
    */
   pendingHostCount: number;
+  /**
+   * Force a re-fetch of pendingHostCount. The booking detail screen
+   * calls this after a host accept/decline so the badge in the header
+   * decrements without waiting for the next persona switch. Best-
+   * effort: a failed fetch leaves the previous value in place.
+   */
+  refreshPendingHostCount: () => void;
 };
 
 const PersonaContext = createContext<PersonaContextValue | null>(null);
@@ -87,10 +95,20 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, profile?.persona]);
 
+  // Refresh trigger: bumping pendingRefreshTick re-runs the count
+  // fetch. The booking detail screen calls refreshPendingHostCount()
+  // after a host accept/decline so the badge decrements without
+  // waiting for the next persona switch.
+  const [pendingRefreshTick, setPendingRefreshTick] = useState(0);
+  const refreshPendingHostCount = useCallback(() => {
+    setPendingRefreshTick((n) => n + 1);
+  }, []);
+
   // Pending-host-bookings count (7.1e). Fetched on:
   //   • user.id change (sign-in, sign-out)
   //   • profile.role change (owner → both, etc.)
   //   • persona switch (deliberate context shift — fresh read)
+  //   • pendingRefreshTick bump (explicit refresh after host action)
   // No polling, no realtime. Stale until the next of these triggers.
   // Pure 'owner' / 'admin' / signed-out users skip the fetch entirely.
   useEffect(() => {
@@ -116,7 +134,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, profile?.role, persona]);
+  }, [user?.id, profile?.role, persona, pendingRefreshTick]);
 
   const setPersona = useCallback(
     (next: Persona) => {
@@ -143,8 +161,13 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<PersonaContextValue>(
-    () => ({ persona, setPersona, pendingHostCount }),
-    [persona, setPersona, pendingHostCount],
+    () => ({
+      persona,
+      setPersona,
+      pendingHostCount,
+      refreshPendingHostCount,
+    }),
+    [persona, setPersona, pendingHostCount, refreshPendingHostCount],
   );
 
   return (
@@ -165,5 +188,6 @@ export function usePersona(): PersonaContextValue {
     persona: 'host',
     setPersona: () => undefined,
     pendingHostCount: 0,
+    refreshPendingHostCount: () => undefined,
   };
 }
