@@ -243,6 +243,18 @@ export default function BookingRequestScreen() {
   const maxPets = listing?.max_concurrent_pets ?? 1;
   const tooManyPets = selectedPetIds.size > maxPets;
 
+  // Milestone A: vaccination warning. When the listing requires vacc
+  // AND any selected pet is missing rabies or fvrcp date → soft warn
+  // (not a hard block — host can decide case-by-case).
+  const vaccinationWarning = (() => {
+    if (!listing?.requires_vaccination) return false;
+    if (selectedPetIds.size === 0) return false;
+    const selectedPets = pets.filter((p) => selectedPetIds.has(p.id));
+    return selectedPets.some(
+      (p) => !p.rabies_vaccinated_at || !p.fvrcp_vaccinated_at,
+    );
+  })();
+
   // Same logic as the relevant branches of validate(), but available to
   // render so we can show an inline error while the user is still typing.
   // Returns the i18n string when invalid; null when ok or empty.
@@ -697,6 +709,13 @@ export default function BookingRequestScreen() {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+        {/* Milestone A vaccination soft-warn — host may decline. */}
+        {vaccinationWarning ? (
+          <Text style={styles.vaccinationWarning}>
+            {t('booking.pet_vaccination_warning')}
+          </Text>
+        ) : null}
+
         <Pressable
           onPress={onSubmit}
           disabled={
@@ -1084,6 +1103,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     color: colors.cream,
+  },
+  vaccinationWarning: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+    backgroundColor: colors.whisper,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: spacing.md,
+    lineHeight: 20,
   },
   errorText: {
     fontFamily: fonts.body,

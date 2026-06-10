@@ -367,6 +367,7 @@ export async function createListing(input: {
   residentPetsNote: string | null;
   offersGrooming: boolean;
   hostGender: 'female' | 'male';
+  requiresVaccination: boolean;
 }): Promise<{ id: string }> {
   if (!supabase) throw new Error('supabase not configured');
 
@@ -384,6 +385,7 @@ export async function createListing(input: {
       resident_pets_note: input.residentPetsNote,
       offers_grooming: input.offersGrooming,
       host_gender: input.hostGender,
+      requires_vaccination: input.requiresVaccination,
       status: 'pending',
     })
     .select('id')
@@ -426,6 +428,7 @@ export type UpdateListingPatch = {
   residentPetsNote?: string | null;
   offersGrooming?: boolean;
   hostGender?: 'female' | 'male';
+  requiresVaccination?: boolean;
 };
 
 /**
@@ -534,6 +537,9 @@ export async function updateListing(
       row.offers_grooming = patch.offersGrooming;
     }
     if (patch.hostGender !== undefined) row.host_gender = patch.hostGender;
+    if (patch.requiresVaccination !== undefined) {
+      row.requires_vaccination = patch.requiresVaccination;
+    }
 
     const { error } = await supabase
       .from('listings')
@@ -581,6 +587,9 @@ export async function updateListing(
     if (patch.hostGender !== undefined) {
       draftPatch.host_gender = patch.hostGender;
     }
+    if (patch.requiresVaccination !== undefined) {
+      draftPatch.requires_vaccination = patch.requiresVaccination;
+    }
 
     const { error } = await supabase
       .from('listing_drafts')
@@ -615,6 +624,8 @@ export async function updateListing(
         : current.resident_pets_note,
     offers_grooming: patch.offersGrooming ?? current.offers_grooming,
     host_gender: patch.hostGender ?? current.host_gender,
+    requires_vaccination:
+      patch.requiresVaccination ?? current.requires_vaccination,
   };
 
   const { error: insertErr } = await supabase
@@ -653,6 +664,7 @@ export type ListingEditData = {
     residentPetsNote: string | null;
     offersGrooming: boolean;
     hostGender: 'female' | 'male';
+    requiresVaccination: boolean;
   };
   /**
    * The photo set the host should edit. Routes to
@@ -733,6 +745,7 @@ export async function getListingForEdit(
       residentPetsNote: src.resident_pets_note,
       offersGrooming: src.offers_grooming,
       hostGender: src.host_gender as 'female' | 'male',
+      requiresVaccination: src.requires_vaccination,
     },
     photos,
   };

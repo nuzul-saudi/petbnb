@@ -98,6 +98,9 @@ export type Database = {
           breed_other: string | null;
           age_months: number | null;
           vaccination_doc_url: string | null;
+          rabies_vaccinated_at: string | null;
+          fvrcp_vaccinated_at: string | null;
+          care_notes: string | null;
           behavioral_notes: string | null;
           medical_needs: string | null;
           dietary_restrictions: string | null;
@@ -114,6 +117,9 @@ export type Database = {
           breed_other?: string | null;
           age_months?: number | null;
           vaccination_doc_url?: string | null;
+          rabies_vaccinated_at?: string | null;
+          fvrcp_vaccinated_at?: string | null;
+          care_notes?: string | null;
           behavioral_notes?: string | null;
           medical_needs?: string | null;
           dietary_restrictions?: string | null;
@@ -130,6 +136,9 @@ export type Database = {
           breed_other?: string | null;
           age_months?: number | null;
           vaccination_doc_url?: string | null;
+          rabies_vaccinated_at?: string | null;
+          fvrcp_vaccinated_at?: string | null;
+          care_notes?: string | null;
           behavioral_notes?: string | null;
           medical_needs?: string | null;
           dietary_restrictions?: string | null;
@@ -169,6 +178,10 @@ export type Database = {
           tier: Database['public']['Enums']['listing_tier'];
           offers_grooming: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
+          // Milestone A (migration 0026) — host requires vaccinated
+          // pets only. Mirrored on listing_drafts and copied through
+          // promote_listing_draft.
+          requires_vaccination: boolean;
           additional_pet_discount: number;
           lat: number | null;
           lng: number | null;
@@ -191,6 +204,7 @@ export type Database = {
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
+          requires_vaccination?: boolean;
           additional_pet_discount?: number;
           lat?: number | null;
           lng?: number | null;
@@ -213,6 +227,7 @@ export type Database = {
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
           host_gender?: Database['public']['Enums']['host_gender'];
+          requires_vaccination?: boolean;
           additional_pet_discount?: number;
           lat?: number | null;
           lng?: number | null;
@@ -320,6 +335,7 @@ export type Database = {
           resident_pets_note: string | null;
           offers_grooming: boolean;
           host_gender: 'female' | 'male';
+          requires_vaccination: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -338,6 +354,7 @@ export type Database = {
           resident_pets_note?: string | null;
           offers_grooming: boolean;
           host_gender: 'female' | 'male';
+          requires_vaccination?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -356,6 +373,7 @@ export type Database = {
           resident_pets_note?: string | null;
           offers_grooming?: boolean;
           host_gender?: 'female' | 'male';
+          requires_vaccination?: boolean;
           created_at?: string;
           updated_at?: string;
         };

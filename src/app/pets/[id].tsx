@@ -50,6 +50,13 @@ export default function PetDetailScreen() {
   const [medicalNeeds, setMedicalNeeds] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState('');
   const [medications, setMedications] = useState('');
+  // Milestone A: vaccination dates + care notes. Dates kept as text
+  // (yyyy-mm-dd) in form state and converted on save. Free-text date
+  // input rather than a picker for MVP speed; full picker is a polish
+  // pass.
+  const [rabiesVaccinatedAt, setRabiesVaccinatedAt] = useState('');
+  const [fvrcpVaccinatedAt, setFvrcpVaccinatedAt] = useState('');
+  const [careNotes, setCareNotes] = useState('');
 
   // photoUrl is the signed URL stored on pets.photo_url for an already-
   // saved photo. pendingPhoto + previewUri are the just-picked photo
@@ -95,6 +102,9 @@ export default function PetDetailScreen() {
         setMedicalNeeds(pet.medical_needs ?? '');
         setDietaryRestrictions(pet.dietary_restrictions ?? '');
         setMedications(pet.medications ?? '');
+        setRabiesVaccinatedAt(pet.rabies_vaccinated_at ?? '');
+        setFvrcpVaccinatedAt(pet.fvrcp_vaccinated_at ?? '');
+        setCareNotes(pet.care_notes ?? '');
         setPhotoUrl(pet.photo_url);
       })
       .catch((e: unknown) => {
@@ -161,6 +171,9 @@ export default function PetDetailScreen() {
             breed: breedSelection.breed,
             breed_other: breedOtherToSave,
             age_months: ageNum,
+            rabies_vaccinated_at: rabiesVaccinatedAt.trim() || null,
+            fvrcp_vaccinated_at: fvrcpVaccinatedAt.trim() || null,
+            care_notes: careNotes.trim() || null,
             behavioral_notes: behavioralNotes.trim() || null,
             medical_needs: medicalNeeds.trim() || null,
             dietary_restrictions: dietaryRestrictions.trim() || null,
@@ -212,6 +225,9 @@ export default function PetDetailScreen() {
           breed: breedSelection.breed,
           breed_other: breedOtherToSave,
           age_months: ageNum,
+          rabies_vaccinated_at: rabiesVaccinatedAt.trim() || null,
+          fvrcp_vaccinated_at: fvrcpVaccinatedAt.trim() || null,
+          care_notes: careNotes.trim() || null,
           behavioral_notes: behavioralNotes.trim() || null,
           medical_needs: medicalNeeds.trim() || null,
           dietary_restrictions: dietaryRestrictions.trim() || null,
@@ -371,6 +387,37 @@ export default function PetDetailScreen() {
           <TextInput
             value={medications}
             onChangeText={setMedications}
+            multiline
+            style={[styles.input, styles.multiline]}
+          />
+        </Field>
+
+        {/* Milestone A — vaccination dates + care notes. Dates are
+            free-text yyyy-mm-dd for MVP; a real date picker is polish. */}
+        <Field label={t('pets.rabies_vaccinated_at_label')}>
+          <TextInput
+            value={rabiesVaccinatedAt}
+            onChangeText={setRabiesVaccinatedAt}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.inkSoft}
+            style={styles.input}
+          />
+        </Field>
+
+        <Field label={t('pets.fvrcp_vaccinated_at_label')}>
+          <TextInput
+            value={fvrcpVaccinatedAt}
+            onChangeText={setFvrcpVaccinatedAt}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.inkSoft}
+            style={styles.input}
+          />
+        </Field>
+
+        <Field label={t('pets.care_notes_label')}>
+          <TextInput
+            value={careNotes}
+            onChangeText={setCareNotes}
             multiline
             style={[styles.input, styles.multiline]}
           />

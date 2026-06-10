@@ -67,6 +67,7 @@ export type ListingFormValues = {
   residentPetsNote: string | null;
   offersGrooming: boolean;
   hostGender: HostGender;
+  requiresVaccination: boolean;
 };
 
 export type ListingFormProps = {
@@ -139,6 +140,9 @@ export function ListingForm({
   );
   const [hostGender, setHostGender] = useState<HostGender | null>(
     initialValues?.hostGender ?? null,
+  );
+  const [requiresVaccination, setRequiresVaccination] = useState(
+    initialValues?.requiresVaccination ?? false,
   );
 
   // Per-field validation errors. Missing key = field valid. Cleared as
@@ -252,6 +256,7 @@ export function ListingForm({
       residentPetsNote: hasResidentPets ? residentNote.trim() || null : null,
       offersGrooming,
       hostGender: hostGender!,
+      requiresVaccination,
     };
 
     await onSave(values);
@@ -276,6 +281,8 @@ export function ListingForm({
   const initialResidentNote = initialValues?.residentPetsNote ?? '';
   const initialOffersGrooming = initialValues?.offersGrooming ?? false;
   const initialHostGender = initialValues?.hostGender ?? null;
+  const initialRequiresVaccination =
+    initialValues?.requiresVaccination ?? false;
 
   const isDirty =
     city !== initialCity ||
@@ -287,7 +294,8 @@ export function ListingForm({
     hasResidentPets !== initialHasResident ||
     residentNote !== initialResidentNote ||
     offersGrooming !== initialOffersGrooming ||
-    hostGender !== initialHostGender;
+    hostGender !== initialHostGender ||
+    requiresVaccination !== initialRequiresVaccination;
 
   const saveDisabled = saving || (requireDirty && !isDirty);
 
@@ -478,6 +486,19 @@ export function ListingForm({
         <Text style={styles.toggleText}>
           {offersGrooming ? '✓' : '○'}{' '}
           {t('listings.form.offers_grooming_label')}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() => setRequiresVaccination((v) => !v)}
+        style={[
+          styles.toggleRow,
+          requiresVaccination && styles.toggleRowActive,
+        ]}
+      >
+        <Text style={styles.toggleText}>
+          {requiresVaccination ? '✓' : '○'}{' '}
+          {t('listings.form.requires_vaccination_label')}
         </Text>
       </Pressable>
 

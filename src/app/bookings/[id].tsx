@@ -807,11 +807,21 @@ export default function BookingDetailScreen() {
 
           <View style={styles.summaryDivider} />
 
-          {/* Per-pet block — one row per pet with avatar + services */}
+          {/* Per-pet block — one row per pet with avatar + services.
+              Milestone A: when the booking is in a confirmed/active
+              lifecycle state, show the host the pet's care_notes and
+              vaccination dates so they have the context they need.
+              The viewer side check on isHost gates it to the listing
+              host only (owners already know their own pet's notes). */}
           {booking.pets.map((p) => {
             const services = isLegacyBooking
               ? []
               : (servicesByPet.get(p.id) ?? []);
+            const showCareDetails =
+              isHost &&
+              (booking.status === 'accepted' ||
+                booking.status === 'active' ||
+                booking.status === 'completed');
             return (
               <View key={p.id} style={styles.petBlock}>
                 <View style={styles.petBlockHeader}>
@@ -828,6 +838,27 @@ export default function BookingDetailScreen() {
                       {t("booking.no_per_pet_services")}
                     </Text>
                   )
+                ) : null}
+                {showCareDetails ? (
+                  <View style={styles.petCareBlock}>
+                    {p.care_notes ? (
+                      <Text style={styles.petCareNotes}>
+                        {t('booking.pet_care_notes_label')}: {p.care_notes}
+                      </Text>
+                    ) : null}
+                    {p.rabies_vaccinated_at || p.fvrcp_vaccinated_at ? (
+                      <Text style={styles.petCareMeta}>
+                        {t('booking.pet_vaccination_label')}:{' '}
+                        {p.rabies_vaccinated_at
+                          ? `${t('booking.vaccine_rabies')} ${p.rabies_vaccinated_at}`
+                          : t('booking.vaccine_rabies_missing')}
+                        {' · '}
+                        {p.fvrcp_vaccinated_at
+                          ? `${t('booking.vaccine_fvrcp')} ${p.fvrcp_vaccinated_at}`
+                          : t('booking.vaccine_fvrcp_missing')}
+                      </Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
             );
@@ -1175,6 +1206,22 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     fontStyle: "italic",
     paddingLeft: spacing.xl + 32,
+  },
+  petCareBlock: {
+    paddingLeft: spacing.xl + 32,
+    gap: 4,
+    marginTop: 4,
+  },
+  petCareNotes: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.ink,
+    lineHeight: 18,
+  },
+  petCareMeta: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.inkSoft,
   },
   breakdownBox: {
     gap: spacing.xs,
