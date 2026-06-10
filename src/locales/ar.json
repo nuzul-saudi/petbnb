@@ -25,6 +25,8 @@
     "empty": "لا يوجد مضيفون متاحون حالياً",
     "load_failed": "تعذّر تحميل الإعلانات",
     "female_filter": "مضيفات فقط",
+    "grooming_filter": "خدمة استحمام متوفرة",
+    "no_resident_pets_filter": "بدون حيوانات مقيمة",
     "distance_label": "{km} كم",
     "geo_denied_hint": "شارك موقعك للحصول على ترتيب أفضل حسب القرب"
   },

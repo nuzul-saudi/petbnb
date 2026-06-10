@@ -92,13 +92,22 @@ export function ListingCard({ listing, onPress, statusBadge }: Props) {
             </Text>
           </View>
 
-          {/* Status badge (host home, 7.1b) takes the slot when supplied;
-              otherwise the owner-feed "new" pill renders unchanged. */}
+          {/* Status badge (host home, 7.1b) takes the slot when
+              supplied. Otherwise: S2 rating pill when the host has
+              reviews, falling back to the "new host" pill. */}
           {statusBadge ? (
             <View
               style={[styles.newBadge, { backgroundColor: statusBadge.color }]}
             >
               <Text style={styles.newBadgeText}>{statusBadge.label}</Text>
+            </View>
+          ) : listing.host_avg_rating != null &&
+            (listing.host_review_count ?? 0) > 0 ? (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>
+                ★ {listing.host_avg_rating.toFixed(1)} ·{' '}
+                {toArabicDigits(listing.host_review_count ?? 0)}
+              </Text>
             </View>
           ) : (
             <View style={styles.newBadge}>

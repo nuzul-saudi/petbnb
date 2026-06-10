@@ -16,6 +16,13 @@ export type ListingFilter = {
   city?: CityKey;
   neighborhood?: string;
   femaleHostsOnly?: boolean;
+  // S2 — discovery filters. All optional; chip-driven on the feed.
+  minPriceSAR?: number;
+  maxPriceSAR?: number;
+  /** Only listings where offers_grooming = true. */
+  groomingOnly?: boolean;
+  /** Only listings where has_resident_pets = false. */
+  noResidentPetsOnly?: boolean;
   /**
    * When provided, the result is sorted nearest-first by haversine
    * distance from this point. Listings without lat/lng remain in the
@@ -44,6 +51,12 @@ export type ListingFeedItem = Tables<'listings'> & {
    * by HostHome's 8h.2 5-state badge selector.
    */
   has_pending_edit?: boolean;
+  // S2 — per-host review aggregate (rating across this host's listings).
+  // Populated by listActiveListings via a follow-up rollup query.
+  // Defaults to null on hosts with no reviews (or when the rollup
+  // query failed); UI shows the "new host" badge as fallback.
+  host_avg_rating?: number | null;
+  host_review_count?: number;
 };
 
 /**
@@ -102,6 +115,17 @@ export async function listActiveListings(
   if (filter.city) query = query.eq('city', filter.city);
   if (filter.neighborhood) query = query.eq('neighborhood', filter.neighborhood);
   if (filter.femaleHostsOnly) query = query.eq('host_gender', 'female');
+  // S2 — owner-feed discovery filters.
+  if (filter.minPriceSAR != null) {
+    query = query.gte('nightly_price_sar', filter.minPriceSAR);
+  }
+  if (filter.maxPriceSAR != null) {
+    query = query.lte('nightly_price_sar', filter.maxPriceSAR);
+  }
+  if (filter.groomingOnly) query = query.eq('offers_grooming', true);
+  if (filter.noResidentPetsOnly) {
+    query = query.eq('has_resident_pets', false);
+  }
 
   const { data, error } = await query;
   if (error) throw error;
@@ -136,6 +160,45 @@ export async function listActiveListings(
       distance_km: distance,
     };
   });
+
+  // S2 — review aggregate per host. Best-effort: if the reviews
+  // query fails (RLS or otherwise), we silently leave host_avg_rating
+  // unset and the card falls back to the "new host" badge. One
+  // rollup query for the full set of host_ids in the result.
+  if (items.length > 0) {
+    const hostIds = Array.from(
+      new Set(items.map((it) => it.host_id).filter((x): x is string => !!x)),
+    );
+    if (hostIds.length > 0) {
+      try {
+        const { data: rev } = await supabase
+          .from('reviews')
+          .select('ratee_id, stars')
+          .in('ratee_id', hostIds);
+        if (rev && rev.length > 0) {
+          const byHost = new Map<string, { sum: number; count: number }>();
+          for (const r of rev) {
+            const cur = byHost.get(r.ratee_id) ?? { sum: 0, count: 0 };
+            cur.sum += r.stars;
+            cur.count += 1;
+            byHost.set(r.ratee_id, cur);
+          }
+          for (const it of items) {
+            const agg = byHost.get(it.host_id);
+            if (agg && agg.count > 0) {
+              it.host_avg_rating = Math.round((agg.sum / agg.count) * 10) / 10;
+              it.host_review_count = agg.count;
+            } else {
+              it.host_avg_rating = null;
+              it.host_review_count = 0;
+            }
+          }
+        }
+      } catch {
+        // RLS or network — silently skip the rating data.
+      }
+    }
+  }
 
   if (filter.sortByDistance) {
     // Nearest first; nulls (listings without coordinates) sorted last.

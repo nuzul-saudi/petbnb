@@ -287,6 +287,9 @@ function OwnerFeedHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [femaleOnly, setFemaleOnly] = useState(false);
+  // S2 discovery filters.
+  const [groomingOnly, setGroomingOnly] = useState(false);
+  const [noResidentPetsOnly, setNoResidentPetsOnly] = useState(false);
   // City filter (7.2c). Default Riyadh — the app's historical default
   // and where every existing listing was backfilled to via migration
   // 0019. Future polish: persist the user's preferred city on profiles.
@@ -318,6 +321,8 @@ function OwnerFeedHome() {
         const rows = await listActiveListings({
           city,
           femaleHostsOnly: femaleOnly,
+          groomingOnly,
+          noResidentPetsOnly,
           sortByDistance: coords ?? undefined,
         });
         setItems(rows);
@@ -329,7 +334,7 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [city, femaleOnly, coords, t],
+    [city, femaleOnly, groomingOnly, noResidentPetsOnly, coords, t],
   );
 
   useEffect(() => {
@@ -387,20 +392,55 @@ function OwnerFeedHome() {
         ))}
       </View>
 
-      <Pressable
-        onPress={() => setFemaleOnly((v) => !v)}
-        style={[styles.filterChip, femaleOnly && styles.filterChipActive]}
-      >
-        <Text
+      <View style={styles.filterRow}>
+        <Pressable
+          onPress={() => setFemaleOnly((v) => !v)}
+          style={[styles.filterChip, femaleOnly && styles.filterChipActive]}
+        >
+          <Text
+            style={[
+              styles.filterChipText,
+              femaleOnly && styles.filterChipTextActive,
+            ]}
+          >
+            {femaleOnly ? '✓ ' : ''}
+            {t('feed.female_filter')}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setGroomingOnly((v) => !v)}
+          style={[styles.filterChip, groomingOnly && styles.filterChipActive]}
+        >
+          <Text
+            style={[
+              styles.filterChipText,
+              groomingOnly && styles.filterChipTextActive,
+            ]}
+          >
+            {groomingOnly ? '✓ ' : ''}
+            {t('feed.grooming_filter')}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setNoResidentPetsOnly((v) => !v)}
           style={[
-            styles.filterChipText,
-            femaleOnly && styles.filterChipTextActive,
+            styles.filterChip,
+            noResidentPetsOnly && styles.filterChipActive,
           ]}
         >
-          {femaleOnly ? '✓ ' : ''}
-          {t('feed.female_filter')}
-        </Text>
-      </Pressable>
+          <Text
+            style={[
+              styles.filterChipText,
+              noResidentPetsOnly && styles.filterChipTextActive,
+            ]}
+          >
+            {noResidentPetsOnly ? '✓ ' : ''}
+            {t('feed.no_resident_pets_filter')}
+          </Text>
+        </Pressable>
+      </View>
 
       {geoDenied ? (
         <Text style={styles.geoHint}>{t('feed.geo_denied_hint')}</Text>
@@ -530,10 +570,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkSoft,
   },
-  filterChip: {
-    alignSelf: 'flex-start',
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
+  },
+  filterChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radii.pill,

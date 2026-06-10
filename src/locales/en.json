@@ -25,6 +25,8 @@
     "empty": "No sitters available right now",
     "load_failed": "Couldn't load sitters",
     "female_filter": "Female sitters only",
+    "grooming_filter": "Grooming offered",
+    "no_resident_pets_filter": "No resident pets",
     "distance_label": "{km} km",
     "geo_denied_hint": "Share your location for better sorting by proximity"
   },
