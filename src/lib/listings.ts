@@ -340,8 +340,7 @@ export async function countPendingHostBookings(
  * listings INSERT path in the codebase. Sets status='pending'
  * EXPLICITLY (the migration 0021 default is also 'pending', but
  * writing it in code makes the approval-gate intent clear at the
- * callsite). The bridge trigger from 0021 keeps is_active in sync
- * until 8i drops the legacy column.
+ * callsite).
  *
  * Title and description are written to the _ar columns regardless of
  * the host's typing language. We have no language detection or
@@ -394,8 +393,8 @@ export async function createListing(input: {
   return { id: data.id };
 }
 
-// Four-state visibility for a listing — the canonical signal after
-// migration 0021 (is_active is a passive shadow column until 8i).
+// Four-state visibility for a listing — the canonical signal since
+// migration 0021. (is_active was dropped in 8i / migration 0024.)
 export type ListingStatus =
   | 'pending'
   | 'approved'

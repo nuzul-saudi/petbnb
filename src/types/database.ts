@@ -163,10 +163,8 @@ export type Database = {
           max_concurrent_pets: number;
           has_resident_pets: boolean;
           resident_pets_note: string | null;
-          is_active: boolean;
-          // Step 8a (migration 0021) — four-state visibility column.
-          // is_active is kept in sync via the listings_sync_is_active
-          // bridge trigger until 8i drops the legacy column.
+          // Step 8 visibility column. is_active was dropped in 8i
+          // (migration 0024) along with its bridge trigger.
           status: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier: Database['public']['Enums']['listing_tier'];
           offers_grooming: boolean;
@@ -189,7 +187,6 @@ export type Database = {
           max_concurrent_pets?: number;
           has_resident_pets?: boolean;
           resident_pets_note?: string | null;
-          is_active?: boolean;
           status?: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
@@ -212,7 +209,6 @@ export type Database = {
           max_concurrent_pets?: number;
           has_resident_pets?: boolean;
           resident_pets_note?: string | null;
-          is_active?: boolean;
           status?: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;

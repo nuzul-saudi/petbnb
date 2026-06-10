@@ -353,8 +353,7 @@ export async function getAdminListingReview(
 
 /**
  * Approve a brand-new pending listing. For type='new_listing' only.
- * Just flips status='approved'; the bridge trigger keeps is_active
- * in sync until 8i drops the legacy column.
+ * Just flips status='approved'.
  */
 export async function approveNewListing(id: string): Promise<void> {
   await setListingStatus(id, 'approved');
