@@ -112,15 +112,19 @@ create policy "listing_blocked_dates_delete_host"
 -- 'completed', 'disputed' don't count toward capacity and aren't
 -- gated.
 --
--- "becoming committed" means:
---   - INSERT with status IN ('accepted','active'), or
---   - UPDATE where OLD.status NOT IN ('accepted','active') AND
---     NEW.status IN ('accepted','active').
+-- "needs re-check" on UPDATE means EITHER:
+--   - the booking is transitioning INTO committed status
+--     (OLD.status NOT IN ('accepted','active') AND NEW.status IN
+--     ('accepted','active')), OR
+--   - the booking is ALREADY committed AND the dates changed
+--     (NEW.status IN ('accepted','active') AND start/end_date moved).
 --
--- An UPDATE that stays in the same committed state and only edits
--- dates does NOT re-check. (If you want to re-validate on date
--- shift, we could extend this; for MVP date edits are gated client-
--- side.)
+-- A date edit on an already-committed booking could push the booking
+-- into a new overlap window that no longer respects capacity or
+-- collides with a blocked range. Re-running the same checks against
+-- the new dates closes that gap. The overlap query excludes
+-- b.id <> NEW.id so re-checking a booking against itself is safe.
+-- On INSERT, only the status check applies (dates have no OLD).
 -- ============================================================
 create or replace function public.guard_booking_capacity()
 returns trigger
@@ -134,11 +138,20 @@ declare
   v_blocked_count integer;
 begin
   -- Decide whether this transition triggers the check.
+  -- On INSERT: any committed status fires.
+  -- On UPDATE: fires when becoming committed OR when dates change on
+  --   an already-committed booking (so a date shift on an
+  --   accepted/active booking still gets capacity + blocked-range
+  --   re-checked against the new window).
   if TG_OP = 'INSERT' then
     v_committed := NEW.status in ('accepted', 'active');
   else
     v_committed := NEW.status in ('accepted', 'active')
-                 and OLD.status not in ('accepted', 'active');
+                 and (
+                   OLD.status not in ('accepted', 'active')
+                   or NEW.start_date is distinct from OLD.start_date
+                   or NEW.end_date is distinct from OLD.end_date
+                 );
   end if;
 
   if not v_committed then

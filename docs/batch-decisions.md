@@ -10,3 +10,7 @@ One line per decision made autonomously during the batch run.
 - **Milestone A — vaccination check** — SOFT warn before submitting booking (per spec), NOT a hard block. Host can decline on their side.
 - **Milestone A — care_notes visibility** — shown to host only when `booking.status IN ('accepted','active','completed')`. Pre-accept the host shouldn't see private care notes; they only need them once committed. (Owner already knows their own pet's notes — only host gets the display.)
 - **Milestone A — vaccination_doc_url** — column was already in 0001's pets schema; not adding upload UI in this batch (would need pet-photo bucket pattern replication). Deferred to a polish pass after the data model proves out.
+
+## Future-milestone backlog (logged during batch run)
+
+- **Change / cancellation policy engine (flight-style).** Pre-launch milestone, AFTER real payments land. Today's locked 48h-cliff refund tiers (full / 50% / none) are the launch-sufficient interim; a richer engine should support: change & cancel rules varying by host preference (Flexible / Moderate / Strict tiers à la Airbnb), date-change fees, host re-approval of changed dates (vs auto-accept inside the same booking), and host compensation on late owner cancel (so hosts who blocked their calendar aren't left empty-handed). Design as its own milestone once the gateway integration lands — change/cancel penalties are meaningless until real money moves.
