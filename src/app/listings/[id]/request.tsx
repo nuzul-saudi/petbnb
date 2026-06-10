@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { DateField } from '@/components/DateField';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import {
@@ -426,8 +427,14 @@ export default function BookingRequestScreen() {
 
       router.replace({ pathname: '/bookings/[id]', params: { id: bookingId } });
     } catch (e) {
+      // Test round 3 (2026-06-10): include the message tail in the
+      // user-facing error so a hidden capacity_exceeded / blocked_range /
+      // RLS rejection surfaces instead of a flat "couldn't submit".
+      // Friendly i18n stays the prefix; the server detail is the suffix.
       console.warn('[booking.submit_failed]', e);
-      setError(t('booking.submit_failed'));
+      const detail =
+        e instanceof Error && e.message ? `: ${e.message}` : '';
+      setError(`${t('booking.submit_failed')}${detail}`);
     } finally {
       setSubmitting(false);
       setSubmitStage('idle');
@@ -829,66 +836,6 @@ function PriceHint({
     );
   }
   return <Text style={styles.addonPrice}>+{priceStr}</Text>;
-}
-
-// ---------------------------------------------------------------------------
-// DateField — Platform-branched date input.
-//
-// Web: native HTML5 <input type="date">. inputRef forwards to the HTML
-//   element so callers can call .focus() for auto-advance.
-// Native: TextInput placeholder until @react-native-community/datetime
-//   picker is wired in a follow-up (Section 13 TODO).
-// ---------------------------------------------------------------------------
-function DateField({
-  value,
-  onChange,
-  min,
-  inputRef,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  min?: string;
-  inputRef?: React.Ref<HTMLInputElement>;
-}) {
-  if (Platform.OS === 'web') {
-    return (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((<input
-        ref={inputRef}
-        type="date"
-        value={value}
-        min={min}
-        onChange={(e) => onChange(e.target.value)}
-        style={{
-          backgroundColor: colors.paper,
-          borderColor: colors.whisper,
-          borderWidth: 1,
-          borderRadius: radii.lg,
-          paddingTop: spacing.md,
-          paddingBottom: spacing.md,
-          paddingLeft: spacing.lg,
-          paddingRight: spacing.lg,
-          fontFamily: fonts.body,
-          fontSize: 16,
-          color: colors.ink,
-          width: '100%',
-          boxSizing: 'border-box',
-        } as any}
-      />) as unknown) as React.ReactElement
-    );
-  }
-  return (
-    <TextInput
-      value={value}
-      onChangeText={onChange}
-      placeholder="YYYY-MM-DD"
-      placeholderTextColor={colors.inkSoft}
-      autoCapitalize="none"
-      autoCorrect={false}
-      inputMode="numeric"
-      style={styles.input}
-    />
-  );
 }
 
 const styles = StyleSheet.create({

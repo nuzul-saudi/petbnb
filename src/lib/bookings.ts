@@ -441,6 +441,51 @@ export async function listBookingsForOwner(
   });
 }
 
+// Host-facing list. Two-step query because we can't easily join
+// "bookings whose listing.host_id = me" in PostgREST's nested select
+// — same shape as countPendingHostBookings, just reading full rows.
+// Test round 3 (2026-06-10) added this when the /bookings screen
+// went persona-aware so hosts could see incoming + accepted +
+// active + completed bookings on their listings.
+export async function listBookingsForHost(
+  hostId: string,
+): Promise<MyBookingListItem[]> {
+  if (!supabase) return [];
+
+  const { data: hostListings, error: lErr } = await supabase
+    .from('listings')
+    .select('id')
+    .eq('host_id', hostId);
+  if (lErr) throw lErr;
+  if (!hostListings || hostListings.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(
+      `
+      *,
+      listing:listings(id, title_ar, title_en, neighborhood),
+      booking_pets(pet:pets(*))
+    `,
+    )
+    .in(
+      'listing_id',
+      hostListings.map((l) => l.id),
+    )
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const { booking_pets: bp, ...rest } = row as typeof row & {
+      booking_pets?: { pet: Tables<'pets'> }[];
+    };
+    return {
+      ...(rest as Tables<'bookings'>),
+      listing: (row.listing ?? null) as MyBookingListItem['listing'],
+      pets: (bp ?? []).map((b) => b.pet),
+    };
+  });
+}
+
 /**
  * Cancel a booking. MVP: owners only, only while status === 'requested'.
  * Once a host has accepted, cancellation requires manual handling

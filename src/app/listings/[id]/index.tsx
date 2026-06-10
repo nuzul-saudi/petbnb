@@ -236,12 +236,15 @@ export default function ListingDetailScreen() {
             ) : null}
           </View>
 
-          {/* Host viewing their own listing sees Edit instead of
-              Request booking — a host can't book their own place.
-              The Edit screen (Step 7.5) now exists; the CTA routes
-              there. Owners (and any non-host viewer) still see
-              Request booking. */}
-          {!!user && listing.host_id === user.id ? (
+          {/* CTA gates on BOTH ownership AND current persona.
+              A 'both' user viewing their own listing in OWNER persona
+              should see the same "Request booking" CTA a real customer
+              sees — they're shopping for sitters, not editing. Only
+              when they switch to HOST persona does the Edit CTA appear
+              (mirrors the self-view banner above, which already uses
+              the persona gate). Owners on listings they don't own
+              always see Request booking. */}
+          {isOwnListing && persona === 'host' ? (
             <Pressable
               onPress={() => router.push(`/listings/${listing.id}/edit`)}
               style={styles.cta}

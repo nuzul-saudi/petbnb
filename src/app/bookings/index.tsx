@@ -5,17 +5,32 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { useAuth } from '@/lib/auth';
-import { listBookingsForOwner, type MyBookingListItem } from '@/lib/bookings';
+import {
+  listBookingsForHost,
+  listBookingsForOwner,
+  type MyBookingListItem,
+} from '@/lib/bookings';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import { usePersona } from '@/lib/persona';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
 
 export default function MyBookingsScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { initializing, session, user } = useAuth();
+  const { initializing, session, user, profile } = useAuth();
+  const { persona } = usePersona();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+
+  // Persona-aware mode (test round 3, 2026-06-10): host persona sees
+  // bookings against THEIR listings (incoming requests + accepted/
+  // active/completed); owner persona sees bookings they themselves
+  // created. role='both' picks by current persona; pure 'owner' and
+  // 'admin' always see owner mode; pure 'host' always sees host mode.
+  const isHostMode =
+    profile?.role === 'host' ||
+    (profile?.role === 'both' && persona === 'host');
 
   const [bookings, setBookings] = useState<MyBookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,14 +41,17 @@ export default function MyBookingsScreen() {
     setLoading(true);
     setError(null);
     try {
-      setBookings(await listBookingsForOwner(user.id));
+      const rows = isHostMode
+        ? await listBookingsForHost(user.id)
+        : await listBookingsForOwner(user.id);
+      setBookings(rows);
     } catch (e) {
       console.warn('[mybookings.load_failed]', e);
       setError(t('mybookings.load_failed'));
     } finally {
       setLoading(false);
     }
-  }, [user, t]);
+  }, [user, t, isHostMode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -51,7 +69,9 @@ export default function MyBookingsScreen() {
         <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
           <Text style={styles.backText}>{t('mybookings.back')}</Text>
         </Pressable>
-        <Text style={styles.title}>{t('mybookings.title')}</Text>
+        <Text style={styles.title}>
+          {isHostMode ? t('mybookings.host_title') : t('mybookings.title')}
+        </Text>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}

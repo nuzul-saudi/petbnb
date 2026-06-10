@@ -11,6 +11,18 @@ import { usePersona } from '@/lib/persona';
 import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
+// Test round 3 (2026-06-10): in host persona, "My Bookings" became
+// confusing because the owner-side bookings list always showed empty
+// (the host wasn't the owner of any booking). Renamed and re-routed —
+// host persona shows "My Listings" pointing at /, which is the host
+// home. Incoming bookings remain accessible via the persona-aware
+// /bookings list (reachable from the standalone pending-requests
+// badge below, or by typing the URL directly).
+const HOST_NAV_BOOKINGS_LABEL_KEY = 'nav.my_listings';
+const HOST_NAV_BOOKINGS_ROUTE = '/';
+const OWNER_NAV_BOOKINGS_LABEL_KEY = 'nav.bookings';
+const OWNER_NAV_BOOKINGS_ROUTE = '/bookings';
+
 export type AppHeaderProps = {
   locale: 'ar' | 'en';
   onLanguageToggle: () => void;
@@ -36,6 +48,11 @@ export function AppHeader({
   const { persona, setPersona, pendingHostCount } = usePersona();
   const theme = useTheme();
 
+  // Host = pure 'host' role OR 'both' currently in host persona.
+  const isHostMode =
+    profile?.role === 'host' ||
+    (profile?.role === 'both' && persona === 'host');
+
   // Active-route detection: '/' is exact-match; the others are prefix
   // matches so /bookings/[id] still highlights "My Bookings".
   const isActive = (route: string): boolean => {
@@ -60,10 +77,18 @@ export function AppHeader({
         onPress={safeNav(() => router.push('/'))}
       />
       <NavItem
-        label={t('nav.bookings')}
-        active={isActive('/bookings')}
+        label={t(
+          isHostMode ? HOST_NAV_BOOKINGS_LABEL_KEY : OWNER_NAV_BOOKINGS_LABEL_KEY,
+        )}
+        active={isActive(
+          isHostMode ? HOST_NAV_BOOKINGS_ROUTE : OWNER_NAV_BOOKINGS_ROUTE,
+        )}
         activeColor={theme.accent}
-        onPress={safeNav(() => router.push('/bookings'))}
+        onPress={safeNav(() =>
+          router.push(
+            isHostMode ? HOST_NAV_BOOKINGS_ROUTE : OWNER_NAV_BOOKINGS_ROUTE,
+          ),
+        )}
       />
       <NavItem
         label={t('nav.account')}
@@ -112,9 +137,13 @@ export function AppHeader({
           </Pressable>
           {persona === 'host' && pendingHostCount > 0 ? (
             <Pressable
-              // TODO 7.6: route to the pending-requests list once it
-              // exists. Until then, '/' lands on the host home.
-              onPress={() => router.push('/')}
+              // Test round 3 (2026-06-10): the badge now routes to
+              // /bookings, which became persona-aware and lists the
+              // host's incoming bookings (requested + accepted +
+              // active + completed). Previously routed to '/' which
+              // dropped the host onto their own listings page with no
+              // path to the requests the badge was pointing at.
+              onPress={() => router.push('/bookings')}
               style={styles.requestsBadge}
             >
               {/* Inbox-tray glyph names the badge: this is pending

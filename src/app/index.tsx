@@ -167,43 +167,49 @@ function HostHome() {
     router.push('/listings/new');
   };
 
-  // 8h.5: split into two sections.
+  // Test round 3 (2026-06-10): the "paused with a pending edit" case
+  // surfaced in Live and confused the host — it's not visible to
+  // customers, so it doesn't belong under Live. New section model:
   //
-  //   "Live / Published" — the host's listings that are public-facing
-  //   or paused-but-still-theirs:
-  //       status in ('approved', 'paused')
+  //   "Drafts / Pending review" — shown FIRST. The host's work-in-
+  //   flight: never-approved, taken down by admin, paused (not visible
+  //   to customers), or has an edit awaiting admin review.
+  //       status in ('pending', 'paused', 'admin_disabled')
+  //       OR has_pending_edit === true
   //
-  //   "Drafts / Pending review" — the host's pipeline (awaiting first
-  //   review, taken down by admin, or has an edit awaiting review):
-  //       status in ('pending', 'admin_disabled') OR has_pending_edit
+  //   "Live / Published" — shown second. Strictly visible-to-customers:
+  //       status === 'approved' (regardless of pending-edit, since the
+  //       APPROVED live copy is what customers see; the edit is
+  //       represented separately in the Drafts section above).
   //
-  // Overlap: approved-with-draft and paused-with-draft appear in BOTH
-  // sections — once as the live listing, once as the pending edit.
-  // Spec calls for this intentional duplication so the host gets
-  // both perspectives ("here's what's published" + "here's what's in
-  // review"). admin_disabled-with-draft only appears in Drafts since
-  // its status is already in that section's filter.
+  // Drafts is shown first because the host has the most work to do
+  // there (review queue, blocked reactivation, pending admin look).
+  // Live is the "everything's fine" section.
+  //
+  // Overlap: approved-with-draft appears in BOTH sections — once
+  // as the live (visible) listing, once as the pending edit. Same
+  // intentional duplication as before; the badge color disambiguates.
+  // paused/admin_disabled with a draft only appears in Drafts.
   //
   // Card tap behavior unchanged: every card → /listings/[id].
   const sections = useMemo(() => {
-    const liveItems = items.filter(
-      (it) => it.status === 'approved' || it.status === 'paused',
-    );
     const draftItems = items.filter(
       (it) =>
         it.status === 'pending' ||
+        it.status === 'paused' ||
         it.status === 'admin_disabled' ||
         it.has_pending_edit === true,
     );
+    const liveItems = items.filter((it) => it.status === 'approved');
     const out: { title: string; data: ListingFeedItem[] }[] = [];
-    if (liveItems.length > 0) {
-      out.push({ title: t('home.host_home_section_live'), data: liveItems });
-    }
     if (draftItems.length > 0) {
       out.push({
         title: t('home.host_home_section_drafts'),
         data: draftItems,
       });
+    }
+    if (liveItems.length > 0) {
+      out.push({ title: t('home.host_home_section_live'), data: liveItems });
     }
     return out;
   }, [items, t]);

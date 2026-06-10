@@ -225,7 +225,7 @@
     "invalid_start_date": "Arrival must be today or later",
     "invalid_end_date": "Departure must be after arrival",
     "pet_required": "Please select one or more cats",
-    "pet_vaccination_warning": "This sitter requires vaccinated cats only. One or more of your selected cats is missing a rabies or FVRCP date in their profile. You can still send the request — the sitter may decline if vaccination is incomplete.",
+    "pet_vaccination_warning": "Heads up: this sitter prefers vaccinated cats. Some of your selected cats are missing a rabies or FVRCP date. You can still send the request now — this is a friendly notice, not a block.",
     "blocked_range_warning": "These dates overlap a period the sitter has blocked. Please pick different dates — the request would be refused at accept.",
     "pet_care_notes_label": "Care notes",
     "pet_vaccination_label": "Vaccinations",
@@ -534,6 +534,7 @@
   },
   "mybookings": {
     "title": "My bookings",
+    "host_title": "Bookings on my listings",
     "back": "← Back",
     "loading": "Loading…",
     "load_failed": "Couldn't load bookings",
@@ -547,6 +548,7 @@
   "nav": {
     "home": "Home",
     "bookings": "My Bookings",
+    "my_listings": "My Listings",
     "account": "My Account",
     "lang_toggle_to_en": "EN",
     "lang_toggle_to_ar": "ع"

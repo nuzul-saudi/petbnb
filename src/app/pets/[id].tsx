@@ -14,7 +14,9 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { BreedPicker, type BreedSelection } from '@/components/BreedPicker';
+import { DateField } from '@/components/DateField';
 import { useAuth } from '@/lib/auth';
+import { todayIso } from '@/lib/format';
 import { findBreed } from '@/lib/breeds';
 import { useTranslation } from '@/lib/i18n';
 import {
@@ -392,25 +394,23 @@ export default function PetDetailScreen() {
           />
         </Field>
 
-        {/* Milestone A — vaccination dates + care notes. Dates are
-            free-text yyyy-mm-dd for MVP; a real date picker is polish. */}
+        {/* Milestone A — vaccination dates + care notes. Test round 3
+            (2026-06-10) swapped the YYYY-MM-DD TextInput for the shared
+            DateField (calendar UX on web), max=today so future-dated
+            vaccinations can't be entered. */}
         <Field label={t('pets.rabies_vaccinated_at_label')}>
-          <TextInput
+          <DateField
             value={rabiesVaccinatedAt}
-            onChangeText={setRabiesVaccinatedAt}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.inkSoft}
-            style={styles.input}
+            onChange={setRabiesVaccinatedAt}
+            max={todayIso()}
           />
         </Field>
 
         <Field label={t('pets.fvrcp_vaccinated_at_label')}>
-          <TextInput
+          <DateField
             value={fvrcpVaccinatedAt}
-            onChangeText={setFvrcpVaccinatedAt}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.inkSoft}
-            style={styles.input}
+            onChange={setFvrcpVaccinatedAt}
+            max={todayIso()}
           />
         </Field>
 

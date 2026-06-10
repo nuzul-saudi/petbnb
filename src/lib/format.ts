@@ -1,18 +1,21 @@
-// Display formatters. CLAUDE.md Section 7 calls out Arabic-Indic digits and
-// the ر.س currency mark — both centralized here so every screen renders the
-// same way and we never accidentally write "$".
+// Display formatters. Centralized so every screen renders numbers and the
+// ر.س currency mark the same way and we never accidentally write "$".
+//
+// Numerals: Latin/Western digits (0–9) everywhere. Founder decision after
+// test round 3 (2026-06-10): mixed Arabic-Indic numerals across screens
+// read inconsistently in the Saudi UX, especially in pet counts and the
+// currency row. `toArabicDigits` is preserved as a NAME ONLY pass-through
+// so existing callsites compile; it returns the input unchanged. Don't
+// re-introduce Arabic-Indic conversion without an explicit ask.
 
 import type { Locale } from '@/lib/i18n';
 
-const ARABIC_INDIC = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-
 export function toArabicDigits(value: number | string): string {
-  return String(value).replace(/[0-9]/g, (d) => ARABIC_INDIC[Number(d)]);
+  return String(value);
 }
 
-export function formatSAR(amount: number, useArabicDigits = true): string {
-  const num = useArabicDigits ? toArabicDigits(amount) : String(amount);
-  return `${num} ر.س`;
+export function formatSAR(amount: number, _useArabicDigits = false): string {
+  return `${String(amount)} ر.س`;
 }
 
 /** Whole-day difference between two ISO dates (yyyy-mm-dd). 0 on invalid. */
@@ -60,7 +63,9 @@ export function formatRiyadhStamp(iso: string, locale: Locale): string {
   const stamp =
     `${get('year')}-${get('month')}-${get('day')} ` +
     `${get('hour')}:${get('minute')}`;
-  return locale === 'ar' ? toArabicDigits(stamp) : stamp;
+  // Both locales now use Latin digits (see header comment).
+  void locale;
+  return stamp;
 }
 
 /** Pick the locale-appropriate version of a bilingual field with
