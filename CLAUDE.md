@@ -164,6 +164,14 @@ These are deferred from MVP build but MUST land before public launch. Each one
 has a specific reason it's safe to defer during build but unsafe to defer at
 launch.
 
+> **SHIPPED 2026-06 (Step 6 + Step 8):** check-in/check-out condition reports
+> (Section 6) and the listings status + two-copy edit model (Step 8) are now
+> live in `main`. The two-copy model replaces the earlier "saving a live edit
+> flips it back to pending" gate from 7.5 — host edits now create an invisible
+> draft, public sees the live copy, admin approves the draft via the queue.
+> Status is the 4-state column `pending/approved/paused/admin_disabled` with a
+> DB-level transition guard (migration 0025). is_active is gone (0024).
+
 - **Swap email OTP → Saudi phone OTP.** Step 4 ships with email OTP for dev
   speed. Before launch: enable Supabase Phone Auth, wire a Send SMS Hook (Edge
   Function calling Unifonic or Taqnyat), swap `{email}` for `{phone}` in

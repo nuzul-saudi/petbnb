@@ -73,10 +73,16 @@ export default function AdminHome() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {/* Queue cards */}
+        {/* Queue cards — inert (no onPress) when the queue is empty
+            so admin doesn't navigate into an empty list. */}
         <Pressable
           onPress={() => router.push('/admin/hosts')}
-          style={[styles.card, styles.queueCard]}
+          disabled={!pendingHostsCount}
+          style={[
+            styles.card,
+            styles.queueCard,
+            !pendingHostsCount && styles.cardInert,
+          ]}
         >
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>{t('admin.pending_hosts_card')}</Text>
@@ -85,13 +91,13 @@ export default function AdminHome() {
         </Pressable>
 
         <Pressable
-          onPress={() =>
-            router.push({
-              pathname: '/admin/listings',
-              params: { filter: 'pending' },
-            })
-          }
-          style={[styles.card, styles.queueCard]}
+          onPress={() => router.push('/admin/listings')}
+          disabled={!pendingListingsCount}
+          style={[
+            styles.card,
+            styles.queueCard,
+            !pendingListingsCount && styles.cardInert,
+          ]}
         >
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>{t('admin.pending_listings_card')}</Text>
@@ -228,6 +234,10 @@ const styles = StyleSheet.create({
   queueCard: {
     borderWidth: 2,
     borderColor: colors.moss,
+  },
+  cardInert: {
+    opacity: 0.5,
+    borderColor: colors.whisper,
   },
   cardDisabled: {
     opacity: 0.6,

@@ -40,8 +40,8 @@
     "tier_silver": "Silver",
     "tier_gold": "Gold",
     "host_label": "Sitter",
-    "host_female": "Sitter",
-    "host_male": "Sitter",
+    "host_female": "Female sitter",
+    "host_male": "Male sitter",
     "max_pets": "Up to {count} cats",
     "max_pets_one": "Up to {count} cat",
     "has_resident_pets": "Resident pets present",
@@ -107,7 +107,8 @@
       "delete_failed": "Couldn't remove the photo. Please try again.",
       "leave_confirm": "You have unsaved photos. Leave without saving?",
       "empty": "You haven't added any photos yet. Add at least 3 before publishing.",
-      "draft_banner": "These are your draft photos. They'll be reviewed before going live. Your published listing keeps showing its current photos until then."
+      "draft_banner": "These are your draft photos. They'll be reviewed before going live. Your published listing keeps showing its current photos until then.",
+      "cannot_delete_last": "You can't delete the last photo. Add a replacement first, then remove this one."
     },
     "edit": {
       "title": "Edit listing",

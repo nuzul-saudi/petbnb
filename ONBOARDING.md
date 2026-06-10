@@ -12,13 +12,16 @@
 
 - **What:** Petbnb is a Saudi Arabia–first, Arabic-language, RTL pet-hosting
   marketplace MVP (Airbnb-for-cats; pivoting to cats+dogs in Step 5.7).
-- **Stage:** Steps 1 → 5.8 + Step 6 (top nav) + Step 7 prep shipped. This
-  session added host booking lifecycle controls (accept/decline/start/
-  complete), host daily photo updates (editable, deletable, active-only),
-  and condition-reports CHECK-IN (immutable, host-only RLS, 6-photo cap).
-  Next: condition-report CHECK-OUT filing (display-only today), then
-  Step 7 (host onboarding), then Steps 8–10 (bookings tracking, messaging,
-  marketplace). Step 5.7 multi-species (cats+dogs) parked.
+- **Stage:** Steps 1 → 8 shipped. Step 6 condition reports (both check-in AND
+  check-out) and Step 7 host onboarding (incl. host listing creation + edit +
+  photo manager + admin approval flow) are live. **Step 8** ships the
+  listings status model (`pending/approved/paused/admin_disabled`) and the
+  two-copy edit model: host edits an approved listing create an invisible
+  draft, public continues to see the live copy, admin promotes the draft via
+  the queue. `is_active` was dropped in 8i; DB-level guard (migration 0025)
+  enforces the status transition matrix. Vaccination + availability + payment
+  scaffolding follow in the current batch (migrations 0026–0028). Step 5.7
+  multi-species (cats+dogs) parked.
 - **Who built it:** Non-technical founder + Claude pairing one step at a
   time. Founder reviews every plan; Claude writes the code and runs
   verifications.

@@ -324,6 +324,17 @@ export default function ListingPhotosScreen() {
 
   const onRemoveSaved = async (photo: SavedPhoto) => {
     if (currentOp) return;
+    // 8e edge case: when editing in drafts (approved/paused), don't
+    // let the host delete the LAST remaining draft photo. If they
+    // could, the next add would re-snapshot from live (count = 0
+    // trigger), so they'd see their original photos come back as if
+    // delete never happened. Cleaner UX: ask them to add a
+    // replacement first. The pending grid doesn't count here — those
+    // photos aren't saved yet.
+    if (useDrafts && savedPhotos.length <= 1) {
+      setActionError(t('listings.photos.cannot_delete_last'));
+      return;
+    }
     if (!confirm('listings.photos.remove_confirm')) return;
     setActionError(null);
     setCurrentOp('delete');
