@@ -8,6 +8,10 @@
 // working. A follow-up migration post-5.6 will drop pet_id once no
 // callers remain.
 
+import {
+  computeCancellationRefund,
+  snapshotFees,
+} from '@/lib/payments-policy';
 import { supabase } from '@/lib/supabase';
 import type { Enums, Tables } from '@/types/database';
 
@@ -446,29 +450,46 @@ export async function listBookingsForOwner(
  * are intentionally untouched — they're an audit trail and have no
  * UPDATE/DELETE policies anyway.
  */
+// S1 — Owner cancels their booking. Computes refund per the policy:
+//   >=48h before start → full refund of total_charged_sar
+//   <48h, not started   → 50% refund
+//   on/after start_date → 0 refund
+// Acceptable from status IN ('requested','accepted'). For 'requested'
+// (host hasn't accepted yet) the booking has no total_charged_sar yet
+// — fall back to total_sar so the refund tier is still computed
+// honestly against the price the owner agreed to.
 export async function cancelBookingAsOwner(
   bookingId: string,
 ): Promise<Tables<'bookings'>> {
   if (!supabase) throw new Error('No Supabase client');
 
-  // App-layer guard: re-fetch and check status is still 'requested'.
-  // Prevents a stale UI from cancelling an already-accepted booking
-  // (a host could accept while the user has the screen open).
   const { data: current, error: rErr } = await supabase
     .from('bookings')
-    .select('id, status')
+    .select('id, status, total_charged_sar, total_sar, start_date')
     .eq('id', bookingId)
     .maybeSingle();
   if (rErr) throw rErr;
   if (!current) throw new Error('Booking not found');
-  if (current.status !== 'requested') {
+  if (current.status !== 'requested' && current.status !== 'accepted') {
     throw new Error(`Cannot cancel a booking in status: ${current.status}`);
   }
 
+  const charged = current.total_charged_sar ?? current.total_sar;
+  const { refundSAR } = computeCancellationRefund(
+    charged,
+    current.start_date,
+    new Date().toISOString(),
+  );
+
   const { data, error } = await supabase
     .from('bookings')
-    .update({ status: 'cancelled' })
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      refund_sar: refundSAR,
+    })
     .eq('id', bookingId)
+    .in('status', ['requested', 'accepted'])
     .select()
     .single();
   if (error || !data) throw error ?? new Error('Failed to cancel booking');
@@ -518,10 +539,48 @@ async function transitionBookingStatus(
   return data;
 }
 
+// S1 — Accepting a booking ALSO snapshots the fees and marks the
+// payment as held. The bridge between the booking lifecycle and the
+// MOCK payment provider lives here (the provider is a stub; no real
+// gateway). At a real-money launch this is where the gateway charge
+// would live.
 export async function acceptBookingAsHost(
   bookingId: string,
 ): Promise<Tables<'bookings'>> {
-  return transitionBookingStatus(bookingId, 'requested', 'accepted');
+  if (!supabase) throw new Error('No Supabase client');
+  // Read the row so we know total_sar (set at request time).
+  const { data: row, error: readErr } = await supabase
+    .from('bookings')
+    .select('total_sar, status')
+    .eq('id', bookingId)
+    .single();
+  if (readErr || !row) {
+    throw readErr ?? new Error('Booking not found');
+  }
+  if (row.status !== 'requested') {
+    throw new Error(`Cannot accept booking from status '${row.status}'`);
+  }
+  const fees = snapshotFees(row.total_sar);
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'accepted',
+      owner_fee_sar: fees.ownerFeeSAR,
+      total_charged_sar: fees.totalChargedSAR,
+      host_fee_sar: fees.hostFeeSAR,
+      payout_sar: fees.payoutSAR,
+      paid_at: new Date().toISOString(),
+      payout_status: 'held',
+    })
+    .eq('id', bookingId)
+    .eq('status', 'requested')
+    .select()
+    .single();
+  if (error || !data) {
+    throw error ?? new Error('Failed to accept booking');
+  }
+  return data;
 }
 
 export async function declineBookingAsHost(
@@ -536,8 +595,26 @@ export async function startBookingAsHost(
   return transitionBookingStatus(bookingId, 'accepted', 'active');
 }
 
+// S1 — Completion releases the held payout. The check-out report
+// flow lives upstream of this call (host fires it from the check-out
+// section); here we just record the payout-status transition.
 export async function completeBookingAsHost(
   bookingId: string,
 ): Promise<Tables<'bookings'>> {
-  return transitionBookingStatus(bookingId, 'active', 'completed');
+  if (!supabase) throw new Error('No Supabase client');
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'completed',
+      payout_status: 'released',
+    })
+    .eq('id', bookingId)
+    .eq('status', 'active')
+    .select()
+    .single();
+  if (error || !data) {
+    throw error ?? new Error('Failed to complete booking');
+  }
+  return data;
 }
+

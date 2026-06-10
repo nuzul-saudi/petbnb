@@ -946,6 +946,46 @@ export default function BookingDetailScreen() {
               ),
             })}
           </Text>
+
+          {/* S1 — host payout view + payout status. Visible only to
+              the host; the owner doesn't need to see the host's net.
+              Renders only when fees have been snapshotted (after
+              host accept). */}
+          {isHost && booking.payout_sar != null ? (
+            <View style={styles.payoutBlock}>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>
+                  {t('booking.host_payout_label')}
+                </Text>
+                <Text style={styles.feeValue}>
+                  {formatSAR(booking.payout_sar)}
+                </Text>
+              </View>
+              <Text style={styles.payoutStatusText}>
+                {t(
+                  booking.payout_status === 'released'
+                    ? 'booking.payout_status_released'
+                    : 'booking.payout_status_held',
+                )}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* S1 — cancellation refund display. Visible to owner
+              when the booking has been cancelled. */}
+          {booking.cancelled_at && booking.refund_sar != null ? (
+            <Text style={styles.cancellationLine}>
+              {booking.refund_sar > 0
+                ? t(
+                    booking.refund_sar ===
+                      (booking.total_charged_sar ?? booking.total_sar)
+                      ? 'booking.cancellation_full_refund'
+                      : 'booking.cancellation_half_refund',
+                    { total: formatSAR(booking.refund_sar) },
+                  )
+                : t('booking.cancellation_no_refund')}
+            </Text>
+          ) : null}
         </View>
 
         {/* Condition reports section — extracted to
@@ -1248,6 +1288,39 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.mossDeep,
     marginTop: spacing.xs,
+  },
+  payoutBlock: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.whisper,
+    gap: 4,
+  },
+  feeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  feeLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+  },
+  feeValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  payoutStatusText: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+  },
+  cancellationLine: {
+    marginTop: spacing.sm,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.terracotta,
   },
   errorText: {
     fontFamily: fonts.body,

@@ -35,6 +35,7 @@ import {
 } from '@/lib/availability';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
+import { snapshotFees } from '@/lib/payments-policy';
 import { listPetsForOwner } from '@/lib/pets';
 import {
   ADDON_CONFIG,
@@ -726,6 +727,34 @@ export default function BookingRequestScreen() {
           <Text style={styles.totalValue}>{formatSAR(breakdown.totalSAR)}</Text>
         </View>
 
+        {/* S1 — service fee + total charged. Shown after the booking
+            subtotal so the owner sees exactly what their card is
+            charged. snapshotFees mirrors what the host-accept
+            mutation writes; numbers here = numbers persisted then. */}
+        {breakdown.totalSAR > 0 ? (() => {
+          const fees = snapshotFees(breakdown.totalSAR);
+          return (
+            <>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>
+                  {t('booking.owner_fee_label')}
+                </Text>
+                <Text style={styles.feeValue}>
+                  {formatSAR(fees.ownerFeeSAR)}
+                </Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>
+                  {t('booking.total_charged_label')}
+                </Text>
+                <Text style={styles.totalValue}>
+                  {formatSAR(fees.totalChargedSAR)}
+                </Text>
+              </View>
+            </>
+          );
+        })() : null}
+
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {/* Milestone A vaccination soft-warn — host may decline. */}
@@ -1097,6 +1126,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.moss,
+  },
+  feeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginTop: spacing.sm,
+  },
+  feeLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+  },
+  feeValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
   },
   totalRow: {
     flexDirection: 'row',

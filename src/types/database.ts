@@ -441,6 +441,18 @@ export type Database = {
           total_sar: number;
           status: Database['public']['Enums']['booking_status'];
           created_at: string;
+          // S1 payments foundations (migration 0028) — all nullable;
+          // filled in at host-accept (paid_at + payout_status='held'
+          // + fees) and at completion (payout_status='released'),
+          // or on owner cancel (cancelled_at + refund_sar).
+          owner_fee_sar: number | null;
+          total_charged_sar: number | null;
+          host_fee_sar: number | null;
+          payout_sar: number | null;
+          paid_at: string | null;
+          payout_status: 'held' | 'released' | null;
+          cancelled_at: string | null;
+          refund_sar: number | null;
         };
         Insert: {
           id?: string;
@@ -457,6 +469,14 @@ export type Database = {
           total_sar: number;
           status?: Database['public']['Enums']['booking_status'];
           created_at?: string;
+          owner_fee_sar?: number | null;
+          total_charged_sar?: number | null;
+          host_fee_sar?: number | null;
+          payout_sar?: number | null;
+          paid_at?: string | null;
+          payout_status?: 'held' | 'released' | null;
+          cancelled_at?: string | null;
+          refund_sar?: number | null;
         };
         Update: {
           id?: string;
@@ -473,6 +493,14 @@ export type Database = {
           total_sar?: number;
           status?: Database['public']['Enums']['booking_status'];
           created_at?: string;
+          owner_fee_sar?: number | null;
+          total_charged_sar?: number | null;
+          host_fee_sar?: number | null;
+          payout_sar?: number | null;
+          paid_at?: string | null;
+          payout_status?: 'held' | 'released' | null;
+          cancelled_at?: string | null;
+          refund_sar?: number | null;
         };
         Relationships: [
           {
