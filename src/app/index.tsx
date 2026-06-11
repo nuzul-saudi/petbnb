@@ -173,32 +173,18 @@ function HostHome() {
     router.push('/listings/new');
   };
 
-  // Test round 3 (2026-06-10): the "paused with a pending edit" case
-  // surfaced in Live and confused the host — it's not visible to
-  // customers, so it doesn't belong under Live. New section model:
-  //
-  //   "Drafts / Pending review" — shown FIRST. The host's work-in-
-  //   flight: never-approved, taken down by admin, paused (not visible
-  //   to customers), or has an edit awaiting admin review.
-  //       status in ('pending', 'paused', 'admin_disabled')
-  //       OR has_pending_edit === true
-  //
-  //   "Live / Published" — shown second. Strictly visible-to-customers:
-  //       status === 'approved' (regardless of pending-edit, since the
-  //       APPROVED live copy is what customers see; the edit is
-  //       represented separately in the Drafts section above).
-  //
-  // Drafts is shown first because the host has the most work to do
-  // there (review queue, blocked reactivation, pending admin look).
-  // Live is the "everything's fine" section.
-  //
-  // Overlap: approved-with-draft appears in BOTH sections — once
-  // as the live (visible) listing, once as the pending edit. Same
-  // intentional duplication as before; the badge color disambiguates.
-  // paused/admin_disabled with a draft only appears in Drafts.
-  //
-  // Card tap behavior unchanged: every card → /listings/[id].
-  const sections = useMemo(() => {
+  // Section model (test round 3 + R2C4 framing):
+  //   "Drafts / Pending review" — shown first, host's work-in-flight.
+  //   "Live / Published" — shown second, customer-visible listings.
+  // R2C4 added a `tone` field to each section so the SectionList
+  // header + container can pick colors from the badge language the
+  // cards already speak (gold for in-flight, moss for live).
+  type HostSection = {
+    title: string;
+    data: ListingFeedItem[];
+    tone: 'drafts' | 'live';
+  };
+  const sections = useMemo<HostSection[]>(() => {
     const draftItems = items.filter(
       (it) =>
         it.status === 'pending' ||
@@ -207,15 +193,20 @@ function HostHome() {
         it.has_pending_edit === true,
     );
     const liveItems = items.filter((it) => it.status === 'approved');
-    const out: { title: string; data: ListingFeedItem[] }[] = [];
+    const out: HostSection[] = [];
     if (draftItems.length > 0) {
       out.push({
         title: t('home.host_home_section_drafts'),
         data: draftItems,
+        tone: 'drafts',
       });
     }
     if (liveItems.length > 0) {
-      out.push({ title: t('home.host_home_section_live'), data: liveItems });
+      out.push({
+        title: t('home.host_home_section_live'),
+        data: liveItems,
+        tone: 'live',
+      });
     }
     return out;
   }, [items, t]);
@@ -265,7 +256,20 @@ function HostHome() {
           keyExtractor={(it, idx) => `${it.id}-${idx}`}
           contentContainerStyle={styles.list}
           renderSectionHeader={({ section }) => (
-            <Text style={styles.sectionHeader}>{section.title}</Text>
+            // R2C4: tinted pill that matches the badge language —
+            // gold for drafts (in-flight), moss for live (published).
+            <View
+              style={[
+                styles.sectionHeaderPill,
+                section.tone === 'live'
+                  ? styles.sectionHeaderPillLive
+                  : styles.sectionHeaderPillDrafts,
+              ]}
+            >
+              <Text style={styles.sectionHeaderPillText}>
+                {section.title}
+              </Text>
+            </View>
           )}
           renderItem={({ item }) => (
             <ListingCard
@@ -648,6 +652,29 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
+  },
+  // R2C4 host-section framing — pill containers whose color matches
+  // the badge language the cards already speak.
+  sectionHeaderPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  sectionHeaderPillLive: {
+    backgroundColor: colors.moss,
+  },
+  sectionHeaderPillDrafts: {
+    backgroundColor: colors.gold,
+  },
+  sectionHeaderPillText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    color: colors.cream,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   createButtonWrap: {
     paddingHorizontal: spacing.xl,
