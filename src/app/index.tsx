@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
@@ -131,6 +131,7 @@ function HostHome() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { profile } = useAuth();
+  const { refreshPendingHostCount } = usePersona();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
@@ -160,6 +161,17 @@ function HostHome() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // R2C7 — refresh both the listings AND the AppHeader pending-
+  // requests badge whenever HostHome gains focus. A host returning
+  // from accepting/declining a booking elsewhere sees fresh counts
+  // immediately. useFocusEffect fires once per focus event; the
+  // persona-context tick throttles redundant fetches if needed.
+  useFocusEffect(
+    useCallback(() => {
+      refreshPendingHostCount();
+    }, [refreshPendingHostCount]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

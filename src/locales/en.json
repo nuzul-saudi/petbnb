@@ -558,7 +558,8 @@
     "back": "← Back",
     "loading": "Loading…",
     "load_failed": "Couldn't load bookings",
-    "empty": "No bookings yet"
+    "empty": "No bookings yet",
+    "unread_indicator": "New update"
   },
   "common": {
     "loading": "Loading…",

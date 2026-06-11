@@ -24,6 +24,7 @@ import { useConditionReports } from "@/hooks/useConditionReports";
 import { useDailyUpdates } from "@/hooks/useDailyUpdates";
 import { useAuth } from "@/lib/auth";
 import { confirmDialog } from "@/lib/confirm";
+import { markSeen } from "@/lib/last-seen-storage";
 import { usePersona } from "@/lib/persona";
 import { findMyReview, type Review } from "@/lib/reviews";
 import {
@@ -265,6 +266,16 @@ export default function BookingDetailScreen() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isAnyFormDirty]);
+
+  // R2C7 — stamp last-seen for this booking when the detail screen
+  // mounts. Best-effort write — failures are swallowed. The owner
+  // bookings list picks this up on next focus and clears the dot.
+  // Persona-agnostic: a host who opens a booking also stamps it,
+  // which is harmless (the dot is owner-mode-only at the index).
+  useEffect(() => {
+    if (!booking?.id || !user?.id) return;
+    void markSeen(user.id, booking.id);
+  }, [booking?.id, user?.id]);
 
   // R2C6 — fetch the caller's own review (if any) for this booking.
   // Re-runs on user / booking status change and on bump of

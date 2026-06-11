@@ -414,13 +414,21 @@ export async function updateBookingRequest(
 }
 
 // Owner-facing list. Used by the /bookings screen. Each row includes
-// the listing summary + the multi-pet array.
+// the listing summary + the multi-pet array + R2C7 unread signals.
 export type MyBookingListItem = Tables<'bookings'> & {
   listing: Pick<
     Tables<'listings'>,
     'id' | 'title_ar' | 'title_en' | 'neighborhood'
   > | null;
   pets: Tables<'pets'>[];
+  /**
+   * R2C7 — latest daily_update.created_at for this booking, or null
+   * if no updates exist. The owner bookings list compares this to
+   * the locally-stored last-seen stamp to decide whether to draw an
+   * unread dot. Populated by a follow-up rollup query (single
+   * .in() over the loaded booking ids).
+   */
+  latest_update_at?: string | null;
 };
 
 export async function listBookingsForOwner(
@@ -439,7 +447,7 @@ export async function listBookingsForOwner(
     .eq('owner_id', ownerId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((row) => {
+  const items: MyBookingListItem[] = (data ?? []).map((row) => {
     const { booking_pets: bp, ...rest } = row as typeof row & {
       booking_pets?: { pet: Tables<'pets'> }[];
     };
@@ -447,8 +455,42 @@ export async function listBookingsForOwner(
       ...(rest as Tables<'bookings'>),
       listing: (row.listing ?? null) as MyBookingListItem['listing'],
       pets: (bp ?? []).map((b) => b.pet),
+      latest_update_at: null,
     };
   });
+
+  // R2C7 — single follow-up query for the latest update timestamp
+  // per booking. We can't easily aggregate in PostgREST without an
+  // RPC, so we fetch every (booking_id, created_at) for our set and
+  // reduce to a max per booking client-side. Best-effort — a failure
+  // leaves latest_update_at as null and the UI just doesn't draw any
+  // unread dots. RLS already permits the owner to read updates on
+  // their own bookings.
+  if (items.length > 0) {
+    try {
+      const ids = items.map((i) => i.id);
+      const { data: updates } = await supabase
+        .from('daily_updates')
+        .select('booking_id, created_at')
+        .in('booking_id', ids);
+      if (updates && updates.length > 0) {
+        const maxByBooking = new Map<string, string>();
+        for (const u of updates) {
+          const cur = maxByBooking.get(u.booking_id);
+          if (!cur || u.created_at > cur) {
+            maxByBooking.set(u.booking_id, u.created_at);
+          }
+        }
+        for (const it of items) {
+          it.latest_update_at = maxByBooking.get(it.id) ?? null;
+        }
+      }
+    } catch {
+      // Silent — UI degrades to "no dots".
+    }
+  }
+
+  return items;
 }
 
 // Host-facing list. Two-step query because we can't easily join

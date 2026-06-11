@@ -13,6 +13,7 @@ import {
 } from '@/lib/bookings';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import { getLastSeenBatch } from '@/lib/last-seen-storage';
 import { usePersona } from '@/lib/persona';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
@@ -21,7 +22,7 @@ export default function MyBookingsScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user, profile } = useAuth();
-  const { persona } = usePersona();
+  const { persona, refreshPendingHostCount } = usePersona();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   // Persona-aware mode (test round 3, 2026-06-10): host persona sees
@@ -36,6 +37,11 @@ export default function MyBookingsScreen() {
   const [bookings, setBookings] = useState<MyBookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // R2C7 — last-seen stamps per booking (owner mode only). Read after
+  // the bookings load resolves so the unread dot can compare against
+  // each row's latest_update_at without re-hitting AsyncStorage per
+  // render.
+  const [lastSeen, setLastSeen] = useState<Map<string, string>>(new Map());
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -46,6 +52,19 @@ export default function MyBookingsScreen() {
         ? await listBookingsForHost(user.id)
         : await listBookingsForOwner(user.id);
       setBookings(rows);
+      // R2C7 — owner mode only. Pull last-seen stamps for the loaded
+      // booking ids. Host bookings list doesn't render an unread dot
+      // (the pending-requests badge in the header is the host's
+      // surface for unread).
+      if (!isHostMode) {
+        const seen = await getLastSeenBatch(
+          user.id,
+          rows.map((r) => r.id),
+        );
+        setLastSeen(seen);
+      } else {
+        setLastSeen(new Map());
+      }
     } catch (e) {
       logWarn('[mybookings.load_failed]', e);
       setError(t('mybookings.load_failed'));
@@ -57,7 +76,14 @@ export default function MyBookingsScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load]),
+      // R2C7 — refresh the AppHeader's pending-requests badge on
+      // screen focus. Without this, a host who accepted a request
+      // somewhere else (e.g. another tab, the booking detail) and
+      // then navigated to /bookings would still see the old count
+      // until they switched personas. Cheap one-shot — the persona
+      // context throttles redundant fetches via its internal tick.
+      refreshPendingHostCount();
+    }, [load, refreshPendingHostCount]),
   );
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
@@ -90,7 +116,17 @@ export default function MyBookingsScreen() {
           data={bookings}
           keyExtractor={(b) => b.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            // R2C7 — unread dot. True when this booking has at least
+            // one daily_update AND the latest one is newer than what
+            // the user last saw. The dot rides next to the title so
+            // it's the first thing scanned.
+            const seenAt = lastSeen.get(item.id) ?? '';
+            const hasUnread =
+              !isHostMode &&
+              !!item.latest_update_at &&
+              item.latest_update_at > seenAt;
+            return (
             <Pressable
               onPress={() =>
                 router.push({
@@ -101,6 +137,12 @@ export default function MyBookingsScreen() {
               style={styles.row}
             >
               <View style={styles.rowHeader}>
+                {hasUnread ? (
+                  <View
+                    style={styles.unreadDot}
+                    accessibilityLabel={t('mybookings.unread_indicator')}
+                  />
+                ) : null}
                 <Text style={styles.rowTitle} numberOfLines={1}>
                   {item.listing
                     ? pickLocalized(
@@ -126,7 +168,8 @@ export default function MyBookingsScreen() {
               </Text>
               <Text style={styles.rowTotal}>{formatSAR(item.total_sar)}</Text>
             </Pressable>
-          )}
+          );
+          }}
         />
       )}
     </SafeAreaView>
@@ -213,6 +256,13 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.xs,
     ...shadows.card,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.terracotta,
+    marginEnd: spacing.xs,
   },
   rowHeader: {
     flexDirection: 'row',
