@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +26,7 @@ export default function AdminBookingsScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[admin.bookings.load_failed]', e);
+        logWarn('[admin.bookings.load_failed]', e);
         setError(t('admin.load_failed'));
       })
       .finally(() => {

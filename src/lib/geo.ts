@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Geolocation wrapper.
 //
 // On web: browser navigator.geolocation prompt.
@@ -55,7 +56,7 @@ function fetchWeb(): Promise<Coords | null> {
       (err) => {
         // PERMISSION_DENIED (1), POSITION_UNAVAILABLE (2), TIMEOUT (3).
         // All treated the same: no location, no toast, app continues.
-        if (__DEV__) console.warn('[geo] web position failed', err.code, err.message);
+        if (__DEV__) logWarn('[geo] web position failed', err.code, err.message);
         resolve(null);
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 1000 * 60 * 5 },
@@ -74,7 +75,7 @@ async function fetchNative(): Promise<Coords | null> {
     });
     return { lat: pos.coords.latitude, lng: pos.coords.longitude };
   } catch (e) {
-    if (__DEV__) console.warn('[geo] native position failed', e);
+    if (__DEV__) logWarn('[geo] native position failed', e);
     return null;
   }
 }

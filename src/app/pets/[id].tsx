@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useEffect, useState } from 'react';
 import {
   Pressable,
@@ -111,7 +112,7 @@ export default function PetDetailScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[pets.load_failed]', e);
+        logWarn('[pets.load_failed]', e);
         setError(t('pets.load_failed'));
       })
       .finally(() => {
@@ -197,7 +198,7 @@ export default function PetDetailScreen() {
             });
             await updatePet(createdId, { photo_url: url });
           } catch (photoErr) {
-            console.warn('[pets.photo_upload_failed]', photoErr);
+            logWarn('[pets.photo_upload_failed]', photoErr);
             setError(t('pets.photo_upload_failed'));
             return;
           }
@@ -217,7 +218,7 @@ export default function PetDetailScreen() {
             });
             photoUrlForPatch = url;
           } catch (photoErr) {
-            console.warn('[pets.photo_upload_failed]', photoErr);
+            logWarn('[pets.photo_upload_failed]', photoErr);
             setError(t('pets.photo_upload_failed'));
             return;
           }
@@ -241,7 +242,7 @@ export default function PetDetailScreen() {
 
       router.replace('/pets');
     } catch (e) {
-      console.warn('[pets.save_failed]', e);
+      logWarn('[pets.save_failed]', e);
       setError(t('pets.save_failed'));
     } finally {
       setSaving(false);
@@ -256,7 +257,7 @@ export default function PetDetailScreen() {
       await deletePet(id);
       router.replace('/pets');
     } catch (e) {
-      console.warn('[pets.delete_failed]', e);
+      logWarn('[pets.delete_failed]', e);
       setError(t('pets.delete_failed'));
     } finally {
       setDeleting(false);

@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // useConditionReports — wraps the condition-reports-load effect that used
 // to live inline in src/app/bookings/[id].tsx.
 //
@@ -30,7 +31,7 @@ export function useConditionReports(id: string): {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn("[condition_reports.load_failed]", e);
+        logWarn("[condition_reports.load_failed]", e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Host-only photo manager for a single listing.
 //
 // Two distinct states the host needs to understand at a glance:
@@ -125,7 +126,7 @@ export default function ListingPhotosScreen() {
     refetch()
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[listings.photos.load_failed]', e);
+        logWarn('[listings.photos.load_failed]', e);
         setLoadError(t('listings.photos.load_failed'));
       })
       .finally(() => {
@@ -264,7 +265,7 @@ export default function ListingPhotosScreen() {
         })),
       ]);
     } catch (e) {
-      console.warn('[listings.photos.pick_failed]', e);
+      logWarn('[listings.photos.pick_failed]', e);
     }
   };
 
@@ -291,7 +292,7 @@ export default function ListingPhotosScreen() {
       });
       await refetch();
     } catch (e) {
-      console.warn('[listings.photos.reorder_failed]', e);
+      logWarn('[listings.photos.reorder_failed]', e);
       setActionError(t('listings.photos.reorder_failed'));
       await refetch().catch(() => undefined);
     } finally {
@@ -307,7 +308,7 @@ export default function ListingPhotosScreen() {
       await setCoverPhoto({ listingId: id, photoId, useDrafts });
       await refetch();
     } catch (e) {
-      console.warn('[listings.photos.cover_failed]', e);
+      logWarn('[listings.photos.cover_failed]', e);
       setActionError(t('listings.photos.reorder_failed'));
     } finally {
       setCurrentOp(null);
@@ -340,7 +341,7 @@ export default function ListingPhotosScreen() {
       });
       await refetch();
     } catch (e) {
-      console.warn('[listings.photos.delete_failed]', e);
+      logWarn('[listings.photos.delete_failed]', e);
       setActionError(t('listings.photos.delete_failed'));
     } finally {
       setCurrentOp(null);
@@ -369,7 +370,7 @@ export default function ListingPhotosScreen() {
     }
     setPending(remainingFailures);
     if (firstError) {
-      console.warn('[listings.photos.save_failed]', firstError);
+      logWarn('[listings.photos.save_failed]', firstError);
       setActionError(t('listings.photos.save_failed'));
     }
     try {

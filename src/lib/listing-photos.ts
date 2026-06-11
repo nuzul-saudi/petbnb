@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Listing-photos CRUD — the host-side write surface for the home
 // gallery shown on the listing detail screen.
 //
@@ -363,7 +364,7 @@ export async function deleteListingPhoto(args: {
         .from(BUCKET)
         .remove([path]);
       if (rmErr && __DEV__) {
-        console.warn('[listing-photos.delete] storage remove failed', rmErr);
+        logWarn('[listing-photos.delete] storage remove failed', rmErr);
       }
     }
   }
@@ -454,7 +455,7 @@ export async function reorderListingPhotos(args: {
   });
   if (error) {
     if (__DEV__) {
-      console.warn(`[listing-photos.reorder] ${rpcName} failed`, error);
+      logWarn(`[listing-photos.reorder] ${rpcName} failed`, error);
     }
     throw new Error('reorder_failed', { cause: error });
   }

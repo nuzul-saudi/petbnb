@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // useDailyUpdates — wraps the daily-updates-load effect that used to live
 // inline in src/app/bookings/[id].tsx.
 //
@@ -29,7 +30,7 @@ export function useDailyUpdates(id: string): {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn("[daily_updates.load_failed]", e);
+        logWarn("[daily_updates.load_failed]", e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Admin listings queue. 8g reshape: the old active/pending/all
 // filter chips and listAllListings are gone. This is now the
 // unified REVIEW QUEUE — both new pending listings AND hosts'
@@ -47,7 +48,7 @@ export default function AdminListingsScreen() {
     try {
       setReviews(await listPendingReviews());
     } catch (e) {
-      console.warn('[admin.listings.load_failed]', e);
+      logWarn('[admin.listings.load_failed]', e);
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);

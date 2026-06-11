@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Listing edit screen (Step 7.5 + 8d two-copy rework). Host-only.
 //
 // Behaviour rules:
@@ -83,7 +84,7 @@ export default function EditListingScreen() {
     refetch()
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[listings.edit.load_failed]', e);
+        logWarn('[listings.edit.load_failed]', e);
         setLoadError(t('listings.edit.load_failed'));
       })
       .finally(() => {
@@ -174,7 +175,7 @@ export default function EditListingScreen() {
       await updateListing(id, values);
       router.replace('/');
     } catch (e) {
-      console.warn('[listings.edit.save_failed]', e);
+      logWarn('[listings.edit.save_failed]', e);
       setSaveError(t('listings.form.save_failed'));
     } finally {
       setSaving(false);
@@ -203,7 +204,7 @@ export default function EditListingScreen() {
       );
       await refetch();
     } catch (e) {
-      console.warn('[listings.edit.toggle_failed]', e);
+      logWarn('[listings.edit.toggle_failed]', e);
       setToggleError(
         t(
           data.status === 'approved'
@@ -228,7 +229,7 @@ export default function EditListingScreen() {
       await discardListingDraft(id);
       await refetch();
     } catch (e) {
-      console.warn('[listings.edit.discard_failed]', e);
+      logWarn('[listings.edit.discard_failed]', e);
       setDiscardError(t('listings.edit.discard_failed'));
     } finally {
       setDiscarding(false);

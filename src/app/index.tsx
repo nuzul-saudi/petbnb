@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -141,7 +142,7 @@ function HostHome() {
         const rows = await listOwnListings(profile.id);
         setItems(rows);
       } catch (e) {
-        console.warn('[host_home.load_failed]', e);
+        logWarn('[host_home.load_failed]', e);
         setError(t('feed.load_failed'));
       } finally {
         setLoading(false);
@@ -333,7 +334,7 @@ function OwnerFeedHome() {
         });
         setItems(rows);
       } catch (e) {
-        console.warn('[feed.load_failed]', e);
+        logWarn('[feed.load_failed]', e);
         setError(t('feed.load_failed'));
       } finally {
         setLoading(false);

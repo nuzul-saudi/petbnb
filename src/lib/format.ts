@@ -36,8 +36,10 @@ export function todayIso(): string {
 }
 
 /** Format an ISO timestamp as "YYYY-MM-DD HH:MM" in Asia/Riyadh time
- *  (UTC+3, no DST), 24-hour clock. Always returns digits in the locale's
- *  preferred numerals — Arabic-Indic for 'ar', ASCII for 'en'.
+ *  (UTC+3, no DST), 24-hour clock. Returns Latin digits in BOTH locales
+ *  per the test-round-3 founder decision (see file header) — the
+ *  `locale` parameter is preserved for callsite stability but is now
+ *  unused inside the function.
  *
  *  Used for daily-update stamps and any other user-facing timestamp
  *  that should be anchored to KSA local time regardless of the viewer's

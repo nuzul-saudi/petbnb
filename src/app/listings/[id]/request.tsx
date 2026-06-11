@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Platform,
@@ -129,7 +130,7 @@ export default function BookingRequestScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[listing.load_failed]', e);
+        logWarn('[listing.load_failed]', e);
         setError(t('listing.load_failed'));
       })
       .finally(() => {
@@ -164,7 +165,7 @@ export default function BookingRequestScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[booking.edit_load_failed]', e);
+        logWarn('[booking.edit_load_failed]', e);
         setError(t('booking.edit_load_failed'));
       });
     return () => {
@@ -433,7 +434,7 @@ export default function BookingRequestScreen() {
       // user-facing error so a hidden capacity_exceeded / blocked_range /
       // RLS rejection surfaces instead of a flat "couldn't submit".
       // Friendly i18n stays the prefix; the server detail is the suffix.
-      console.warn('[booking.submit_failed]', e);
+      logWarn('[booking.submit_failed]', e);
       const detail =
         e instanceof Error && e.message ? `: ${e.message}` : '';
       setError(`${t('booking.submit_failed')}${detail}`);

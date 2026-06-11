@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -392,7 +393,7 @@ export default function BookingDetailScreen() {
       // but the call is a no-op, kept here for simplicity.
       refreshPendingHostCount();
     } catch (e) {
-      console.warn(`[booking.host_${action}_failed]`, e);
+      logWarn(`[booking.host_${action}_failed]`, e);
       setHostError(t(failedKey));
     } finally {
       setHostFlight(null);
@@ -444,7 +445,7 @@ export default function BookingDetailScreen() {
       router.replace("/bookings");
       return;
     } catch (e) {
-      console.warn("[booking.cancel_failed]", e);
+      logWarn("[booking.cancel_failed]", e);
       setCancelError(t("booking.cancel_failed"));
     } finally {
       setCancelling(false);
@@ -488,7 +489,7 @@ export default function BookingDetailScreen() {
       setUpdateNote("");
       await refetchUpdates();
     } catch (e) {
-      console.warn("[daily_updates.post_failed]", e);
+      logWarn("[daily_updates.post_failed]", e);
       setPostError(t("daily_updates.post_failed"));
     } finally {
       setPostingUpdate(false);
@@ -560,7 +561,7 @@ export default function BookingDetailScreen() {
       onEditCancel();
       await refetchUpdates();
     } catch (e) {
-      console.warn("[daily_updates.edit_save_failed]", e);
+      logWarn("[daily_updates.edit_save_failed]", e);
       setEditError(t("daily_updates.edit_save_failed"));
     } finally {
       setEditingFlight(null);
@@ -578,7 +579,7 @@ export default function BookingDetailScreen() {
       await deleteDailyUpdate({ updateId: entryId, hostId: user.id });
       await refetchUpdates();
     } catch (e) {
-      console.warn("[daily_updates.delete_failed]", e);
+      logWarn("[daily_updates.delete_failed]", e);
       setDeleteError(t("daily_updates.delete_failed"));
     } finally {
       setDeletingFlight(null);
@@ -694,7 +695,7 @@ export default function BookingDetailScreen() {
       setCrNote("");
       await refetchConditionReports();
     } catch (e) {
-      console.warn("[condition_reports.save_failed]", e);
+      logWarn("[condition_reports.save_failed]", e);
       setCrPostError(t("condition_reports.save_failed"));
     } finally {
       setCrPosting(false);
@@ -733,7 +734,7 @@ export default function BookingDetailScreen() {
       try {
         await completeBookingAsHost(booking.id);
       } catch (e) {
-        console.warn("[booking.complete_after_report_failed]", e);
+        logWarn("[booking.complete_after_report_failed]", e);
         setCoPostError(t("condition_reports.checkout_complete_warning"));
         await refetchConditionReports();
         return;
@@ -744,7 +745,7 @@ export default function BookingDetailScreen() {
       await refetchConditionReports();
       await refetchBooking();
     } catch (e) {
-      console.warn("[condition_reports.checkout_save_failed]", e);
+      logWarn("[condition_reports.checkout_save_failed]", e);
       setCoPostError(t("condition_reports.save_failed"));
     } finally {
       setCoPosting(false);

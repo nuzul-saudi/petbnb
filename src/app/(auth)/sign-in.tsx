@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,7 +42,7 @@ export default function SignInScreen() {
       if (e) throw e;
       router.push({ pathname: '/verify', params: { email: cleanEmail } });
     } catch (err) {
-      console.warn('[auth.send_failed]', err);
+      logWarn('[auth.send_failed]', err);
       setError(t('auth.send_failed'));
     } finally {
       setSubmitting(false);

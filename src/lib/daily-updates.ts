@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Daily-update CRUD for Phase 6.2.
 //
 // A "daily update" is the host posting one or more photos (+ optional
@@ -229,11 +230,11 @@ async function deletePhotosFromBucket(urls: string[]): Promise<void> {
   try {
     const { error } = await supabase.storage.from(BUCKET).remove(paths);
     if (error && __DEV__) {
-      console.warn('[daily_updates.bucket_cleanup_failed]', error, paths);
+      logWarn('[daily_updates.bucket_cleanup_failed]', error, paths);
     }
   } catch (e) {
     if (__DEV__) {
-      console.warn('[daily_updates.bucket_cleanup_threw]', e, paths);
+      logWarn('[daily_updates.bucket_cleanup_threw]', e, paths);
     }
   }
 }

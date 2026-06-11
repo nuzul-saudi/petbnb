@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Read-only data access for the listings feed and listing detail screen.
 // Inserts/updates land in Step 7 (host create-listing flow).
 
@@ -840,7 +841,7 @@ export async function cleanupOrphanListingPhotos(
     await supabase.storage.from('listing-photos').remove(paths);
   } catch (e) {
     if (__DEV__) {
-      console.warn('[listings.cleanupOrphanListingPhotos]', e);
+      logWarn('[listings.cleanupOrphanListingPhotos]', e);
     }
   }
 }

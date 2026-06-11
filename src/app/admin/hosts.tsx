@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +30,7 @@ export default function PendingHostsScreen() {
       );
       setUsers(pending);
     } catch (e) {
-      console.warn('[admin.hosts.load_failed]', e);
+      logWarn('[admin.hosts.load_failed]', e);
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
@@ -51,7 +52,7 @@ export default function PendingHostsScreen() {
       // queue feels responsive.
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (e) {
-      console.warn('[admin.hosts.approve_failed]', e);
+      logWarn('[admin.hosts.approve_failed]', e);
       setError(t('admin.save_failed'));
     } finally {
       setApprovingId(null);

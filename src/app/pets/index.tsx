@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,7 +31,7 @@ export default function PetsListScreen() {
     try {
       setPets(await listPetsForOwner(user.id));
     } catch (e) {
-      console.warn('[pets.load_failed]', e);
+      logWarn('[pets.load_failed]', e);
       setError(t('pets.load_failed'));
     } finally {
       setLoading(false);

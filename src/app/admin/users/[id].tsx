@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Pressable,
@@ -48,7 +49,7 @@ export default function AdminUserDetailScreen() {
       setData(u);
       setNameDraft(u?.full_name ?? '');
     } catch (e) {
-      console.warn('[admin.user.load_failed]', e);
+      logWarn('[admin.user.load_failed]', e);
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
@@ -66,7 +67,7 @@ export default function AdminUserDetailScreen() {
       await fn();
       await load();
     } catch (e) {
-      console.warn('[admin.user.save_failed]', e);
+      logWarn('[admin.user.save_failed]', e);
       setError(t('admin.save_failed'));
     } finally {
       setBusyAction(null);

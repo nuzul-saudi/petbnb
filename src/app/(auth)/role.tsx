@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +37,7 @@ export default function RoleScreen() {
       await refreshProfile();
       router.replace('/');
     } catch (err) {
-      console.warn('[auth.save_failed]', err);
+      logWarn('[auth.save_failed]', err);
       setError(t('auth.save_failed'));
     } finally {
       setSaving(false);

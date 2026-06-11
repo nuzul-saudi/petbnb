@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,7 +61,7 @@ export default function VerifyScreen() {
       // it from here (routes to /role if profile is fresh, else stays at /).
       router.replace('/');
     } catch (err) {
-      console.warn('[auth.verify_failed]', err);
+      logWarn('[auth.verify_failed]', err);
       setError(t('auth.verify_failed'));
       submittedRef.current = false; // allow retry
     } finally {
@@ -78,7 +79,7 @@ export default function VerifyScreen() {
       setToken('');
       submittedRef.current = false;
     } catch (err) {
-      console.warn('[auth.resend_failed]', err);
+      logWarn('[auth.resend_failed]', err);
       setError(t('auth.send_failed'));
     }
   };

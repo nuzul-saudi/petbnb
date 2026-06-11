@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Create-listing screen. After the 7.5a refactor this is a thin shell
 // around <ListingForm/> — the form fields, validation, district modal,
 // and save/cancel buttons all live in src/components/ListingForm.tsx
@@ -52,7 +53,7 @@ export default function NewListingScreen() {
       });
       router.replace('/');
     } catch (e) {
-      console.warn('[listings.form.save_failed]', e);
+      logWarn('[listings.form.save_failed]', e);
       setSaveError(t('listings.form.save_failed'));
     } finally {
       setSaving(false);

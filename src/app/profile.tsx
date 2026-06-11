@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useEffect, useState } from 'react';
 import {
   Pressable,
@@ -11,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { Button } from '@/components/Button';
 import { RoleEditor, type SelectableRole } from '@/components/RoleEditor';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
@@ -67,7 +69,7 @@ export default function ProfileScreen() {
       if (e) throw e;
       await refreshProfile();
     } catch (e) {
-      console.warn('[profile.save_failed]', e);
+      logWarn('[profile.save_failed]', e);
       setError(t('profile.save_failed'));
     } finally {
       setSaving(false);
@@ -128,22 +130,25 @@ export default function ProfileScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable
-          onPress={onSave}
-          disabled={!canSave || saving}
-          style={[
-            styles.saveButton,
-            (!canSave || saving) && styles.buttonDisabled,
-          ]}
-        >
-          <Text style={styles.saveText}>
-            {saving ? t('profile.saving') : t('profile.save_changes')}
-          </Text>
-        </Pressable>
+        <View style={styles.actionGap}>
+          <Button
+            label={saving ? t('profile.saving') : t('profile.save_changes')}
+            onPress={onSave}
+            disabled={!canSave || saving}
+            loading={saving}
+            variant="primary"
+            fullWidth
+          />
+        </View>
 
-        <Pressable onPress={signOut} style={styles.signOutButton}>
-          <Text style={styles.signOutText}>{t('home.sign_out')}</Text>
-        </Pressable>
+        <View style={styles.actionGap}>
+          <Button
+            label={t('home.sign_out')}
+            onPress={signOut}
+            variant="destructive"
+            fullWidth
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -262,32 +267,7 @@ const styles = StyleSheet.create({
     color: colors.terracotta,
     textAlign: 'center',
   },
-  saveButton: {
-    backgroundColor: colors.moss,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
+  actionGap: {
     marginTop: spacing.lg,
-  },
-  saveText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    color: colors.cream,
-  },
-  signOutButton: {
-    paddingVertical: spacing.md,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.terracotta,
-  },
-  signOutText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 14,
-    color: colors.terracotta,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
 });

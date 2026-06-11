@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Admin listing detail. 8h.1 reshape — unified review:
 //
 //   - new_listing AND pending_edit → SAME screen layout: a read-only
@@ -33,6 +34,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { Button } from '@/components/Button';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import {
   adminRestoreListing,
@@ -105,7 +107,7 @@ export default function AdminListingDetailScreen() {
       setDetail(d);
       hydrateForm(d);
     } catch (e) {
-      console.warn('[admin.listing.load_failed]', e);
+      logWarn('[admin.listing.load_failed]', e);
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
@@ -146,7 +148,7 @@ export default function AdminListingDetailScreen() {
       if (e) throw e;
       await load();
     } catch (e) {
-      console.warn('[admin.listing.save_failed]', e);
+      logWarn('[admin.listing.save_failed]', e);
       setError(t('admin.save_failed'));
     } finally {
       setBusy(null);
@@ -173,7 +175,7 @@ export default function AdminListingDetailScreen() {
       }
       await load();
     } catch (e) {
-      console.warn('[admin.listing.approve_failed]', e);
+      logWarn('[admin.listing.approve_failed]', e);
       setError(
         t(
           isEdit ? 'admin.approve_edit_failed' : 'admin.approve_new_failed',
@@ -208,7 +210,7 @@ export default function AdminListingDetailScreen() {
       }
       await load();
     } catch (e) {
-      console.warn('[admin.listing.reject_failed]', e);
+      logWarn('[admin.listing.reject_failed]', e);
       setError(
         t(
           isEdit ? 'admin.reject_edit_failed' : 'admin.reject_new_failed',
@@ -228,7 +230,7 @@ export default function AdminListingDetailScreen() {
       await adminTakeOffline(detail.listing.id);
       await load();
     } catch (e) {
-      console.warn('[admin.listing.take_offline_failed]', e);
+      logWarn('[admin.listing.take_offline_failed]', e);
       setError(t('admin.take_offline_failed'));
     } finally {
       setBusy(null);
@@ -243,7 +245,7 @@ export default function AdminListingDetailScreen() {
       await adminRestoreListing(detail.listing.id);
       await load();
     } catch (e) {
-      console.warn('[admin.listing.restore_failed]', e);
+      logWarn('[admin.listing.restore_failed]', e);
       setError(t('admin.restore_failed'));
     } finally {
       setBusy(null);
@@ -378,56 +380,50 @@ export default function AdminListingDetailScreen() {
                 hostGender={hostGender}
                 setHostGender={setHostGender}
               />
-              <Pressable
-                onPress={onSaveDirect}
-                disabled={busy !== null}
-                style={[
-                  styles.saveButton,
-                  busy !== null && styles.buttonDisabled,
-                ]}
-              >
-                <Text style={styles.saveButtonText}>
-                  {busy === 'save' ? t('admin.saving') : t('admin.save')}
-                </Text>
-              </Pressable>
+              <View style={styles.actionGap}>
+                <Button
+                  label={busy === 'save' ? t('admin.saving') : t('admin.save')}
+                  onPress={onSaveDirect}
+                  disabled={busy !== null}
+                  loading={busy === 'save'}
+                  variant="primary"
+                  fullWidth
+                />
+              </View>
             </>
           )}
 
           {/* Override actions — Take offline / Restore. */}
           {listing.status === 'approved' ? (
-            <Pressable
-              onPress={onTakeOffline}
-              disabled={busy !== null}
-              style={[
-                styles.dangerButton,
-                styles.fullWidthButton,
-                busy !== null && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.dangerButtonText}>
-                {busy === 'take_offline'
-                  ? t('admin.take_offline_in_flight')
-                  : t('admin.take_offline')}
-              </Text>
-            </Pressable>
+            <View style={styles.actionGap}>
+              <Button
+                label={
+                  busy === 'take_offline'
+                    ? t('admin.take_offline_in_flight')
+                    : t('admin.take_offline')
+                }
+                onPress={onTakeOffline}
+                disabled={busy !== null}
+                loading={busy === 'take_offline'}
+                variant="destructive"
+                fullWidth
+              />
+            </View>
           ) : null}
 
           {listing.status === 'admin_disabled' ? (
-            <Pressable
-              onPress={onRestore}
-              disabled={busy !== null}
-              style={[
-                styles.primaryButton,
-                styles.fullWidthButton,
-                busy !== null && styles.buttonDisabled,
-              ]}
-            >
-              <Text style={styles.primaryButtonText}>
-                {busy === 'restore'
-                  ? t('admin.restoring')
-                  : t('admin.restore')}
-              </Text>
-            </Pressable>
+            <View style={styles.actionGap}>
+              <Button
+                label={
+                  busy === 'restore' ? t('admin.restoring') : t('admin.restore')
+                }
+                onPress={onRestore}
+                disabled={busy !== null}
+                loading={busy === 'restore'}
+                variant="primary"
+                fullWidth
+              />
+            </View>
           ) : null}
         </View>
       </ScrollView>
@@ -556,36 +552,34 @@ function ReviewPanel({
         </View>
       ) : null}
 
-      <Pressable
-        onPress={onApprove}
-        disabled={busy !== null}
-        style={[
-          styles.primaryButton,
-          styles.fullWidthButton,
-          busy !== null && styles.buttonDisabled,
-        ]}
-      >
-        <Text style={styles.primaryButtonText}>
-          {busy === 'approve'
-            ? t('admin.approving')
-            : t(isEdit ? 'admin.approve_edit' : 'admin.approve_new')}
-        </Text>
-      </Pressable>
-      <Pressable
-        onPress={onReject}
-        disabled={busy !== null}
-        style={[
-          styles.dangerButton,
-          styles.fullWidthButton,
-          busy !== null && styles.buttonDisabled,
-        ]}
-      >
-        <Text style={styles.dangerButtonText}>
-          {busy === 'reject'
-            ? t('admin.rejecting')
-            : t(isEdit ? 'admin.reject_edit' : 'admin.reject_new')}
-        </Text>
-      </Pressable>
+      <View style={styles.actionGap}>
+        <Button
+          label={
+            busy === 'approve'
+              ? t('admin.approving')
+              : t(isEdit ? 'admin.approve_edit' : 'admin.approve_new')
+          }
+          onPress={onApprove}
+          disabled={busy !== null}
+          loading={busy === 'approve'}
+          variant="primary"
+          fullWidth
+        />
+      </View>
+      <View style={styles.actionGap}>
+        <Button
+          label={
+            busy === 'reject'
+              ? t('admin.rejecting')
+              : t(isEdit ? 'admin.reject_edit' : 'admin.reject_new')
+          }
+          onPress={onReject}
+          disabled={busy !== null}
+          loading={busy === 'reject'}
+          variant="destructive"
+          fullWidth
+        />
+      </View>
     </View>
   );
 }
@@ -937,49 +931,8 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: 'right',
   },
-  primaryButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.moss,
-    borderRadius: radii.pill,
-  },
-  primaryButtonText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 13,
-    color: colors.cream,
-    textAlign: 'center',
-  },
-  fullWidthButton: {
-    alignSelf: 'stretch',
-    paddingVertical: spacing.md,
-    borderRadius: radii.lg,
-  },
-  dangerButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.terracotta,
-    borderRadius: radii.pill,
-  },
-  dangerButtonText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 13,
-    color: colors.cream,
-    textAlign: 'center',
-  },
-  saveButton: {
+  actionGap: {
     marginTop: spacing.lg,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.moss,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 15,
-    color: colors.cream,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
   backPill: {
     paddingVertical: spacing.md,

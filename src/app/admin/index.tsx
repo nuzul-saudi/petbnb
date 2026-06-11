@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useCallback, useState } from 'react';
 import {
   Modal,
@@ -45,7 +46,7 @@ export default function AdminHome() {
       setPendingHostsCount(pendingHosts);
       setPendingListingsCount(reviews.length);
     } catch (e) {
-      console.warn('[admin.load_failed]', e);
+      logWarn('[admin.load_failed]', e);
       setError(t('admin.load_failed'));
     }
   }, [t]);

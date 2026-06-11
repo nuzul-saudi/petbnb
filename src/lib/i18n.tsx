@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // i18n with locale switching, plural-aware translation, and a React
 // Context that re-renders consumers when the locale changes. The
 // module-scope t() / getLocale() are kept for non-React callsites
@@ -114,7 +115,7 @@ function translate(
 
   if (__DEV__) {
     // eslint-disable-next-line no-console
-    console.warn('[i18n.missing_key]', { locale, key });
+    logWarn('[i18n.missing_key]', { locale, key });
   }
   return key;
 }
@@ -239,7 +240,7 @@ export function LocaleProvider({
           .then((res) => {
             if (res.error && __DEV__) {
               // eslint-disable-next-line no-console
-              console.warn('[i18n.persist_failed]', res.error.message);
+              logWarn('[i18n.persist_failed]', res.error.message);
             }
           });
       });
@@ -269,7 +270,7 @@ export function useTranslation(): LocaleContextValue {
   // Defensive fallback for tests or rare edge cases. Logs once in dev.
   if (__DEV__) {
     // eslint-disable-next-line no-console
-    console.warn('[i18n.no_provider] useTranslation used outside LocaleProvider');
+    logWarn('[i18n.no_provider] useTranslation used outside LocaleProvider');
   }
   return {
     locale: moduleLocale,

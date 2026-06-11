@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // ============================================================================
 // Auth context — single source of truth for "who is signed in right now".
 //
@@ -66,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Don't crash — the trigger should have created the row, but if it
       // didn't (or RLS hides it), we'd rather render the sign-in flow than
       // a white screen. Surface in dev so we notice.
-      if (__DEV__) console.warn('[auth] failed to load profile', error);
+      if (__DEV__) logWarn('[auth] failed to load profile', error);
       setProfile(null);
       return;
     }

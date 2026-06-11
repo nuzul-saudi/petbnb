@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,7 +47,7 @@ export default function MyBookingsScreen() {
         : await listBookingsForOwner(user.id);
       setBookings(rows);
     } catch (e) {
-      console.warn('[mybookings.load_failed]', e);
+      logWarn('[mybookings.load_failed]', e);
       setError(t('mybookings.load_failed'));
     } finally {
       setLoading(false);

@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Milestone B — Host availability manager.
 //
 // Host-only screen at /listings/[id]/availability. Lists existing
@@ -84,7 +85,7 @@ export default function ListingAvailabilityScreen() {
     refetch()
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[availability.load_failed]', e);
+        logWarn('[availability.load_failed]', e);
         setLoadError(t('listings.availability.load_failed'));
       })
       .finally(() => {
@@ -164,7 +165,7 @@ export default function ListingAvailabilityScreen() {
       setNewEnd('');
       await refetch();
     } catch (err) {
-      console.warn('[availability.add_failed]', err);
+      logWarn('[availability.add_failed]', err);
       setAddError(t('listings.availability.add_failed'));
     } finally {
       setAdding(false);
@@ -179,7 +180,7 @@ export default function ListingAvailabilityScreen() {
       await removeBlockedRange(rangeId);
       await refetch();
     } catch (err) {
-      console.warn('[availability.remove_failed]', err);
+      logWarn('[availability.remove_failed]', err);
     } finally {
       setBusyDelete(null);
     }

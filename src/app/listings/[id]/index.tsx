@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -5,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { Button } from '@/components/Button';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
@@ -41,7 +43,7 @@ export default function ListingDetailScreen() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn('[listing.load_failed]', e);
+        logWarn('[listing.load_failed]', e);
         setError(t('listing.load_failed'));
       })
       .finally(() => {
@@ -244,21 +246,23 @@ export default function ListingDetailScreen() {
               (mirrors the self-view banner above, which already uses
               the persona gate). Owners on listings they don't own
               always see Request booking. */}
-          {isOwnListing && persona === 'host' ? (
-            <Pressable
-              onPress={() => router.push(`/listings/${listing.id}/edit`)}
-              style={styles.cta}
-            >
-              <Text style={styles.ctaText}>{t('listing.edit_button')}</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => router.push(`/listings/${listing.id}/request`)}
-              style={styles.cta}
-            >
-              <Text style={styles.ctaText}>{t('listing.request_button')}</Text>
-            </Pressable>
-          )}
+          <View style={styles.ctaWrap}>
+            {isOwnListing && persona === 'host' ? (
+              <Button
+                label={t('listing.edit_button')}
+                onPress={() => router.push(`/listings/${listing.id}/edit`)}
+                variant="primary"
+                fullWidth
+              />
+            ) : (
+              <Button
+                label={t('listing.request_button')}
+                onPress={() => router.push(`/listings/${listing.id}/request`)}
+                variant="primary"
+                fullWidth
+              />
+            )}
+          </View>
 
           <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
             <Text style={styles.backText}>{t('listing.back')}</Text>
@@ -496,17 +500,8 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     marginTop: 2,
   },
-  cta: {
-    backgroundColor: colors.moss,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
+  ctaWrap: {
     marginTop: spacing.xl,
-  },
-  ctaText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    color: colors.cream,
   },
   backLink: {
     marginTop: spacing.lg,

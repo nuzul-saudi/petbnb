@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 import { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -54,7 +55,7 @@ export default function AdminUsersScreen() {
     try {
       setUsers(await listAllUsers());
     } catch (e) {
-      console.warn('[admin.users.load_failed]', e);
+      logWarn('[admin.users.load_failed]', e);
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);

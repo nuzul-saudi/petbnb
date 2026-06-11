@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // useBooking — wraps the booking-load effect that used to live inline in
 // src/app/bookings/[id].tsx. Returns the same { data, loading, refetch }
 // shape as the sibling data-loading hooks.
@@ -44,7 +45,7 @@ export function useBooking(
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        console.warn("[booking.load_failed]", e);
+        logWarn("[booking.load_failed]", e);
         onLoadErrorRef.current?.(e);
       })
       .finally(() => {

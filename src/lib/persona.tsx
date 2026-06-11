@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Persona context for role='both' users. Persists across devices via
 // profiles.persona (DB source of truth, migration 0018) with an
 // AsyncStorage cache for instant first paint. Mirrors LocaleProvider's
@@ -126,7 +127,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
         const count = await countPendingHostBookings(user.id);
         if (!cancelled) setPendingHostCount(count);
       } catch (e) {
-        console.warn('[persona.pending_count_failed]', e);
+        logWarn('[persona.pending_count_failed]', e);
         // Leave the previous value in place — a transient failure
         // shouldn't clear an existing badge.
       }
@@ -152,7 +153,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
           .eq('id', user.id)
           .then((res) => {
             if (res.error) {
-              console.warn('[persona.write_failed]', res.error.message);
+              logWarn('[persona.write_failed]', res.error.message);
             }
           });
       }
@@ -179,7 +180,7 @@ export function usePersona(): PersonaContextValue {
   const ctx = useContext(PersonaContext);
   if (ctx) return ctx;
   if (__DEV__) {
-    console.warn(
+    logWarn(
       '[persona.no_provider] usePersona used outside PersonaProvider',
     );
   }

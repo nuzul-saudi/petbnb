@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/log';
 // Pet CRUD. Read/list/create existed since Step 5 (inline pet creation in
 // the booking flow). Step 5.5 added the full surface — update + delete +
 // the health fields (medical_needs / dietary_restrictions / medications)
@@ -183,7 +184,7 @@ export async function pickPhotosMulti(): Promise<PetPhotoSource[]> {
       mimeType: a.mimeType ?? undefined,
     }));
   } catch (e) {
-    if (__DEV__) console.warn('[pets.pickPhotosMulti]', e);
+    if (__DEV__) logWarn('[pets.pickPhotosMulti]', e);
     return [];
   }
 }
@@ -222,7 +223,7 @@ export async function pickPetPhoto(): Promise<PetPhotoSource | null> {
     const a = result.assets[0];
     return { kind: 'native-uri', uri: a.uri, mimeType: a.mimeType ?? undefined };
   } catch (e) {
-    if (__DEV__) console.warn('[pets.pickPetPhoto]', e);
+    if (__DEV__) logWarn('[pets.pickPetPhoto]', e);
     return null;
   }
 }
