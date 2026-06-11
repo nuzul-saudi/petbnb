@@ -17,7 +17,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +24,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
+import { DateField } from '@/components/DateField';
 import {
   addBlockedRange,
   listBlockedRanges,
@@ -32,9 +32,19 @@ import {
   type BlockedRange,
 } from '@/lib/availability';
 import { useAuth } from '@/lib/auth';
+import { todayIso } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingForEdit } from '@/lib/listings';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
+
+// ISO-date 'YYYY-MM-DD' arithmetic: one day after the given ISO date.
+// Mirrors the helper in /listings/[id]/request.tsx so the two date
+// surfaces use the same min-date language.
+function nextDayIso(iso: string): string {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function ListingAvailabilityScreen() {
   const router = useRouter();
@@ -214,24 +224,25 @@ export default function ListingAvailabilityScreen() {
               <Text style={styles.dateLabel}>
                 {t('listings.availability.start_label')}
               </Text>
-              <TextInput
+              <DateField
                 value={newStart}
-                onChangeText={setNewStart}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.inkSoft}
-                style={styles.input}
+                onChange={(v) => {
+                  setNewStart(v);
+                  // Same behavior as request.tsx — if the new start
+                  // invalidates an already-picked end, clear it.
+                  if (newEnd && newEnd <= v) setNewEnd('');
+                }}
+                min={todayIso()}
               />
             </View>
             <View style={styles.dateField}>
               <Text style={styles.dateLabel}>
                 {t('listings.availability.end_label')}
               </Text>
-              <TextInput
+              <DateField
                 value={newEnd}
-                onChangeText={setNewEnd}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.inkSoft}
-                style={styles.input}
+                onChange={setNewEnd}
+                min={newStart ? nextDayIso(newStart) : todayIso()}
               />
             </View>
           </View>
@@ -360,17 +371,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-  },
-  input: {
-    backgroundColor: colors.paper,
-    borderColor: colors.whisper,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.ink,
   },
   rangeRow: {
     flexDirection: 'row',
