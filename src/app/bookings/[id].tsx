@@ -15,6 +15,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
 import { CheckOutSection } from "@/components/bookings/CheckOutSection";
+import { ReviewCard } from "@/components/bookings/ReviewCard";
 import { ConditionReportsSection } from "@/components/bookings/ConditionReportsSection";
 import { DailyUpdatesSection } from "@/components/bookings/DailyUpdatesSection";
 import { HostActions } from "@/components/bookings/HostActions";
@@ -24,6 +25,7 @@ import { useDailyUpdates } from "@/hooks/useDailyUpdates";
 import { useAuth } from "@/lib/auth";
 import { confirmDialog } from "@/lib/confirm";
 import { usePersona } from "@/lib/persona";
+import { findMyReview, type Review } from "@/lib/reviews";
 import {
   acceptBookingAsHost,
   cancelBookingAsOwner,
@@ -91,6 +93,12 @@ export default function BookingDetailScreen() {
 
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+
+  // R2C6 two-way reviews. The caller's own existing review for this
+  // booking (if any). Re-fetched whenever booking transitions to
+  // 'completed' or after a successful submit.
+  const [myReview, setMyReview] = useState<Review | null>(null);
+  const [reviewFetchTick, setReviewFetchTick] = useState(0);
 
   // Single in-flight indicator across all 4 host actions: at most one
   // transition can run at a time, and the lit button tells the host which.
@@ -257,6 +265,39 @@ export default function BookingDetailScreen() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isAnyFormDirty]);
+
+  // R2C6 — fetch the caller's own review (if any) for this booking.
+  // Re-runs on user / booking status change and on bump of
+  // reviewFetchTick after a successful submit.
+  useEffect(() => {
+    if (!booking || !user) {
+      setMyReview(null);
+      return;
+    }
+    if (booking.status !== "completed") {
+      setMyReview(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await findMyReview(booking.id, user.id);
+        if (!cancelled) setMyReview(r);
+      } catch (e) {
+        // Best-effort: leave the previous value. The UI falls back
+        // to the compose form, which the unique-constraint backstop
+        // will reject if a stale state lets a double-submit through.
+        if (!cancelled) setMyReview(null);
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.warn("[reviews.fetch_my_failed]", e);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [booking?.id, booking?.status, user?.id, reviewFetchTick]);
 
   // Reconstruct AddonSelection[] from the persisted booking_addons rows
   // so we can re-run the same breakdown function the request screen used.
@@ -1095,6 +1136,40 @@ export default function BookingDetailScreen() {
           onCompleteStay={onCompleteStay}
           setCoNote={setCoNote}
         />
+
+        {/* R2C6 — two-way reviews. Renders only on completed
+            bookings. Persona-gated so:
+              - owner persona (booking.owner_id === user.id) sees
+                "Rate your host"; rater = user, ratee = host.
+              - host persona (listing.host_id === user.id) sees
+                "Rate the owner"; rater = user, ratee = owner.
+            One-shot: ReviewCard flips to read-only mode when
+            myReview is non-null. Server RLS + unique constraint
+            backstop the gate. */}
+        {booking.status === "completed" && user && booking.listing ? (
+          <>
+            {isOwnerMode && booking.owner_id === user.id ? (
+              <ReviewCard
+                bookingId={booking.id}
+                raterId={user.id}
+                rateeId={booking.listing.host_id}
+                titleKey="reviews.rate_host_title"
+                existing={myReview}
+                onSubmitted={() => setReviewFetchTick((n) => n + 1)}
+              />
+            ) : null}
+            {isHostMode && booking.listing.host_id === user.id ? (
+              <ReviewCard
+                bookingId={booking.id}
+                raterId={user.id}
+                rateeId={booking.owner_id}
+                titleKey="reviews.rate_owner_title"
+                existing={myReview}
+                onSubmitted={() => setReviewFetchTick((n) => n + 1)}
+              />
+            ) : null}
+          </>
+        ) : null}
 
         {canEdit ? (
           <Button

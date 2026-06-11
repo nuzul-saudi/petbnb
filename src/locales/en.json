@@ -284,6 +284,16 @@
     "host_complete_failed": "Couldn't complete the stay. Please try again.",
     "host_completing": "Completing…"
   },
+  "reviews": {
+    "rate_host_title": "Rate your host",
+    "rate_owner_title": "Rate the owner",
+    "stars_hint": "Pick 1 to 5 stars",
+    "text_placeholder": "Share your experience (optional)",
+    "submit_button": "Submit review",
+    "submitting": "Submitting…",
+    "submit_failed": "Couldn't submit the review — please try again.",
+    "already_rated_hint": "Thanks — your review for this stay has been sent."
+  },
   "daily_updates": {
     "section_title": "Daily updates",
     "empty": "No updates yet",

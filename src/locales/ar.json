@@ -284,6 +284,16 @@
     "host_complete_failed": "تعذر إنهاء الإقامة، حاولي مرة أخرى.",
     "host_completing": "جاري الإنهاء..."
   },
+  "reviews": {
+    "rate_host_title": "قيّمي المضيفة",
+    "rate_owner_title": "قيّمي مالكة الحيوان",
+    "stars_hint": "اختاري من ١ إلى ٥ نجوم",
+    "text_placeholder": "شاركي تجربتكِ (اختياري)",
+    "submit_button": "إرسال التقييم",
+    "submitting": "جاري الإرسال…",
+    "submit_failed": "تعذّر إرسال التقييم، حاولي مرة أخرى.",
+    "already_rated_hint": "شكراً — لقد أرسلتِ تقييمكِ لهذه الإقامة."
+  },
   "daily_updates": {
     "section_title": "تحديثات يومية",
     "empty": "لا توجد تحديثات بعد",
