@@ -1024,8 +1024,12 @@ export default function BookingDetailScreen() {
                 <View style={styles.breakdownLine}>
                   <Text style={styles.breakdownLabel}>
                     {t("booking.breakdown_base", {
-                      pets: toArabicDigits(booking.pets.length),
-                      nights: toArabicDigits(booking.nights),
+                      pets_phrase: t("booking.breakdown_pets_phrase", {
+                        count: booking.pets.length,
+                      }),
+                      nights_phrase: t("booking.breakdown_nights_phrase", {
+                        count: booking.nights,
+                      }),
                     })}
                   </Text>
                   <Text style={styles.breakdownValue}>

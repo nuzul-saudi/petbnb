@@ -748,8 +748,12 @@ export default function BookingRequestScreen() {
             <View style={styles.breakdownLine}>
               <Text style={styles.breakdownLabel}>
                 {t('booking.breakdown_base', {
-                  pets: toArabicDigits(selectedPetIds.size),
-                  nights: toArabicDigits(nights),
+                  pets_phrase: t('booking.breakdown_pets_phrase', {
+                    count: selectedPetIds.size,
+                  }),
+                  nights_phrase: t('booking.breakdown_nights_phrase', {
+                    count: nights,
+                  }),
                 })}
               </Text>
               <Text style={styles.breakdownValue}>
