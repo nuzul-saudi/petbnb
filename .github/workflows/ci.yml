@@ -1,0 +1,44 @@
+# Continuous integration for Petbnb.
+# Runs on every push to main and on every pull request.
+# Three checks:
+#   1. i18n parity   — every t('…') key resolves; ar/en in sync.
+#   2. TypeScript    — strict mode passes (no implicit any, no errors).
+#   3. Unit tests    — vitest over pure libs (payments-policy, pricing,
+#                      availability, vaccination).
+#
+# Audit Section 6 (2026-06-11) — first CI workflow. Today's manual
+# disciplines (tsc per commit, migration verification queries) get
+# made automatic so this review re-runs itself on every push.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: i18n parity check
+        run: npm run check:i18n
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test

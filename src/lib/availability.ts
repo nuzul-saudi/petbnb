@@ -73,34 +73,8 @@ export async function removeBlockedRange(rangeId: string): Promise<void> {
   if (error) throw error;
 }
 
-/**
- * Half-open overlap predicate. Used by the booking request screen
- * (client-side pre-check) to warn before submit. The DB-level trigger
- * in 0027 is the hard gate; this helper just produces a friendly UX
- * surface.
- *
- * Two ranges [a1, a2) and [b1, b2) overlap iff a1 < b2 AND a2 > b1.
- */
-export function rangesOverlap(
-  a1: string,
-  a2: string,
-  b1: string,
-  b2: string,
-): boolean {
-  return a1 < b2 && a2 > b1;
-}
-
-/**
- * Returns true if the proposed (start, end) range overlaps ANY blocked
- * range in the supplied list. Mirrors the trigger's logic for the
- * client-side warning.
- */
-export function isRangeBlocked(
-  startDate: string,
-  endDate: string,
-  blocked: BlockedRange[],
-): boolean {
-  return blocked.some((b) =>
-    rangesOverlap(startDate, endDate, b.start_date, b.end_date),
-  );
-}
+// rangesOverlap + isRangeBlocked moved to src/lib/range-overlap.ts
+// in 2026-06-11 R1C6 so tests can target the pure helpers without
+// pulling expo-constants / supabase-js into the vitest module graph.
+// Re-exported for back-compat with existing import paths.
+export { isRangeBlocked, rangesOverlap } from '@/lib/range-overlap';
