@@ -34,6 +34,7 @@ import {
   listBlockedRanges,
   type BlockedRange,
 } from '@/lib/availability';
+import { worstVaccinationStatus } from '@/lib/vaccination';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
 import { snapshotFees } from '@/lib/payments-policy';
@@ -256,16 +257,17 @@ export default function BookingRequestScreen() {
   const maxPets = listing?.max_concurrent_pets ?? 1;
   const tooManyPets = selectedPetIds.size > maxPets;
 
-  // Milestone A: vaccination warning. When the listing requires vacc
-  // AND any selected pet is missing rabies or fvrcp date → soft warn
-  // (not a hard block — host can decide case-by-case).
-  const vaccinationWarning = (() => {
-    if (!listing?.requires_vaccination) return false;
-    if (selectedPetIds.size === 0) return false;
+  // Milestone A: vaccination soft-warn. Updated by audit finding C4
+  // (2026-06-11): previously only checked PRESENCE — a 2020-vaccinated
+  // cat passed silently. Now also flags dates older than the
+  // helper's max age (365 days by default). Renders "expired" if any
+  // selected pet has an outdated date, else "missing" if any is
+  // blank. Still a soft warn (host decides case-by-case).
+  const vaccinationWarningStatus: 'missing' | 'expired' | null = (() => {
+    if (!listing?.requires_vaccination) return null;
+    if (selectedPetIds.size === 0) return null;
     const selectedPets = pets.filter((p) => selectedPetIds.has(p.id));
-    return selectedPets.some(
-      (p) => !p.rabies_vaccinated_at || !p.fvrcp_vaccinated_at,
-    );
+    return worstVaccinationStatus(selectedPets, new Date().toISOString());
   })();
 
   // Milestone B: blocked-range pre-check. Client-side warning when the
@@ -764,10 +766,14 @@ export default function BookingRequestScreen() {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        {/* Milestone A vaccination soft-warn — host may decline. */}
-        {vaccinationWarning ? (
+        {/* Milestone A vaccination soft-warn — split by status. */}
+        {vaccinationWarningStatus === 'expired' ? (
           <Text style={styles.vaccinationWarning}>
-            {t('booking.pet_vaccination_warning')}
+            {t('booking.pet_vaccination_warning_expired')}
+          </Text>
+        ) : vaccinationWarningStatus === 'missing' ? (
+          <Text style={styles.vaccinationWarning}>
+            {t('booking.pet_vaccination_warning_missing')}
           </Text>
         ) : null}
 
