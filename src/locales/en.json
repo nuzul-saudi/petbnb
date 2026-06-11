@@ -29,7 +29,13 @@
     "grooming_filter": "Grooming offered",
     "no_resident_pets_filter": "No resident pets",
     "distance_label": "{km} km",
-    "geo_denied_hint": "Share your location for better sorting by proximity"
+    "geo_denied_hint": "Share your location for better sorting by proximity",
+    "sort_label": "Sort:",
+    "sort_newest": "Newest",
+    "sort_price_asc": "Price ↑",
+    "sort_price_desc": "Price ↓",
+    "sort_rating": "Rating",
+    "sort_distance": "Nearest"
   },
   "listing": {
     "host_new_badge": "New",

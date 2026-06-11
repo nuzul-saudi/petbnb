@@ -312,6 +312,13 @@ function OwnerFeedHome() {
   const [city, setCity] = useState<CityKey>('riyadh');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
+  // R2C5 sort selector. Default 'newest' preserves the
+  // pre-R2C5 behavior (base query orders by created_at desc).
+  // 'distance' is only meaningful when coords is set — UI hides
+  // the chip otherwise.
+  const [sortBy, setSortBy] = useState<
+    'newest' | 'price_asc' | 'price_desc' | 'rating' | 'distance'
+  >('newest');
 
   // Fetch the user's location once on mount. On success, the load
   // callback below picks up the new coords via its dependency and
@@ -339,7 +346,12 @@ function OwnerFeedHome() {
           femaleHostsOnly: femaleOnly,
           groomingOnly,
           noResidentPetsOnly,
-          sortByDistance: coords ?? undefined,
+          // Distance is also a sort, but the DB query has the haversine
+          // computation already wired to sortByDistance. Newest, price,
+          // and rating are client-side sorts (next effect) over the
+          // returned rows.
+          sortByDistance:
+            sortBy === 'distance' && coords ? coords : undefined,
         });
         setItems(rows);
       } catch (e) {
@@ -350,8 +362,35 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [city, femaleOnly, groomingOnly, noResidentPetsOnly, coords, t],
+    [city, femaleOnly, groomingOnly, noResidentPetsOnly, coords, sortBy, t],
   );
+
+  // R2C5 client-side sort over the loaded items. Distance is handled
+  // by the DB query above (sortByDistance), so when sortBy='distance'
+  // we leave items untouched. Newest is the DB default (created_at
+  // desc), so it's also a no-op here.
+  const sortedItems = useMemo(() => {
+    if (sortBy === 'price_asc') {
+      return [...items].sort(
+        (a, b) => a.nightly_price_sar - b.nightly_price_sar,
+      );
+    }
+    if (sortBy === 'price_desc') {
+      return [...items].sort(
+        (a, b) => b.nightly_price_sar - a.nightly_price_sar,
+      );
+    }
+    if (sortBy === 'rating') {
+      // Hosts with NO rating sort last (matches "new host" badge — no
+      // signal yet). Among rated hosts, higher avg first.
+      return [...items].sort((a, b) => {
+        const ra = a.host_avg_rating ?? -1;
+        const rb = b.host_avg_rating ?? -1;
+        return rb - ra;
+      });
+    }
+    return items;
+  }, [items, sortBy]);
 
   useEffect(() => {
     load();
@@ -466,6 +505,43 @@ function OwnerFeedHome() {
         </Pressable>
       </View>
 
+      {/* R2C5 sort selector. Chip strip — same pill shape as the
+          filter row. Distance only appears when device geolocation
+          succeeded (coords != null). */}
+      <View style={styles.sortRow}>
+        <Text style={styles.sortLabel}>{t('feed.sort_label')}</Text>
+        {(
+          [
+            'newest',
+            'price_asc',
+            'price_desc',
+            'rating',
+            'distance',
+          ] as const
+        )
+          .filter((key) => key !== 'distance' || coords)
+          .map((key) => {
+            const active = sortBy === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setSortBy(key)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    active && styles.filterChipTextActive,
+                  ]}
+                >
+                  {active ? '✓ ' : ''}
+                  {t(`feed.sort_${key}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
+      </View>
+
       {geoDenied ? (
         <Text style={styles.geoHint}>{t('feed.geo_denied_hint')}</Text>
       ) : null}
@@ -478,13 +554,13 @@ function OwnerFeedHome() {
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
-      ) : items.length === 0 ? (
+      ) : sortedItems.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.centeredText}>{t('feed.empty')}</Text>
         </View>
       ) : (
         <FlatList
-          data={items}
+          data={sortedItems}
           keyExtractor={(it) => it.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
@@ -600,6 +676,20 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  sortLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.inkSoft,
+    marginEnd: spacing.xs,
   },
   filterChip: {
     paddingHorizontal: spacing.md,

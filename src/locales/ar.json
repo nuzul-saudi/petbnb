@@ -29,7 +29,13 @@
     "grooming_filter": "خدمة استحمام متوفرة",
     "no_resident_pets_filter": "بدون حيوانات مقيمة",
     "distance_label": "{km} كم",
-    "geo_denied_hint": "شارك موقعك للحصول على ترتيب أفضل حسب القرب"
+    "geo_denied_hint": "شارك موقعك للحصول على ترتيب أفضل حسب القرب",
+    "sort_label": "ترتيب:",
+    "sort_newest": "الأحدث",
+    "sort_price_asc": "السعر ↑",
+    "sort_price_desc": "السعر ↓",
+    "sort_rating": "التقييم",
+    "sort_distance": "الأقرب"
   },
   "listing": {
     "host_new_badge": "جديد",
