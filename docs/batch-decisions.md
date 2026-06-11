@@ -65,3 +65,61 @@ Source: VC due-diligence review + Claude Code technical feedback convergence (pl
 - Privatize repo (GitHub → Settings → Danger Zone → Change visibility).
 - Rotate Supabase admin to a dedicated address with hardware 2FA.
 - Trademark opinion + backup brand name (BEFORE any brand spend).
+
+## Round 4 (2026-06-12) — Host booking detail surface
+
+Source: Plan v2 Round 4. Long-standing UX gap — host accepted bookings blind.
+
+### Decisions
+- **Shared UserAvatar component extracted** alongside the new section, not after. This is now the 3rd site needing the photo→initial→'?' fallback (others: sitter-first ListingCard, listing detail sitterHeader). Inline patterns at the other two sites stay for now — sweep them in a future cleanup.
+- **OwnerPetsSection is presentational + host-only.** Owner persona already knows their own pets and an owner row would be self-referential.
+- **Vaccination pill uses worst-of-two semantics** — if either rabies or FVRCP is expired, the pill is expired (terracotta). Missing wins over current. Matches the booking-request screen's warning logic.
+
+## Round 5a (2026-06-12) — Messaging data layer
+
+Source: Plan v2 Round 5a. Step 9 → launch blocker.
+
+### Decisions
+- **Migration 0033 SKIPPED.** Briefing's claim that the original 0002 messages_insert_participants policy predates suspension was inverted — 0004 already drop-and-recreated the policy with `is_active_user()` in the with-check. Wasted-migration trap avoided by the operating-rule-10 grep step.
+- **containsContactInfo regex covers Arabic-Indic digits + Arabic keyword spellings** (واتساب, تليجرام, سناب) in addition to Latin. Saudi senders write phone numbers in either digit family; the nudge would silently fail without this.
+
+## Round 5b (2026-06-12) — Messaging chat UI
+
+Source: Plan v2 Round 5b.
+
+### Decisions
+- **Realtime explicitly out of scope.** Without Supabase Realtime subscription, the other party won't see new messages until they next focus the screen. The parent's `useFocusEffect(refetchMessages)` makes "navigate away + back" the implicit pull-to-refresh gesture. Documented in the MessagesSection component header and committed-message body.
+- **canSend gates off declined / cancelled / disputed.** An immutable booking shouldn't accept new conversation either.
+
+## Round 6 (2026-06-12) — Pet photo URL (path-not-signed + batch-sign)
+
+Source: Plan v2 Round 6.
+
+### Decisions
+- **Round 6 NOT 5 in the plan ordering** because path-not-signed touches 4 consumer screens and needs the new useSignedPetPhotoUrls hook — naturally fits AFTER 5b's chat UI lands.
+- **1-hour signed URLs at render** (was 7-day at upload). Hosts open booking details continuously; a 1-hour signed URL is comfortably longer than any single browsing session.
+- **Legacy compatibility via `startsWith('https://')` detection** — pre-Round-6 rows hold signed URLs that already work. The cleanup is logged in `docs/data-hygiene-prelaunch.md` for when the founder wants to delete the legacy branch.
+
+## Round 7 (2026-06-12) — Dispute workflow
+
+Source: Plan v2 Round 7 (was in v1 as Tier 2; promoted to blocker).
+
+### Decisions
+- **No new RLS migration needed.** The existing 0004 bookings_update_owner_or_host policy permits both parties (active or admin) to update; no transitioning trigger exists on bookings. Status enum already includes 'disputed' from 0001.
+- **Admin visibility = a third queue card on the dashboard** routing to the all-bookings screen. Founder filters visually until volume justifies a dedicated screen.
+- **Email/Slack notification deferred.** An Edge Function trigger on transition INTO 'disputed' would page the founder immediately. For MVP the dashboard counter is enough — founder checks daily.
+
+## Round 8 (2026-06-12) — Pre-launch data hygiene doc
+
+Source: Plan v2 Round 8.
+
+### Decisions
+- **Cleanup SQL is COMMITTED COMMENTED-OUT.** Safe in the repo; running each block is a deliberate founder action with reviewable diff via the SQL editor. Each section has a detect query + a fix block + a verify follow-up.
+- **Pre-0009 legacy bookings + pre-R1C1 decimal fees stay as-is.** Immutable evidence records — rounding them after the fact would lose the audit trail of what each party actually paid. The display layer's branches handle them correctly.
+
+## Migrations written (Round 3-7) — Omar applies after review
+
+- `0031_feed_index.sql` (Round 3)
+- `0032_host_rating_rpc.sql` (Round 3)
+- (Round 5a SKIPPED, see decision above)
+- (Round 7 needed no migration, see decision above)
