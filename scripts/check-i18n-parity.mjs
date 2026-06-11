@@ -49,8 +49,32 @@ const en = flatten(JSON.parse(readFileSync(EN_PATH, 'utf8')));
 const arKeys = new Set(ar.keys());
 const enKeys = new Set(en.keys());
 
-const missingFromEn = [...arKeys].filter((k) => !enKeys.has(k));
-const missingFromAr = [...enKeys].filter((k) => !arKeys.has(k));
+// CLDR plural categories. A key ending in `_<category>` is a plural
+// variant of its base key. These exist per-locale (Arabic has all six,
+// English only one+other, French one+other, etc.) — so a `_two` key
+// that's in ar.json but not en.json is correct, not missing. We allow
+// it as long as the BASE key exists in both locales.
+const PLURAL_CATEGORIES = ['zero', 'one', 'two', 'few', 'many', 'other'];
+function isPluralVariant(key) {
+  for (const cat of PLURAL_CATEGORIES) {
+    if (key.endsWith(`_${cat}`)) {
+      return { base: key.slice(0, -1 - cat.length), category: cat };
+    }
+  }
+  return null;
+}
+function isAllowedUnilateralVariant(key, ownLocaleKeys, otherLocaleKeys) {
+  const variant = isPluralVariant(key);
+  if (!variant) return false;
+  return ownLocaleKeys.has(variant.base) && otherLocaleKeys.has(variant.base);
+}
+
+const missingFromEn = [...arKeys].filter(
+  (k) => !enKeys.has(k) && !isAllowedUnilateralVariant(k, arKeys, enKeys),
+);
+const missingFromAr = [...enKeys].filter(
+  (k) => !arKeys.has(k) && !isAllowedUnilateralVariant(k, enKeys, arKeys),
+);
 
 if (missingFromEn.length > 0) {
   failures.push(
