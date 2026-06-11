@@ -44,9 +44,16 @@ export function AppHeader({
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
-  const { profile } = useAuth();
+  const { session, profile } = useAuth();
   const { persona, setPersona, pendingHostCount } = usePersona();
   const theme = useTheme();
+
+  // R2C3 guest mode (2026-06-11): when no session, the header shows
+  // only Home + language toggle + a sign-in CTA. Persona toggle,
+  // account, and the gated middle item (My Bookings / My Listings)
+  // hide entirely. Tapping anywhere stateful from the body of the
+  // page routes to /sign-in?returnTo=<current>.
+  const isGuest = !session;
 
   // Host = pure 'host' role OR 'both' currently in host persona.
   const isHostMode =
@@ -76,26 +83,47 @@ export function AppHeader({
         activeColor={theme.accent}
         onPress={safeNav(() => router.push('/'))}
       />
-      <NavItem
-        label={t(
-          isHostMode ? HOST_NAV_BOOKINGS_LABEL_KEY : OWNER_NAV_BOOKINGS_LABEL_KEY,
-        )}
-        active={isActive(
-          isHostMode ? HOST_NAV_BOOKINGS_ROUTE : OWNER_NAV_BOOKINGS_ROUTE,
-        )}
-        activeColor={theme.accent}
-        onPress={safeNav(() =>
-          router.push(
+      {isGuest ? null : (
+        <NavItem
+          label={t(
+            isHostMode
+              ? HOST_NAV_BOOKINGS_LABEL_KEY
+              : OWNER_NAV_BOOKINGS_LABEL_KEY,
+          )}
+          active={isActive(
             isHostMode ? HOST_NAV_BOOKINGS_ROUTE : OWNER_NAV_BOOKINGS_ROUTE,
-          ),
-        )}
-      />
-      <NavItem
-        label={t('nav.account')}
-        active={isActive('/profile')}
-        activeColor={theme.accent}
-        onPress={safeNav(() => router.push('/profile'))}
-      />
+          )}
+          activeColor={theme.accent}
+          onPress={safeNav(() =>
+            router.push(
+              isHostMode ? HOST_NAV_BOOKINGS_ROUTE : OWNER_NAV_BOOKINGS_ROUTE,
+            ),
+          )}
+        />
+      )}
+      {isGuest ? null : (
+        <NavItem
+          label={t('nav.account')}
+          active={isActive('/profile')}
+          activeColor={theme.accent}
+          onPress={safeNav(() => router.push('/profile'))}
+        />
+      )}
+      {/* R2C3 guest sign-in CTA — replaces the persona toggle slot. */}
+      {isGuest ? (
+        <Pressable
+          onPress={safeNav(() =>
+            router.push(
+              `/sign-in?returnTo=${encodeURIComponent(pathname ?? '/')}`,
+            ),
+          )}
+          style={[styles.personaToggle, { borderColor: theme.accent }]}
+        >
+          <Text style={[styles.personaToggleText, { color: theme.accent }]}>
+            {t('nav.guest_sign_in')}
+          </Text>
+        </Pressable>
+      ) : null}
       {/* Persona toggle — visible only for role='both'. Single
           destination-labeled button: its label names the OTHER persona
           (the one you'd switch TO). Tapping calls setPersona(the other

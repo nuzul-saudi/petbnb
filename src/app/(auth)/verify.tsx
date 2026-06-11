@@ -2,7 +2,12 @@ import { logWarn } from '@/lib/log';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
@@ -15,8 +20,14 @@ export default function VerifyScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session } = useAuth();
-  const params = useLocalSearchParams<{ email?: string }>();
+  const params = useLocalSearchParams<{ email?: string; returnTo?: string }>();
   const email = typeof params.email === 'string' ? params.email : '';
+  // R2C3 — preserve the returnTo from the sign-in step so a guest who
+  // started on a listing detail page ends up back there after auth.
+  const returnTo =
+    typeof params.returnTo === 'string' && params.returnTo.startsWith('/')
+      ? params.returnTo
+      : null;
 
   const [token, setToken] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +53,7 @@ export default function VerifyScreen() {
   }, [token]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
-  if (session) return <Redirect href="/" />;
+  if (session) return <Redirect href={(returnTo ?? '/') as Href} />;
   if (!email) return <Redirect href="/sign-in" />;
 
   const onSubmit = async () => {
@@ -59,7 +70,9 @@ export default function VerifyScreen() {
       if (e) throw e;
       // Session will appear via onAuthStateChange; the home screen takes
       // it from here (routes to /role if profile is fresh, else stays at /).
-      router.replace('/');
+      // R2C3: when guest mode brought the user here, send them back to
+      // the URL they came from.
+      router.replace((returnTo ?? '/') as Href);
     } catch (err) {
       logWarn('[auth.verify_failed]', err);
       setError(t('auth.verify_failed'));

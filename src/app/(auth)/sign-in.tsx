@@ -2,7 +2,12 @@ import { logWarn } from '@/lib/log';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
@@ -15,12 +20,21 @@ export default function SignInScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session } = useAuth();
+  const params = useLocalSearchParams<{ returnTo?: string }>();
+  // R2C3 (2026-06-11): guest-mode entry routes here with returnTo so
+  // the user lands back on the page that triggered the sign-in (the
+  // listing they wanted to book, the booking they wanted to open,
+  // etc.) instead of dropping onto the home feed.
+  const returnTo =
+    typeof params.returnTo === 'string' && params.returnTo.startsWith('/')
+      ? params.returnTo
+      : null;
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
-  if (session) return <Redirect href="/" />;
+  if (session) return <Redirect href={(returnTo ?? '/') as Href} />;
 
   const onSubmit = async () => {
     if (!supabase) {
@@ -40,7 +54,12 @@ export default function SignInScreen() {
         options: { shouldCreateUser: true },
       });
       if (e) throw e;
-      router.push({ pathname: '/verify', params: { email: cleanEmail } });
+      router.push({
+        pathname: '/verify',
+        params: returnTo
+          ? { email: cleanEmail, returnTo }
+          : { email: cleanEmail },
+      });
     } catch (err) {
       logWarn('[auth.send_failed]', err);
       setError(t('auth.send_failed'));

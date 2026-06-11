@@ -33,7 +33,12 @@ export default function HomeScreen() {
   const { persona } = usePersona();
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
-  if (!session) return <Redirect href="/sign-in" />;
+  // R2C3 guest mode (2026-06-11): signed-out visitors can now browse
+  // the owner feed. Previously this redirected to /sign-in
+  // unconditionally. Gated actions (Request booking, persona toggle,
+  // pets, bookings) route to /sign-in?returnTo=… when the visitor
+  // taps them — see OwnerFeedHome and AppHeader.
+  if (!session) return <OwnerFeedHome />;
   if (!profile) return <SafeAreaView style={styles.safe} />;
   // Suspended check runs before role gating so admins can also be locked out.
   if (profile.is_suspended) return <Redirect href="/suspended" />;
@@ -367,9 +372,17 @@ function OwnerFeedHome() {
               ),
             })}
           </Text>
-          <Text style={styles.greetingSmall}>
-            {t('home.signed_in_greeting', { name: profile!.full_name })}
-          </Text>
+          {/* Greeting line — signed-in users see "أهلاً، <name>".
+              Guests (R2C3) see a hint that they can sign in for more. */}
+          {profile ? (
+            <Text style={styles.greetingSmall}>
+              {t('home.signed_in_greeting', { name: profile.full_name })}
+            </Text>
+          ) : (
+            <Text style={styles.greetingSmall}>
+              {t('home.guest_greeting')}
+            </Text>
+          )}
         </View>
       </View>
 

@@ -55,7 +55,10 @@ export default function ListingDetailScreen() {
   }, [id, t]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
-  if (!session) return <Redirect href="/sign-in" />;
+  // R2C3 guest mode (2026-06-11): listing detail is browsable by anon.
+  // Below, the CTA branches handle the guest case — a sign-in CTA
+  // replaces "Request booking" for signed-out visitors, with returnTo
+  // pointing back to this URL after auth.
 
   if (loading) {
     return (
@@ -270,6 +273,17 @@ export default function ListingDetailScreen() {
                   {t('listing.self_booking_notice')}
                 </Text>
               </View>
+            ) : !session ? (
+              <Button
+                label={t('listing.guest_sign_in_to_book')}
+                onPress={() =>
+                  router.push(
+                    `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}/request`)}`,
+                  )
+                }
+                variant="primary"
+                fullWidth
+              />
             ) : (
               <Button
                 label={t('listing.request_button')}

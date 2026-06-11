@@ -7,6 +7,7 @@
     "welcome": "مرحبا بكم في Petbnb",
     "foundation_ok": "تم إعداد الأساس بنجاح",
     "signed_in_greeting": "أهلاً، {name}",
+    "guest_greeting": "تصفّحي بحرّية — سجّلي دخولاً لطلب الحجز",
     "your_role": "دورك",
     "sign_out": "تسجيل الخروج",
     "host_home_empty_title": "لم تضيفي أي إعلان بعد",
@@ -37,6 +38,7 @@
     "self_view_banner": "لديكِ تعديل قيد المراجعة. هذا هو إعلانك المنشور كما يراه العملاء.",
     "self_view_banner_link": "تعديل ←",
     "self_booking_notice": "هذا إعلانكِ — بدّلي إلى وضع المضيفة لإدارته. لا يمكن للمضيفة حجز مكانها الخاص.",
+    "guest_sign_in_to_book": "سجّلي دخولاً أو أنشئي حساباً لحجز هذا المكان",
     "not_found": "الإعلان غير موجود",
     "nightly_suffix": "/ ليلة",
     "tier_bronze": "برونزي",
@@ -561,6 +563,7 @@
     "bookings": "حجوزاتي",
     "my_listings": "إعلاناتي",
     "account": "حسابي",
+    "guest_sign_in": "تسجيل الدخول",
     "lang_toggle_to_en": "EN",
     "lang_toggle_to_ar": "ع"
   }

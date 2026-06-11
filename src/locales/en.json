@@ -7,6 +7,7 @@
     "welcome": "Welcome to Petbnb",
     "foundation_ok": "Foundation set up successfully",
     "signed_in_greeting": "Hi, {name}",
+    "guest_greeting": "Browsing as guest — sign in to request a booking",
     "your_role": "Your role",
     "sign_out": "Sign out",
     "host_home_empty_title": "You haven't listed a place yet",
@@ -37,6 +38,7 @@
     "self_view_banner": "You have a pending edit awaiting review. This is your live listing as customers see it.",
     "self_view_banner_link": "Edit →",
     "self_booking_notice": "This is your listing — switch to host mode to manage it. A sitter can't book their own home.",
+    "guest_sign_in_to_book": "Sign in or create an account to book this stay",
     "not_found": "Sitter not found",
     "nightly_suffix": "/ night",
     "tier_bronze": "Bronze",
@@ -552,6 +554,7 @@
     "bookings": "My Bookings",
     "my_listings": "My Listings",
     "account": "My Account",
+    "guest_sign_in": "Sign in",
     "lang_toggle_to_en": "EN",
     "lang_toggle_to_ar": "ع"
   }
