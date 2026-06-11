@@ -183,6 +183,7 @@
     "report_confirm": "هل تريدين الإبلاغ عن مشكلة في هذا الحجز؟ ستتم مراجعته من الإدارة.",
     "report_failed": "تعذّر الإبلاغ عن المشكلة، حاولي مرة أخرى",
     "owner_section_title": "صاحبة الحيوان",
+    "owner_no_ratings": "بلا تقييمات بعد",
     "pets_section_title": "الحيوانات المحجوزة",
     "care_notes_label": "ملاحظات العناية",
     "medical_needs_label": "الاحتياجات الطبية",

@@ -1138,6 +1138,8 @@ export default function BookingDetailScreen() {
             pets={booking.pets}
             locale={locale}
             signedPhotos={signedBookingPetPhotos}
+            ownerAvgRating={booking.owner_avg_rating}
+            ownerReviewCount={booking.owner_review_count}
             t={t}
           />
         ) : null}

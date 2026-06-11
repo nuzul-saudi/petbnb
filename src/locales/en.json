@@ -183,6 +183,7 @@
     "report_confirm": "Report a problem with this booking? It will be reviewed by admin.",
     "report_failed": "Couldn't report the problem, please try again",
     "owner_section_title": "Pet Owner",
+    "owner_no_ratings": "No ratings yet",
     "pets_section_title": "Booked Pets",
     "care_notes_label": "Care Notes",
     "medical_needs_label": "Medical Needs",

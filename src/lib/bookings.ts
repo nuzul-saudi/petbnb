@@ -155,6 +155,13 @@ export type BookingDetail = Tables<'bookings'> & {
     'id' | 'title_ar' | 'title_en' | 'neighborhood' | 'host_id'
   > | null;
   owner: BookingOwnerSummary | null;
+  /** Round-2-feedback polish — owner rating aggregate from the 0032
+   *  RPC. Null when the owner has zero reviews (the host sees a
+   *  "no ratings yet" affordance instead). Populated by a follow-up
+   *  RPC call on top of the main fetch since the rating endpoint
+   *  exposes only avg + count, not the individual reviews. */
+  owner_avg_rating: number | null;
+  owner_review_count: number;
   addons: Tables<'booking_addons'>[];
   pets: Tables<'pets'>[];
 };
@@ -191,10 +198,34 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
     booking_pets?: { pet: Tables<'pets'> }[];
     owner?: BookingOwnerSummary | null;
   };
+
+  // Polish (Round 2 feedback) — fetch owner rating aggregate via the
+  // 0032 RPC. Best-effort: a missing RPC or network blip leaves the
+  // card showing the "no ratings yet" affordance, which is the
+  // honest fallback.
+  let ownerAvgRating: number | null = null;
+  let ownerReviewCount = 0;
+  if (owner) {
+    try {
+      const { data: ratings } = await supabase.rpc('get_host_ratings', {
+        host_ids: [owner.id],
+      });
+      if (ratings && ratings.length > 0) {
+        const row = ratings[0];
+        ownerAvgRating = row.review_count > 0 ? Number(row.avg_rating) : null;
+        ownerReviewCount = Number(row.review_count);
+      }
+    } catch {
+      // Silent — fallback to "no ratings yet" in the UI.
+    }
+  }
+
   return {
     ...(rest as Tables<'bookings'>),
     listing: (data.listing ?? null) as BookingDetail['listing'],
     owner: owner ?? null,
+    owner_avg_rating: ownerAvgRating,
+    owner_review_count: ownerReviewCount,
     addons: addons ?? [],
     pets: (bp ?? []).map((b) => b.pet),
   };

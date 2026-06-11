@@ -32,6 +32,13 @@ export type OwnerPetsSectionProps = {
    */
   signedPhotos: Map<string, string>;
   /**
+   * Polish (post-Round-7 feedback) — owner rating aggregate from the
+   * 0032 RPC. Nullable when the owner has no reviews; UI falls back
+   * to a "no ratings yet" pill so the card never fabricates trust.
+   */
+  ownerAvgRating: number | null;
+  ownerReviewCount: number;
+  /**
    * Localized labels keyed by the i18n booking.* namespace. Passing
    * pre-localized strings keeps this component pure presentational
    * and avoids a useTranslation() inside a presentational component.
@@ -44,6 +51,8 @@ export function OwnerPetsSection({
   pets,
   locale,
   signedPhotos,
+  ownerAvgRating,
+  ownerReviewCount,
   t,
 }: OwnerPetsSectionProps) {
   const ownerName =
@@ -60,9 +69,25 @@ export function OwnerPetsSection({
           displayName={ownerName}
           size={56}
         />
-        <Text style={styles.ownerName} numberOfLines={1}>
-          {ownerName}
-        </Text>
+        <View style={styles.ownerTextCol}>
+          <Text style={styles.ownerName} numberOfLines={1}>
+            {ownerName}
+          </Text>
+          <View style={styles.ownerMetaRow}>
+            {/* Rating: real number when reviewed, "no ratings yet"
+                fallback otherwise. Stars never lie — empty card is
+                better than a fabricated zero. */}
+            {ownerAvgRating != null && ownerReviewCount > 0 ? (
+              <Text style={styles.ownerRating}>
+                ★ {ownerAvgRating.toFixed(1)} · {ownerReviewCount}
+              </Text>
+            ) : (
+              <Text style={styles.ownerMetaMuted}>
+                {t('booking.owner_no_ratings')}
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
 
       {/* Per-pet cards */}
@@ -183,11 +208,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  ownerName: {
+  ownerTextCol: {
     flex: 1,
+    gap: 2,
+  },
+  ownerName: {
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     color: colors.ink,
+  },
+  ownerMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  ownerRating: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.goldDeep,
+  },
+  ownerMetaMuted: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
   },
   muted: {
     fontFamily: fonts.body,
