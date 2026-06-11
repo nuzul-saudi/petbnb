@@ -6,6 +6,7 @@ import { logWarn } from '@/lib/log';
 
 import { Platform } from 'react-native';
 
+import { materializeSourceToStrippedBlob } from '@/lib/image-strip';
 import { supabase } from '@/lib/supabase';
 import type { Tables, TablesUpdate } from '@/types/database';
 
@@ -242,22 +243,10 @@ export async function uploadPetPhoto(args: {
 }): Promise<string> {
   if (!supabase) throw new Error('No Supabase client');
 
-  let blob: Blob;
-  let ext = 'jpg';
-
-  if (args.source.kind === 'web-file') {
-    blob = args.source.file;
-    const nameExt = args.source.file.name.split('.').pop()?.toLowerCase();
-    if (nameExt && /^(jpe?g|png|webp)$/.test(nameExt)) {
-      ext = nameExt === 'jpeg' ? 'jpg' : nameExt;
-    }
-  } else {
-    const resp = await fetch(args.source.uri);
-    blob = await resp.blob();
-    const mt = args.source.mimeType ?? blob.type;
-    if (mt.includes('png')) ext = 'png';
-    else if (mt.includes('webp')) ext = 'webp';
-  }
+  // EXIF strip + materialize (Round 3 / 2026-06-XX). A pet photo
+  // taken at home would leak the owner's address via embedded GPS
+  // without this. Output is always JPEG.
+  const { blob, ext } = await materializeSourceToStrippedBlob(args.source);
 
   const path = `${args.ownerId}/${args.petId}/${Date.now()}.${ext}`;
 

@@ -18,6 +18,7 @@
 // RLS:
 //   condition-report-photos/<booking_id>/<timestamp>-<index>.<ext>
 
+import { materializeSourceToStrippedBlob } from '@/lib/image-strip';
 import { supabase } from '@/lib/supabase';
 import type { PetPhotoSource } from '@/lib/pets';
 import type { Enums, Tables } from '@/types/database';
@@ -97,22 +98,10 @@ async function uploadOnePhoto(
 ): Promise<string> {
   if (!supabase) throw new Error('No Supabase client');
 
-  let blob: Blob;
-  let ext = 'jpg';
-
-  if (source.kind === 'web-file') {
-    blob = source.file;
-    const nameExt = source.file.name.split('.').pop()?.toLowerCase();
-    if (nameExt && /^(jpe?g|png|webp)$/.test(nameExt)) {
-      ext = nameExt === 'jpeg' ? 'jpg' : nameExt;
-    }
-  } else {
-    const resp = await fetch(source.uri);
-    blob = await resp.blob();
-    const mt = source.mimeType ?? blob.type;
-    if (mt.includes('png')) ext = 'png';
-    else if (mt.includes('webp')) ext = 'webp';
-  }
+  // EXIF strip + materialize (Round 3 / 2026-06-XX). Condition-report
+  // photos are evidence shots taken at the host's home; without
+  // stripping, embedded GPS would leak the host's address.
+  const { blob, ext } = await materializeSourceToStrippedBlob(source);
 
   const path = `${bookingId}/${ts}-${index}.${ext}`;
 

@@ -42,6 +42,7 @@ import { logWarn } from '@/lib/log';
 //   instead of the reorder_listing_photos RPC (which targets the live
 //   table only). The RPC equivalent for drafts ships in 8f.
 
+import { materializeSourceToStrippedBlob } from '@/lib/image-strip';
 import { supabase } from '@/lib/supabase';
 import type { PetPhotoSource } from '@/lib/pets';
 
@@ -121,30 +122,18 @@ async function ensureDraftPhotoSnapshot(listingId: string): Promise<void> {
 
 /**
  * Materialise a picked source into a Blob + lowercase extension.
- * Shared between the live and draft insert paths. Mirrors
- * uploadPetPhoto's shape so the two upload paths stay aligned.
+ * Strips EXIF/GPS metadata via the shared image-strip helper before
+ * upload (Round 3 / 2026-06-XX) — a host's home photo with embedded
+ * GPS coordinates would otherwise leak her home address.
+ *
+ * The strip pass re-encodes to JPEG, so all outputs land with
+ * ext='jpg' regardless of the input format (jpg/png/webp). Storage
+ * filenames stay timestamped + unique.
  */
 async function pickSourceToBlob(
   source: PetPhotoSource,
 ): Promise<{ blob: Blob; ext: string }> {
-  let blob: Blob;
-  let ext = 'jpg';
-
-  if (source.kind === 'web-file') {
-    blob = source.file;
-    const nameExt = source.file.name.split('.').pop()?.toLowerCase();
-    if (nameExt && /^(jpe?g|png|webp)$/.test(nameExt)) {
-      ext = nameExt === 'jpeg' ? 'jpg' : nameExt;
-    }
-  } else {
-    const resp = await fetch(source.uri);
-    blob = await resp.blob();
-    const mt = source.mimeType ?? blob.type;
-    if (mt.includes('png')) ext = 'png';
-    else if (mt.includes('webp')) ext = 'webp';
-  }
-
-  return { blob, ext };
+  return materializeSourceToStrippedBlob(source);
 }
 
 // ---------------------------------------------------------------------------

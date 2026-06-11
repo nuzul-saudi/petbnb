@@ -10,6 +10,7 @@ import { logWarn } from '@/lib/log';
 // Path convention enforced by the bucket's RLS:
 //   daily-update-media/<booking_id>/<timestamp>-<index>.<ext>
 
+import { materializeSourceToStrippedBlob } from '@/lib/image-strip';
 import { supabase } from '@/lib/supabase';
 import type { PetPhotoSource } from '@/lib/pets';
 import type { Tables } from '@/types/database';
@@ -250,22 +251,10 @@ async function uploadOnePhoto(
 ): Promise<string> {
   if (!supabase) throw new Error('No Supabase client');
 
-  let blob: Blob;
-  let ext = 'jpg';
-
-  if (source.kind === 'web-file') {
-    blob = source.file;
-    const nameExt = source.file.name.split('.').pop()?.toLowerCase();
-    if (nameExt && /^(jpe?g|png|webp)$/.test(nameExt)) {
-      ext = nameExt === 'jpeg' ? 'jpg' : nameExt;
-    }
-  } else {
-    const resp = await fetch(source.uri);
-    blob = await resp.blob();
-    const mt = source.mimeType ?? blob.type;
-    if (mt.includes('png')) ext = 'png';
-    else if (mt.includes('webp')) ext = 'webp';
-  }
+  // EXIF strip + materialize (Round 3 / 2026-06-XX). Daily updates
+  // are photos a host took at their own home; GPS in metadata would
+  // leak her address.
+  const { blob, ext } = await materializeSourceToStrippedBlob(source);
 
   const path = `${bookingId}/${ts}-${index}.${ext}`;
 
