@@ -1,6 +1,11 @@
 import { logWarn } from '@/lib/log';
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Redirect,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Platform,
   ScrollView,
@@ -18,13 +23,16 @@ import { CheckOutSection } from "@/components/bookings/CheckOutSection";
 import { ReviewCard } from "@/components/bookings/ReviewCard";
 import { ConditionReportsSection } from "@/components/bookings/ConditionReportsSection";
 import { OwnerPetsSection } from "@/components/bookings/OwnerPetsSection";
+import { MessagesSection } from "@/components/bookings/MessagesSection";
 import { DailyUpdatesSection } from "@/components/bookings/DailyUpdatesSection";
 import { HostActions } from "@/components/bookings/HostActions";
 import { useBooking } from "@/hooks/useBooking";
 import { useConditionReports } from "@/hooks/useConditionReports";
 import { useDailyUpdates } from "@/hooks/useDailyUpdates";
+import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/lib/auth";
 import { confirmDialog } from "@/lib/confirm";
+import { sendMessage, containsContactInfo } from "@/lib/messages";
 import { markSeen } from "@/lib/last-seen-storage";
 import { usePersona } from "@/lib/persona";
 import { findMyReview, type Review } from "@/lib/reviews";
@@ -146,6 +154,22 @@ export default function BookingDetailScreen() {
     loading: crLoading,
     refetch: refetchConditionReports,
   } = useConditionReports(id);
+
+  // Round 5b — messages. Same hook pattern as the others. Refetched
+  // on screen-focus (useFocusEffect below) — that's the MVP
+  // behavior in lieu of Supabase Realtime. The trade-off is that
+  // navigating away and back is the implicit "pull-to-refresh"
+  // gesture for the other party's new messages.
+  const {
+    data: messages,
+    loading: messagesLoading,
+    refetch: refetchMessages,
+  } = useMessages(id);
+  useFocusEffect(
+    useCallback(() => {
+      void refetchMessages();
+    }, [refetchMessages]),
+  );
   const [filingCheckIn, setFilingCheckIn] = useState(false);
   const [crPendingPhotos, setCrPendingPhotos] = useState<PetPhotoSource[]>([]);
   const [crNote, setCrNote] = useState("");
@@ -1074,6 +1098,37 @@ export default function BookingDetailScreen() {
             owner={booking.owner}
             pets={booking.pets}
             locale={locale}
+            t={t}
+          />
+        ) : null}
+
+        {/* Round 5b — messaging. Both parties of the booking can
+            send/read; visible on every status. Compose bar hides on
+            declined / cancelled / disputed (canSend=false). */}
+        {user ? (
+          <MessagesSection
+            messages={messages}
+            loading={messagesLoading}
+            currentUserId={user.id}
+            locale={locale}
+            canSend={
+              booking.status !== 'declined' &&
+              booking.status !== 'cancelled' &&
+              booking.status !== 'disputed'
+            }
+            onSend={async (body) => {
+              // Soft anti-leakage nudge: if the body looks like
+              // contact info (phone, email, WhatsApp/Telegram/Snap,
+              // either Latin or Arabic-Indic digits), confirm before
+              // sending. Sending is still allowed if the user
+              // confirms.
+              if (containsContactInfo(body)) {
+                const ok = await confirmDialog(t('messages.contact_warning'));
+                if (!ok) return;
+              }
+              await sendMessage(booking.id, body);
+              await refetchMessages();
+            }}
             t={t}
           />
         ) : null}
