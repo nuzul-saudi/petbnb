@@ -1,0 +1,52 @@
+-- Owner-feed hot-path covering index.
+--
+-- Background: migration 0001 created `listings_active_neighborhood_idx`
+-- on (is_active, neighborhood). When migration 0024 dropped the
+-- `is_active` column (Step 8i, the canonical visibility signal moved
+-- to `status`), that index dropped with it and was never replaced.
+--
+-- The owner feed query (`listActiveListings` in src/lib/listings.ts)
+-- filters every load on `status='approved'` AND `city=<selected>`,
+-- then optionally `host_gender`, `offers_grooming`, etc. At the data
+-- scale the founder is targeting (50–500 listings), a covering
+-- composite on (status, city) takes the post-0024 feed back to
+-- single-digit-millisecond planner time.
+--
+-- The index is partial-friendly — Postgres will use it for any
+-- prefix-match starting with `status`, and the (status='approved')
+-- filter prunes the bulk of rows before the city filter narrows
+-- further. The remaining filter chips (`host_gender`,
+-- `offers_grooming`, `has_resident_pets`) sit on top of an already-
+-- tiny intermediate set.
+
+create index if not exists listings_status_city_idx
+  on public.listings (status, city);
+
+
+-- ============================================================
+-- Verification queries — run after the migration
+-- ============================================================
+--
+-- 1. The new index exists.
+--   select indexname from pg_indexes
+--   where schemaname = 'public' and tablename = 'listings'
+--     and indexname = 'listings_status_city_idx';
+--   expect: 1 row.
+--
+-- 2. The old `is_active`-based index is genuinely gone (sanity check
+--    that 0024 cleaned up after itself).
+--   select indexname from pg_indexes
+--   where schemaname = 'public' and tablename = 'listings'
+--     and indexname = 'listings_active_neighborhood_idx';
+--   expect: 0 rows.
+--
+-- 3. EXPLAIN proves the feed query plans with the new index.
+--   explain analyze
+--   select id from public.listings
+--   where status = 'approved' and city = 'riyadh'
+--   order by created_at desc
+--   limit 20;
+--   expect: an Index Scan or Bitmap Index Scan referencing
+--   listings_status_city_idx. At small row counts the planner may
+--   still pick a Seq Scan — that's fine and not a failure. The
+--   shape will shift to the index as the table grows.
