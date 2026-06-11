@@ -140,11 +140,21 @@ export async function createBookingRequest(
   return booking;
 }
 
+/** Owner summary embedded into BookingDetail since Round 4 — the host
+ *  needs to see who's bringing what pet BEFORE accepting a booking.
+ *  Mirrors `HostSummary` shape from src/lib/listings.ts so consumers can
+ *  treat the two interchangeably. */
+export type BookingOwnerSummary = Pick<
+  Tables<'profiles'>,
+  'id' | 'full_name' | 'full_name_en' | 'avatar_url'
+>;
+
 export type BookingDetail = Tables<'bookings'> & {
   listing: Pick<
     Tables<'listings'>,
     'id' | 'title_ar' | 'title_en' | 'neighborhood' | 'host_id'
   > | null;
+  owner: BookingOwnerSummary | null;
   addons: Tables<'booking_addons'>[];
   pets: Tables<'pets'>[];
 };
@@ -154,9 +164,15 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
   const { data, error } = await supabase
     .from('bookings')
     .select(
+      // Round 4 — owner join. The `profiles!bookings_owner_id_fkey`
+      // alias resolves the FK explicitly to the booking's `owner_id`
+      // (vs the alternative `host_id`-via-listing reachable as a
+      // nested PostgREST join). Verified the auto-generated FK name
+      // exists for bookings.owner_id REFERENCES profiles.
       `
       *,
       listing:listings(id, title_ar, title_en, neighborhood, host_id),
+      owner:profiles!bookings_owner_id_fkey(id, full_name, full_name_en, avatar_url),
       booking_addons(*),
       booking_pets(pet:pets(*))
     `,
@@ -168,14 +184,17 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
   const {
     booking_addons: addons,
     booking_pets: bp,
+    owner,
     ...rest
   } = data as typeof data & {
     booking_addons?: Tables<'booking_addons'>[];
     booking_pets?: { pet: Tables<'pets'> }[];
+    owner?: BookingOwnerSummary | null;
   };
   return {
     ...(rest as Tables<'bookings'>),
     listing: (data.listing ?? null) as BookingDetail['listing'],
+    owner: owner ?? null,
     addons: addons ?? [],
     pets: (bp ?? []).map((b) => b.pet),
   };
