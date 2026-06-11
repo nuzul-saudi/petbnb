@@ -42,6 +42,7 @@ import {
   cancelBookingAsOwner,
   completeBookingAsHost,
   declineBookingAsHost,
+  disputeBooking,
   startBookingAsHost,
 } from "@/lib/bookings";
 import { createConditionReport } from "@/lib/condition-reports";
@@ -104,6 +105,12 @@ export default function BookingDetailScreen() {
 
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+
+  // Round 7 — dispute workflow. The "Report a problem" button on
+  // active/completed bookings transitions to disputed status.
+  // Visible to both parties; admin dashboard surfaces the queue.
+  const [disputing, setDisputing] = useState(false);
+  const [disputeError, setDisputeError] = useState<string | null>(null);
 
   // R2C6 two-way reviews. The caller's own existing review for this
   // booking (if any). Re-fetched whenever booking transitions to
@@ -535,6 +542,25 @@ export default function BookingDetailScreen() {
       setCancelError(t("booking.cancel_failed"));
     } finally {
       setCancelling(false);
+    }
+  };
+
+  // Round 7 — dispute. Active OR completed only; either party can
+  // raise. Re-fetches the booking on success so the now-illegal
+  // controls hide and the status badge updates.
+  const onReportProblem = async () => {
+    if (!booking) return;
+    if (!(await confirmDialog(t("booking.report_confirm")))) return;
+    setDisputing(true);
+    setDisputeError(null);
+    try {
+      await disputeBooking(booking.id);
+      await refetchBooking();
+    } catch (e) {
+      logWarn("[booking.dispute_failed]", e);
+      setDisputeError(t("booking.report_failed"));
+    } finally {
+      setDisputing(false);
     }
   };
 
@@ -1297,6 +1323,27 @@ export default function BookingDetailScreen() {
               onPress={onCancel}
               variant="destructive"
               loading={cancelling}
+              fullWidth
+            />
+          </>
+        ) : null}
+
+        {/* Round 7 — Report a problem. Available to both parties on
+            active and completed bookings. Transitions to 'disputed';
+            admin queue surfaces it on the dashboard. */}
+        {(booking.status === "active" || booking.status === "completed") &&
+        user &&
+        (booking.owner_id === user.id ||
+          booking.listing?.host_id === user.id) ? (
+          <>
+            {disputeError ? (
+              <Text style={styles.errorText}>{disputeError}</Text>
+            ) : null}
+            <Button
+              label={t("booking.report_problem")}
+              onPress={onReportProblem}
+              variant="destructive"
+              loading={disputing}
               fullWidth
             />
           </>

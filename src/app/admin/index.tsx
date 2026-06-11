@@ -11,7 +11,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { listAllUsers, listPendingReviews } from '@/lib/admin';
+import {
+  countDisputedBookings,
+  listAllUsers,
+  listPendingReviews,
+} from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -23,15 +27,17 @@ export default function AdminHome() {
 
   const [pendingHostsCount, setPendingHostsCount] = useState<number | null>(null);
   const [pendingListingsCount, setPendingListingsCount] = useState<number | null>(null);
+  const [disputedBookingsCount, setDisputedBookingsCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAddHostModal, setShowAddHostModal] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [users, reviews] = await Promise.all([
+      const [users, reviews, disputed] = await Promise.all([
         listAllUsers(),
         listPendingReviews(),
+        countDisputedBookings(),
       ]);
       const pendingHosts = users.filter(
         (u) =>
@@ -45,6 +51,7 @@ export default function AdminHome() {
       // not in the queue and don't inflate this counter anymore.
       setPendingHostsCount(pendingHosts);
       setPendingListingsCount(reviews.length);
+      setDisputedBookingsCount(disputed);
     } catch (e) {
       logWarn('[admin.load_failed]', e);
       setError(t('admin.load_failed'));
@@ -103,6 +110,28 @@ export default function AdminHome() {
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>{t('admin.pending_listings_card')}</Text>
             <CountBadge value={pendingListingsCount} />
+          </View>
+        </Pressable>
+
+        {/* Round 7 — disputed bookings queue. Inert when zero
+            (same pattern as the other queue cards). Routes to the
+            existing all-bookings screen; founder filters by status
+            visually for now. A dedicated disputed-only screen is a
+            follow-up. */}
+        <Pressable
+          onPress={() => router.push('/admin/bookings')}
+          disabled={!disputedBookingsCount}
+          style={[
+            styles.card,
+            styles.queueCard,
+            !disputedBookingsCount && styles.cardInert,
+          ]}
+        >
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>
+              {t('admin.disputed_bookings_card')}
+            </Text>
+            <CountBadge value={disputedBookingsCount} />
           </View>
         </Pressable>
 

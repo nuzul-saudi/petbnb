@@ -179,6 +179,9 @@
     }
   },
   "booking": {
+    "report_problem": "Report a Problem",
+    "report_confirm": "Report a problem with this booking? It will be reviewed by admin.",
+    "report_failed": "Couldn't report the problem, please try again",
     "owner_section_title": "Pet Owner",
     "pets_section_title": "Booked Pets",
     "care_notes_label": "Care Notes",
@@ -398,6 +401,7 @@
     "back": "← Back",
     "pending_hosts_card": "Pending sitter applications",
     "pending_listings_card": "Listings awaiting approval",
+    "disputed_bookings_card": "Bookings under review",
     "nav_all_users": "All users",
     "nav_all_listings": "All listings",
     "nav_all_bookings": "All bookings",

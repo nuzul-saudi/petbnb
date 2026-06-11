@@ -56,6 +56,22 @@ export async function listAllBookings(): Promise<AdminBooking[]> {
   }));
 }
 
+/**
+ * Round 7 — count of bookings in 'disputed' status. Surfaces on the
+ * admin dashboard so the founder can triage incoming reports without
+ * navigating into the all-bookings list. Cheap count(*) head query;
+ * RLS admin-bypass means it reads across all hosts.
+ */
+export async function countDisputedBookings(): Promise<number> {
+  if (!supabase) return 0;
+  const { count, error } = await supabase
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'disputed');
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function getUserById(id: string): Promise<AdminUser | null> {
   const all = await listAllUsers();
   return all.find((u) => u.id === id) ?? null;

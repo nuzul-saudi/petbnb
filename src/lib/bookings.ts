@@ -619,6 +619,61 @@ export async function cancelBookingAsOwner(
 }
 
 // ---------------------------------------------------------------------------
+// Dispute workflow (Round 7).
+//
+// A trust-first marketplace without an in-app dispute path is fragile.
+// The 'disputed' status has existed in the booking_status enum since
+// 0001 but had no surface — no way to enter it, no admin queue, nothing.
+// This wires a "Report a problem" button on active / completed bookings
+// for either party + admin queue visibility (added in the same round).
+//
+// Permitted source statuses: 'active' (during the stay) and
+// 'completed' (after the fact). Outside those, the report doesn't
+// apply — a 'requested' booking should be cancelled, a 'declined'
+// or 'cancelled' booking has no real to dispute.
+//
+// RLS: the existing bookings_update_owner_or_host policy (0004)
+// already permits owner OR host to update; admin bypasses via
+// is_admin(). No new migration needed.
+//
+// Future follow-up (post-MVP): an Edge Function trigger on transition
+// INTO 'disputed' could email the founder + post to an admin-only
+// Slack/Discord channel. For MVP the admin dashboard's queue count
+// is enough — founder will check the dashboard.
+// ---------------------------------------------------------------------------
+export async function disputeBooking(
+  bookingId: string,
+): Promise<Tables<'bookings'>> {
+  if (!supabase) throw new Error('No Supabase client');
+
+  // Re-fetch current status — same app-layer guard pattern as
+  // cancelBookingAsOwner. Catches race conditions and gives a clearer
+  // error than the raw RLS rejection.
+  const { data: current, error: rErr } = await supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (rErr) throw rErr;
+  if (!current) throw new Error('Booking not found');
+  if (current.status !== 'active' && current.status !== 'completed') {
+    throw new Error(
+      `Cannot dispute a booking in status: ${current.status}`,
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ status: 'disputed' })
+    .eq('id', bookingId)
+    .in('status', ['active', 'completed'])
+    .select()
+    .single();
+  if (error || !data) throw error ?? new Error('Failed to dispute booking');
+  return data;
+}
+
+// ---------------------------------------------------------------------------
 // Host-side status transitions (Step 6.1 / Phase 7).
 //
 // Each function mirrors cancelBookingAsOwner's shape: re-fetch current
