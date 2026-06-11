@@ -36,3 +36,32 @@ One line per decision made autonomously during the batch run.
 - **R2C6 — two-way reviews (behavior §5).** `src/lib/reviews.ts` adds `createReview` (1..5 stars, optional text) + `findMyReview` (caller's prior review for back-and-forth UI flips). New `src/components/bookings/ReviewCard.tsx` — tappable stars + textarea in compose mode, read-only stars + thanks copy when an existing review exists. Wired into bookings/[id].tsx with persona gates: owner mode renders "Rate your host", host mode renders "Rate the owner". Migration 0029 part 3 adds `reviews_insert_participant` (rater = auth.uid, booking completed, rater ∈ {owner_id, host_id}, ratee = the other) + `reviews_select_authenticated`. No update/delete policies — reviews are immutable (mirrors condition_reports posture). `unique(booking_id, rater_id)` backstops double-submits.
 - **R2C7 — in-app notification signals (behavior §7 Phase 1).** New `src/lib/last-seen-storage.ts` (AsyncStorage, per-user-per-booking ISO stamps, batched `multiGet` for the list). `MyBookingListItem` gains `latest_update_at` populated by one follow-up `daily_updates` query per index load. Owner bookings list draws a terracotta 8px dot when `latest_update_at > lastSeen[id]`; booking detail calls `markSeen()` on mount. `useFocusEffect` calls `refreshPendingHostCount()` on HostHome and `/bookings` so the host badge decrements without waiting for a persona switch. Admin index already had focus-refresh — no change.
 - **Future-milestone backlog addition.** Phase 2 notifications (real push via `expo-notifications`) stays out of any unattended batch — needs Expo project credentials + a real device for testing. Same status as the payment gateway swap: physical prerequisites only the founder can provide. Sequence after payments.
+
+## Round 3 (2026-06-11) — Opsec + DB Hardening (VC review response)
+
+Source: VC due-diligence review + Claude Code technical feedback convergence (plan v2).
+
+### Decisions
+- **Admin email rotation, not git filter-repo.** Scrubbing the founder's `@gmail` from history would rewrite every commit hash. Rotating identity (new admin address with hardware 2FA) + privatizing the repo achieves the same outcome with zero hash churn.
+- **Repo goes private after this round's push.** Standing strategy + RLS + competitor analysis sitting in a public repo was unforced opsec leak. The codebase remains transferable to a future hire; the public-repo signaling value didn't justify the exposure.
+- **EXIF stripping added to upload pipeline** (`src/lib/image-strip.ts`). Privacy-critical for the female-trust positioning — a host home photo with embedded GPS = her home address. Wired into all four user-photo upload paths: listing photos, pet photos, condition-report photos, daily-update photos (the briefing flagged three; daily-updates has the same exposure and got swept in).
+- **Feed pagination at 20 default; load-more is a follow-up.** Unpaginated feed was hot-pathed at every approved listing every load. Trivial at 30 listings, painful at 300.
+- **Rating aggregation moved server-side via RPC** (migration 0032). The client-side aggregate was fetching every `(ratee_id, stars)` row for the visible host set. RPC does avg + count in Postgres and ships one row per host.
+- **Composite index on `(status, city)`** (migration 0031). Restores the hot-path covering that died with `is_active` in migration 0024.
+- **Analytics deferred to provider-choice decision.** The plan v2's "stub analytics now" round was pulled out. Sprinkling `track()` calls without a provider chosen is noise; the decision (PostHog vs Amplitude vs Mixpanel — KSA data-residency matters) is the hard part. Re-open after Round 7.
+- **window.confirm deferral:** The 2 remaining `window.confirm` sites in `confirmLeaveIfDirty` (`bookings/[id].tsx` and `photos.tsx`) are a deliberate known limitation, not oversight. `Pressable.onPress` cannot await an async confirm before navigation fires. Fixing requires an architectural change to AppHeader's nav-gate contract (intercept → dialog → re-dispatch nav after confirm). Documented in ONBOARDING.md §9. Re-evaluate only if the AppHeader nav-gate contract is being changed for another reason.
+
+### Items NOT acted on
+- **git filter-repo:** rotating email is sufficient.
+- **Playwright integration tests:** deferred until payments make integration tests worth the Expo Web setup cost.
+- **TanStack Query migration:** Context + Supabase direct is fine at MVP scale; the React Query benefits don't justify the migration footprint today.
+- **Hardcoded add-on catalog → DB table:** deferred until hosts request custom pricing. Today's 4 fixed add-ons sit in `pricing.ts` as constants imported by both `request.tsx` and the booking detail; no actual duplication.
+
+### Migrations written (Omar applies after review)
+- `0031_feed_index.sql` — composite index on `(status, city)`.
+- `0032_host_rating_rpc.sql` — `get_host_ratings(host_ids uuid[])` RPC.
+
+### Founder-lane follow-ups (after push)
+- Privatize repo (GitHub → Settings → Danger Zone → Change visibility).
+- Rotate Supabase admin to a dedicated address with hardware 2FA.
+- Trademark opinion + backup brand name (BEFORE any brand spend).
