@@ -186,8 +186,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   heading: {
+    // Matched to OwnerPetsSection's 20 — uniform section-heading
+    // weight across the booking detail page.
     fontFamily: fonts.headingBold,
-    fontSize: 18,
+    fontSize: 20,
     color: colors.mossDeep,
   },
   muted: {

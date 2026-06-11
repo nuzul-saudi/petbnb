@@ -244,8 +244,10 @@ export function CheckOutSection({
 const styles = StyleSheet.create({
   // ---- CR-only (local to this component) ----
   crSectionTitle: {
+    // Polish — uniform 20px section-heading weight across the
+    // booking detail page (matched to OwnerPets / Messages).
     fontFamily: fonts.headingBold,
-    fontSize: 18,
+    fontSize: 20,
     color: colors.mossDeep,
     textAlign: "right",
   },

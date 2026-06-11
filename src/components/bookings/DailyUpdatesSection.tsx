@@ -417,8 +417,10 @@ export function DailyUpdatesSection({
 const styles = StyleSheet.create({
   // ---- daily-updates-only (local to this component) ----
   dailyUpdatesTitle: {
+    // Polish — uniform 20px section-heading weight across the
+    // booking detail page (matched to OwnerPets / Messages / CR).
     fontFamily: fonts.headingBold,
-    fontSize: 18,
+    fontSize: 20,
     color: colors.mossDeep,
   },
   updatesList: {

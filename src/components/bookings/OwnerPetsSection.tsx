@@ -186,15 +186,24 @@ function PetDetail({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   section: {
-    backgroundColor: colors.paper,
+    // Polish (post-Round-7 feedback): money/transactional cards stay
+    // on colors.paper; identity / people cards use colors.cream to
+    // give the eye a single-glance tell. The booking-summary card
+    // above is paper; this is cream; the messages card below is
+    // back to paper. Visual hierarchy via background tone, not borders.
+    backgroundColor: colors.cream,
     borderRadius: radii.xl,
     padding: spacing.xl,
     gap: spacing.md,
     ...shadows.card,
   },
   heading: {
+    // Bumped to 20 (was 18) so section headings dominate inline
+    // prominent content like the booking-summary totalLine (18).
+    // Polish-pass discipline: section headings get one weight class;
+    // inline numbers never outweigh them.
     fontFamily: fonts.headingBold,
-    fontSize: 18,
+    fontSize: 20,
     color: colors.mossDeep,
   },
   subheading: {
@@ -239,7 +248,9 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
   },
   petCard: {
-    backgroundColor: colors.cream,
+    // Inverted from the section's cream so the pet cards sit
+    // visibly against the warmer parent surface.
+    backgroundColor: colors.paper,
     borderRadius: radii.lg,
     padding: spacing.md,
     gap: spacing.sm,
