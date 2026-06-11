@@ -520,6 +520,12 @@ export async function cancelBookingAsOwner(
   }
 
   const charged = current.total_charged_sar ?? current.total_sar;
+  // C2 (audit 2026-06-11): `new Date()` is the device clock — a real-
+  // payments user could set their phone clock back to jump a refund
+  // tier. Harmless on the mock provider; before the gateway swap
+  // (CLAUDE.md §11) the refund tier MUST be computed server-side
+  // via an RPC using Postgres `now()`. Do NOT trust this value past
+  // the mock-payments milestone.
   const { refundSAR } = computeCancellationRefund(
     charged,
     current.start_date,
