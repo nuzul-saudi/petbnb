@@ -80,9 +80,24 @@ create policy "listing_blocked_dates_select_public"
 -- PART 3 — Two-way reviews policies
 -- ============================================================
 --
--- Reviews schema was created in 0001 with RLS enabled but no policies
--- (a deliberate "ship the table, design the policies later" move).
--- This is "later". Three policies:
+-- AUTHORING NOTE (corrected 2026-06-11 via 0030):
+-- This header originally claimed "Reviews schema was created in 0001
+-- with RLS enabled but no policies." That was wrong. 0002 added
+-- reviews_select_public + reviews_insert_participant_after_completed;
+-- 0004 refreshed the INSERT for is_active_user(). Migration 0030
+-- reconciles the duplication: drops 0004's INSERT (mine below is a
+-- strict superset that also adds admin bypass) and drops the
+-- reviews_select_authenticated created here (the 0002 _public is
+-- more permissive, so authenticated callers already pass it).
+-- Net state after 0030: TWO policies on public.reviews:
+--   reviews_insert_participant (mine, this migration — kept)
+--   reviews_select_public      (0002, kept — anon + authenticated)
+-- If you're reading these comments at HEAD, the table already has
+-- only those two policies. The two CREATE statements below remain
+-- as the source of truth for the INSERT body and as historical
+-- record for the SELECT path I tried to add.
+--
+-- Three policies originally intended:
 --
 --   reviews_insert_participant — INSERT one row per (booking, rater)
 --     where:
