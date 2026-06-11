@@ -1008,7 +1008,7 @@ a blank screen.
 ### Auth / Storage
 
 - **Resend sandbox sender** (`onboarding@resend.dev`) only delivers to
-  the Resend account owner's email (currently `nahdiua@gmail.com`).
+  the Resend account owner's email (currently `<admin-email>`).
   Pre-launch: verify a real domain (e.g., `auth@petbnb.sa`).
 - **Pet photos are 7-day signed URLs** stored in `pets.photo_url`.
   Production pattern is path-in-DB + on-render signing — listed in
@@ -1187,12 +1187,14 @@ Founder reviews after the batch and applies via the SQL Editor.
 
 ### Promote yourself to admin
 
-If the auth user is `nahdiua@gmail.com` (the founder's account):
+If the auth user is `<admin-email>` (the founder's account — replace the
+placeholder with the actual address before running):
 
 ```sql
+-- Replace <admin-email> with the actual admin email
 update public.profiles
 set role = 'admin'
-where id = (select id from auth.users where email = 'nahdiua@gmail.com');
+where id = (select id from auth.users where email = '<admin-email>');
 ```
 
 ### Identify the port-8081 occupier
