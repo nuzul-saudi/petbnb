@@ -12,7 +12,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,6 +31,7 @@ import {
   type BlockedRange,
 } from '@/lib/availability';
 import { useAuth } from '@/lib/auth';
+import { confirmDialog } from '@/lib/confirm';
 import { todayIso } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingForEdit } from '@/lib/listings';
@@ -171,16 +171,9 @@ export default function ListingAvailabilityScreen() {
     }
   };
 
-  const confirm = (key: string): boolean => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return window.confirm(t(key));
-    }
-    return true;
-  };
-
   const onRemove = async (rangeId: string) => {
     if (busyDelete) return;
-    if (!confirm('listings.availability.remove_confirm')) return;
+    if (!(await confirmDialog(t('listings.availability.remove_confirm')))) return;
     setBusyDelete(rangeId);
     try {
       await removeBlockedRange(rangeId);

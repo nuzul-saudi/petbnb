@@ -23,7 +23,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -45,6 +44,7 @@ import {
   rejectNewListing,
   type AdminReviewDetail,
 } from '@/lib/admin';
+import { confirmDialog } from '@/lib/confirm';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -116,13 +116,6 @@ export default function AdminListingDetailScreen() {
     if (id) load();
   }, [id, load]);
 
-  const confirm = (key: string): boolean => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return window.confirm(t(key));
-    }
-    return true;
-  };
-
   const onSaveDirect = async () => {
     if (!supabase || !detail) return;
     setBusy('save');
@@ -169,7 +162,7 @@ export default function AdminListingDetailScreen() {
     const confirmKey = isEdit
       ? 'admin.approve_edit_confirm'
       : 'admin.approve_new_confirm';
-    if (!confirm(confirmKey)) return;
+    if (!(await confirmDialog(t(confirmKey)))) return;
     setBusy('approve');
     setError(null);
     try {
@@ -204,7 +197,7 @@ export default function AdminListingDetailScreen() {
     const confirmKey = isEdit
       ? 'admin.reject_edit_confirm'
       : 'admin.reject_new_confirm';
-    if (!confirm(confirmKey)) return;
+    if (!(await confirmDialog(t(confirmKey)))) return;
     setBusy('reject');
     setError(null);
     try {
@@ -228,7 +221,7 @@ export default function AdminListingDetailScreen() {
 
   const onTakeOffline = async () => {
     if (!detail) return;
-    if (!confirm('admin.take_offline_confirm')) return;
+    if (!(await confirmDialog(t('admin.take_offline_confirm')))) return;
     setBusy('take_offline');
     setError(null);
     try {

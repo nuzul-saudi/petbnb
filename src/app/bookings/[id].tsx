@@ -21,6 +21,7 @@ import { useBooking } from "@/hooks/useBooking";
 import { useConditionReports } from "@/hooks/useConditionReports";
 import { useDailyUpdates } from "@/hooks/useDailyUpdates";
 import { useAuth } from "@/lib/auth";
+import { confirmDialog } from "@/lib/confirm";
 import { usePersona } from "@/lib/persona";
 import {
   acceptBookingAsHost,
@@ -343,14 +344,10 @@ export default function BookingDetailScreen() {
   // We can't safely round-trip them through the new model.
   const isLegacyBooking = !!booking && booking.additional_pet_discount === null;
 
-  const onEdit = () => {
+  const onEdit = async () => {
     if (!booking) return;
     if (isLegacyBooking) {
-      const confirmed =
-        Platform.OS === "web" && typeof window !== "undefined"
-          ? window.confirm(t("booking.edit_legacy_warning"))
-          : true;
-      if (!confirmed) return;
+      if (!(await confirmDialog(t("booking.edit_legacy_warning")))) return;
     }
     router.push({
       pathname: "/listings/[id]/request",
@@ -383,11 +380,7 @@ export default function BookingDetailScreen() {
     fn: (bookingId: string) => Promise<unknown>,
   ) => {
     if (!booking) return;
-    const confirmed =
-      Platform.OS === "web" && typeof window !== "undefined"
-        ? window.confirm(t(confirmKey))
-        : true;
-    if (!confirmed) return;
+    if (!(await confirmDialog(t(confirmKey)))) return;
     setHostFlight(action);
     setHostError(null);
     try {
@@ -440,11 +433,7 @@ export default function BookingDetailScreen() {
 
   const onCancel = async () => {
     if (!booking) return;
-    const confirmed =
-      Platform.OS === "web" && typeof window !== "undefined"
-        ? window.confirm(t("booking.cancel_confirm"))
-        : true;
-    if (!confirmed) return;
+    if (!(await confirmDialog(t("booking.cancel_confirm")))) return;
     setCancelling(true);
     setCancelError(null);
     try {
@@ -726,11 +715,7 @@ export default function BookingDetailScreen() {
   // unique index from migration 0017).
   const onCompleteStay = async () => {
     if (!booking || !user) return;
-    const confirmed =
-      Platform.OS === "web" && typeof window !== "undefined"
-        ? window.confirm(t("booking.host_complete_confirm"))
-        : true;
-    if (!confirmed) return;
+    if (!(await confirmDialog(t("booking.host_complete_confirm")))) return;
     setCoPosting(true);
     setCoPostError(null);
     try {

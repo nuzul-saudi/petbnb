@@ -25,7 +25,7 @@
 //     re-fetches and reverts to the live values.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -34,6 +34,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { ListingForm, type ListingFormValues } from '@/components/ListingForm';
 import { useAuth } from '@/lib/auth';
+import { confirmDialog } from '@/lib/confirm';
 import { useTranslation } from '@/lib/i18n';
 import {
   discardListingDraft,
@@ -152,14 +153,6 @@ export default function EditListingScreen() {
 
   // ---- helpers (post-guard) ----
 
-  const confirm = (key: string): boolean => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return window.confirm(t(key));
-    }
-    // Native fallback matches the pet-delete / photo-delete pattern.
-    return true;
-  };
-
   const isDraftPath =
     data.status === 'approved' || data.status === 'paused';
 
@@ -173,7 +166,7 @@ export default function EditListingScreen() {
   // confirm copy.
   const onSave = async (values: ListingFormValues) => {
     if (isDraftPath) {
-      if (!confirm('listings.edit.live_save_confirm')) return;
+      if (!(await confirmDialog(t('listings.edit.live_save_confirm')))) return;
     }
     setSaveError(null);
     setSaving(true);
@@ -199,7 +192,7 @@ export default function EditListingScreen() {
   const onToggleActive = async () => {
     if (togglingActive || saving || discarding) return;
     if (data.status === 'approved') {
-      if (!confirm('listings.edit.deactivate_confirm')) return;
+      if (!(await confirmDialog(t('listings.edit.deactivate_confirm')))) return;
     }
     setToggleError(null);
     setTogglingActive(true);
@@ -228,7 +221,7 @@ export default function EditListingScreen() {
   // raw deletes with an atomic discard_listing_draft RPC.
   const onDiscardDraft = async () => {
     if (togglingActive || saving || discarding) return;
-    if (!confirm('listings.edit.discard_confirm')) return;
+    if (!(await confirmDialog(t('listings.edit.discard_confirm')))) return;
     setDiscardError(null);
     setDiscarding(true);
     try {

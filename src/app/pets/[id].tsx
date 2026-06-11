@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { BreedPicker, type BreedSelection } from '@/components/BreedPicker';
 import { DateField } from '@/components/DateField';
 import { useAuth } from '@/lib/auth';
+import { confirmDialog } from '@/lib/confirm';
 import { todayIso } from '@/lib/format';
 import { findBreed } from '@/lib/breeds';
 import { useTranslation } from '@/lib/i18n';
@@ -249,13 +249,7 @@ export default function PetDetailScreen() {
   };
 
   const onDelete = async () => {
-    // Cross-platform confirm: window.confirm on web, accept on native for MVP.
-    // A polished native Alert.alert can replace this later.
-    const confirmed =
-      Platform.OS === 'web' && typeof window !== 'undefined'
-        ? window.confirm(t('pets.delete_confirm'))
-        : true;
-    if (!confirmed) return;
+    if (!(await confirmDialog(t('pets.delete_confirm')))) return;
     setDeleting(true);
     setError(null);
     try {

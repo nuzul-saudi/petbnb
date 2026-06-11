@@ -36,6 +36,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/lib/auth';
+import { confirmDialog } from '@/lib/confirm';
 import { useTranslation } from '@/lib/i18n';
 import { getListingForEdit, type ListingStatus } from '@/lib/listings';
 import {
@@ -313,14 +314,6 @@ export default function ListingPhotosScreen() {
     }
   };
 
-  const confirm = (key: string): boolean => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return window.confirm(t(key));
-    }
-    // Native fallback matches the pet-delete pattern in pets/[id].tsx —
-    // auto-accept for MVP, replaced by a native Alert.alert later.
-    return true;
-  };
 
   const onRemoveSaved = async (photo: SavedPhoto) => {
     if (currentOp) return;
@@ -335,7 +328,7 @@ export default function ListingPhotosScreen() {
       setActionError(t('listings.photos.cannot_delete_last'));
       return;
     }
-    if (!confirm('listings.photos.remove_confirm')) return;
+    if (!(await confirmDialog(t('listings.photos.remove_confirm')))) return;
     setActionError(null);
     setCurrentOp('delete');
     try {
