@@ -1334,6 +1334,30 @@ export default function BookingDetailScreen() {
           </>
         ) : null}
 
+        {/* Book again — owner-only, completed-bookings-only. Pre-
+            fills the request flow with the same pets + addons; the
+            user picks new dates. The highest-leverage feature for
+            the repeat-rate KPI per the VC review. */}
+        {booking.status === "completed" &&
+        user &&
+        booking.owner_id === user.id &&
+        booking.listing ? (
+          <Button
+            label={t("booking.book_again")}
+            onPress={() =>
+              router.push({
+                pathname: "/listings/[id]/request",
+                params: {
+                  id: booking.listing!.id,
+                  rebookFrom: booking.id,
+                },
+              })
+            }
+            variant="primary"
+            fullWidth
+          />
+        ) : null}
+
         {/* Round 7 — Report a problem. Available to both parties on
             active and completed bookings. Transitions to 'disputed';
             admin queue surfaces it on the dashboard. */}

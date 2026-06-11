@@ -179,6 +179,7 @@
     }
   },
   "booking": {
+    "book_again": "Book again",
     "report_problem": "Report a Problem",
     "report_confirm": "Report a problem with this booking? It will be reviewed by admin.",
     "report_failed": "Couldn't report the problem, please try again",

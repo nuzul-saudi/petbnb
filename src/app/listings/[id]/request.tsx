@@ -78,13 +78,27 @@ export default function BookingRequestScreen() {
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
-  const params = useLocalSearchParams<{ id?: string; editBooking?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    editBooking?: string;
+    rebookFrom?: string;
+  }>();
   const listingId = typeof params.id === 'string' ? params.id : '';
   const editBookingId =
     typeof params.editBooking === 'string' && params.editBooking.length > 0
       ? params.editBooking
       : null;
   const isEditMode = editBookingId !== null;
+  // One-tap rebook (post-Round-7 polish). When this URL param is
+  // present we load the source booking's pets + addons and pre-fill
+  // the form — dates stay blank since the user is picking new ones.
+  // Mutually exclusive with editBooking; if both are present, edit
+  // wins (more conservative, since edit is a write-back path).
+  const rebookFromId =
+    typeof params.rebookFrom === 'string' && params.rebookFrom.length > 0
+      ? params.rebookFrom
+      : null;
+  const isRebookMode = !isEditMode && rebookFromId !== null;
 
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [pets, setPets] = useState<Tables<'pets'>[]>([]);
@@ -175,6 +189,47 @@ export default function BookingRequestScreen() {
       cancelled = true;
     };
   }, [editBookingId, listingId, t]);
+
+  // One-tap rebook: hydrate pets + addons (NOT dates — the user
+  // picks new ones) from a prior booking. Reuses the same
+  // getBookingForEdit helper since the read shape is identical;
+  // edit-only-on-requested gate doesn't matter here because we
+  // only consume the hydrated values, never write back to the
+  // source booking. Listing-mismatch is fine here too — the user
+  // is rebooking a SPECIFIC listing, even if it differs from the
+  // original (e.g. "Book a similar place").
+  useEffect(() => {
+    if (!rebookFromId) return;
+    let cancelled = false;
+    getBookingForEdit(rebookFromId)
+      .then((edit) => {
+        if (cancelled) return;
+        // Pets: only auto-select the ones the owner still owns
+        // (pet might have been deleted between bookings).
+        const stillOwnedPetIds = new Set(
+          edit.petIds.filter((id) => pets.some((p) => p.id === id)),
+        );
+        setSelectedPetIds(stillOwnedPetIds);
+        // Per-pet addons: same filter — drop entries for pets the
+        // owner no longer has.
+        const filteredPerPet = new Map<string, Set<AddonType>>();
+        for (const [petId, types] of edit.perPetAddons) {
+          if (stillOwnedPetIds.has(petId)) filteredPerPet.set(petId, types);
+        }
+        setPerPetAddons(filteredPerPet);
+        setBookingAddons(edit.bookingAddons);
+        // Dates intentionally left blank — fresh stay.
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        logWarn('[booking.rebook_load_failed]', e);
+        // Silent recovery: blank form is better than an error
+        // screen for a "book again" tap. User can fill in manually.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rebookFromId, pets]);
 
   // Calendar UX: when user picks arrival, focus the departure field so
   // they can continue without an extra tap. Web-only; native picker
