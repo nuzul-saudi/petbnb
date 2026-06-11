@@ -166,8 +166,8 @@
       "approved_with_draft": "نشط · تعديل قيد المراجعة",
       "paused": "موقوف",
       "paused_with_draft": "موقوف · تعديل قيد المراجعة",
-      "admin_disabled": "موقوف من الإدارة",
-      "admin_disabled_with_draft": "موقوف من الإدارة · تعديل قيد المراجعة"
+      "admin_disabled": "مرفوض من الإدارة",
+      "admin_disabled_with_draft": "مرفوض من الإدارة · تعديل قيد المراجعة"
     }
   },
   "booking": {

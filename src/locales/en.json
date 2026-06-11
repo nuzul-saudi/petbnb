@@ -166,8 +166,8 @@
       "approved_with_draft": "Live · edit pending",
       "paused": "Paused",
       "paused_with_draft": "Paused · edit pending",
-      "admin_disabled": "Removed by admin",
-      "admin_disabled_with_draft": "Removed by admin · edit pending"
+      "admin_disabled": "Rejected by admin",
+      "admin_disabled_with_draft": "Rejected by admin · edit pending"
     }
   },
   "booking": {
