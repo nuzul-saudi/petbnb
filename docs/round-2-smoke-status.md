@@ -1,8 +1,9 @@
 # Round 2 — Smoke-test status
 
-**Date:** 2026-06-11
-**Branch:** `main` (latest commit at smoke-test time: `ae1e857`)
+**Date:** 2026-06-11 (DB validation morning, full UI validation evening after env fix)
+**Branch:** `main`
 **Migrations applied:** `0029_round2_behavior.sql` + `0030_reconcile_review_policies.sql`
+**Final status:** ✅ **All checks passed. Round 1 + Round 2 closed.**
 
 Three columns, ordered by strength of evidence — not two, because "tested vs not tested" hides the difference between logic verified by automated tests and UI rendering verified by human eyeballs. Both matter; they're not the same.
 
@@ -40,33 +41,38 @@ These pieces have automated guarantees on their math/logic but were not interact
 
 ---
 
-## 3. Visual rendering UNVERIFIED — deferred due to Windows Metro env issue
+## 3. Visual rendering — VERIFIED 2026-06-11 (evening)
 
-Web target returned `ERR_EMPTY_RESPONSE`; Expo Go on phone hit "network connection lost"; neither web bundle nor native bundle would complete. The five highest-value UI checks below are what to run **first** when the env is back, before grinding through every screen.
+Originally deferred due to a Windows Metro environment issue (web returned `ERR_EMPTY_RESPONSE`; Expo Go on phone hit "network connection lost"). **Root cause turned out to be Node v24.14.0 — not LTS.** Expo SDK 55 + Metro have known HTTP/streaming regressions on Node ≥23. Side finding: McAfee Management Service (`macmnsvc`) was independently holding port 8081, masking the symptom further. Fix: install Node 22.18.0 LTS, full `rm node_modules && npm ci`, restart Metro on a clean port (8082). Web target restored; full UI smoke ran on `localhost:8082` in Chrome incognito.
 
-1. **R1C3 — `DateField` on the availability screen.** The shared component already validated on the booking request flow visually; this is the third (last) surface adopting it. Open `/listings/<your-listing>/availability` and confirm both date fields render as native HTML5 calendars (web) or the YYYY-MM-DD fallback (native).
-2. **R2C1 — self-listing notice card.** Switch a 'both' user to OWNER persona, open their own listing detail. Confirm an inert tinted notice ("This is your listing — switch to host mode to manage it") appears instead of the Request booking CTA. DB layer is already locked (column 1, Test 1); this is the user-facing surface.
-3. **R2C4 — host-home tinted section pills.** Switch to HOST persona, land on `/`. Confirm the two SectionList headers render as colored pills — gold for Drafts (shown first), moss for Live (shown second) — not plain uppercase text.
-4. **R2C6 — `ReviewCard` end-to-end render + persistence.** On the `434db8d9` booking marked `completed` today (now reverted to `requested` — re-mark it `completed` first), open as owner, submit a 5-star review, refresh the page, confirm the card flips to read-only mode showing the persisted review.
-5. **R2C7 — unread dot + focus refresh.** As host on an active booking, post a daily update. As owner, open `/bookings` and confirm a terracotta dot appears before the booking title. Tap into the booking; navigate back; confirm the dot is gone. Separately confirm the pending-requests badge in the AppHeader decrements after accepting a booking, without needing a persona switch.
+Five highest-value UI checks, all passed:
 
-If 1–5 all pass, the remaining UI changes (R2C3 guest mode, R1 spot checks) are lower-risk visual confirmations of behavior that's already locked at other layers.
+| # | Check | Result |
+|---|---|---|
+| 1 | **R2C5 — owner feed sort selector.** Tapped Newest / Price ↑ / Price ↓ / Rating / Nearest chips; cards reordered correctly. 4 visible listings with prices 150/150/180/150 gave clear Price ↑/↓ verification. | ✅ |
+| 2 | **R2C4 — host home tinted section pills.** Gold pill "DRAFTS · PENDING REVIEW" shown first; moss pill "LIVE · PUBLIC" shown second. Pill colors match the badges on cards inside each section. | ✅ |
+| 2 bonus | **R2C2 — Rejected by admin label.** The `admin_disabled` listing in the Drafts section rendered with the "Rejected by admin" red pill (replaced "Removed by admin"). | ✅ |
+| 3 | **R2C1 — self-listing notice card (UI layer).** Owner persona viewing own listing showed the inert "هذا إعلانكِ — بدّلي إلى وضع المضيفة لإدارته" notice instead of the Request-booking CTA. Feminine register confirmed. | ✅ |
+| 4 | **R2C6 — review flow end-to-end.** On a completed booking (booking `434db8d9` on Noura's listing), submitted 4 stars + text via the ReviewCard. Card flipped to read-only immediately. Hard-refresh kept read-only state. DB row `a7efbcc6-810c-...` confirmed with stars=4, rater=Omar, ratee=Noura. | ✅ |
+| 5 | **R1C1 — fee integers.** Fresh booking accepted as host (Khalid's request on "yes yes" at 750 SAR). DB snapshot: `owner_fee_sar=38`, `host_fee_sar=113`, `total_charged_sar=788`, `payout_sar=637` — all whole integers, exact match to `Math.round` formula. Legacy row (4bd4d8fc, pre-R1C1) confirmed to still hold decimal values from the old `round2` math — expected and consistent. | ✅ |
+| — | **R2C7 — unread dot + focus refresh.** Live observation during fee verification: pending-requests badge incremented from 1 → 2 when Khalid's request landed, decremented 2 → 1 immediately after Accept without persona switch. The unread-dot half wasn't exercised here (no daily updates posted today); the focus-refresh half is verified. | ✅ (focus refresh) |
+
+**One UX gap surfaced and logged**, not a regression of Round 1 or 2: the host's booking detail screen omits the owner's name/rating and the pet's name/breed/care notes — the host has no context on who they're committing to before they tap Accept. Logged in `docs/batch-decisions.md` as a future-milestone backlog item (host booking detail — owner & pet identity surface).
 
 ---
 
-## Recovery sequence when you come back
+## Final scoreboard
 
-Run, in order, from `C:\Users\Administrator\Petbnb`:
-
-1. **Restart Windows.** Genuinely clears stale Metro daemons, lock files, firewall state. Often enough on its own.
-2. **`npm run ci`** — confirms i18n parity (524 keys), `tsc --noEmit` clean, 35 vitest cases green. If any of the three turn red, fix BEFORE touching Metro.
-3. **`npx expo start`** — let it bind. Try web in incognito at `http://localhost:8081`. If web is back, do the five UI checks above on web.
-4. **If web still broken**, switch to phone via Expo Go (`npx expo start --tunnel` if LAN is blocked). Same five UI checks on phone.
-
-If the env still fails after all of the above, escalate to: `rmdir /s node_modules .expo; npm install; npx expo start`. After that, the issue is system-level (PATH, antivirus, corporate proxy) and out of repo scope.
+| Layer | Status |
+|---|---|
+| 4 DB smoke tests (self-booking RLS, anon blocked-dates SELECT, valid review INSERT, self-rating REJECTED) | ✅ verified 2026-06-11 morning |
+| Migrations 0029 (parts A+B+C) and 0030 applied | ✅ green |
+| 7 code-review + CI + unit-test items (R1C1, R1C2, R1C4, R1C5, R2C2, R2C5 sort logic) | ✅ locked at commit time |
+| 5 high-value UI checks + R2C7 focus-refresh | ✅ verified 2026-06-11 evening |
+| Round 1 + Round 2 + env saga | ✅ closed |
 
 ---
 
 ## Cross-reference
 
-Underlying decisions and full audit trail for every commit in Round 1 + Round 2: see [`docs/batch-decisions.md`](./batch-decisions.md). Migration SQL bodies + verification queries: [`supabase/migrations/0029_round2_behavior.sql`](../supabase/migrations/0029_round2_behavior.sql) and [`0030_reconcile_review_policies.sql`](../supabase/migrations/0030_reconcile_review_policies.sql).
+Underlying decisions and full audit trail for every commit in Round 1 + Round 2: see [`docs/batch-decisions.md`](./batch-decisions.md). The host-detail UX gap that surfaced during the smoke test is in the "Future-milestone backlog" section there. Migration SQL bodies + verification queries: [`supabase/migrations/0029_round2_behavior.sql`](../supabase/migrations/0029_round2_behavior.sql) and [`0030_reconcile_review_policies.sql`](../supabase/migrations/0030_reconcile_review_policies.sql).
