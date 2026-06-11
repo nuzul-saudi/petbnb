@@ -17,6 +17,7 @@ import { PetAvatar } from "@/components/PetAvatar";
 import { CheckOutSection } from "@/components/bookings/CheckOutSection";
 import { ReviewCard } from "@/components/bookings/ReviewCard";
 import { ConditionReportsSection } from "@/components/bookings/ConditionReportsSection";
+import { OwnerPetsSection } from "@/components/bookings/OwnerPetsSection";
 import { DailyUpdatesSection } from "@/components/bookings/DailyUpdatesSection";
 import { HostActions } from "@/components/bookings/HostActions";
 import { useBooking } from "@/hooks/useBooking";
@@ -1063,6 +1064,19 @@ export default function BookingDetailScreen() {
             </Text>
           ) : null}
         </View>
+
+        {/* Round 4 — host needs to see who's bringing what pet
+            BEFORE accepting. Pre-this-commit the host accepted blind:
+            dates, price, listing, and total only. Host-only visibility;
+            owner already knows their own pets. */}
+        {isHostMode && booking.owner ? (
+          <OwnerPetsSection
+            owner={booking.owner}
+            pets={booking.pets}
+            locale={locale}
+            t={t}
+          />
+        ) : null}
 
         {/* Condition reports section — extracted to
             ConditionReportsSection. Parent owns state + handlers

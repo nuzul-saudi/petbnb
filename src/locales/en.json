@@ -179,6 +179,15 @@
     }
   },
   "booking": {
+    "owner_section_title": "Pet Owner",
+    "pets_section_title": "Booked Pets",
+    "care_notes_label": "Care Notes",
+    "medical_needs_label": "Medical Needs",
+    "dietary_label": "Dietary Restrictions",
+    "medications_label": "Medications",
+    "vacc_current": "Vaccination current",
+    "vacc_expired": "Vaccination expired",
+    "vacc_missing": "No vaccination",
     "request_title": "Booking request",
     "back_to_listing": "← Back to sitter",
     "edit_back_to_booking": "Back to booking",

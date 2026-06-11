@@ -179,6 +179,15 @@
     }
   },
   "booking": {
+    "owner_section_title": "صاحبة الحيوان",
+    "pets_section_title": "الحيوانات المحجوزة",
+    "care_notes_label": "ملاحظات العناية",
+    "medical_needs_label": "الاحتياجات الطبية",
+    "dietary_label": "النظام الغذائي",
+    "medications_label": "الأدوية",
+    "vacc_current": "تطعيم ساري",
+    "vacc_expired": "تطعيم منتهي",
+    "vacc_missing": "لا يوجد تطعيم",
     "request_title": "طلب حجز",
     "back_to_listing": "← العودة إلى الإعلان",
     "edit_back_to_booking": "العودة إلى الحجز",
