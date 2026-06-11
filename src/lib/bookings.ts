@@ -57,12 +57,13 @@ export async function createBookingRequest(
     throw new Error('At least one pet is required for a booking');
   }
 
-  // Server-side enforcement of listings.max_concurrent_pets. Belt-and-
-  // braces against UI bugs or direct API misuse. UI gates this too;
-  // this check is the source of truth.
+  // App-level enforcement of two listing constraints. Belt-and-braces
+  // against UI bugs or direct API misuse. UI gates these too; DB-level
+  // gates also exist (RLS for self-booking via 0029; trigger for
+  // capacity via 0027). One read covers both checks.
   const { data: listingForCheck, error: lErr } = await supabase
     .from('listings')
-    .select('max_concurrent_pets')
+    .select('max_concurrent_pets, host_id')
     .eq('id', input.listingId)
     .maybeSingle();
   if (lErr) throw lErr;
@@ -71,6 +72,15 @@ export async function createBookingRequest(
     throw new Error(
       `Exceeds listing max of ${listingForCheck.max_concurrent_pets} pets`,
     );
+  }
+  // R2C1 — self-booking guard. A host cannot book their own listing.
+  // Reason: self-bookings would let a 'both' user complete the flow,
+  // switch personas, accept their own request, and (once two-way
+  // reviews ship) rate themselves five stars. RLS in 0029 makes this
+  // hard at the DB layer; this throw makes it a friendlier error
+  // surface in the UI.
+  if (listingForCheck.host_id === input.ownerId) {
+    throw new Error('Cannot book your own listing');
   }
 
   const addons: AddonInput[] = input.addons ?? [];

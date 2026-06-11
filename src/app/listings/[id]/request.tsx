@@ -314,6 +314,54 @@ export default function BookingRequestScreen() {
     );
   }
 
+  // R2C1 — self-booking guard. If the URL is opened directly (or
+  // bookmarked) for the viewer's own listing, refuse the form and
+  // show the same inert notice as the listing detail. Mirrors the
+  // app-level check in createBookingRequest + the DB RLS in 0029.
+  if (user && listing.host_id === user.id) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
+        <View style={styles.centered}>
+          <View
+            style={{
+              backgroundColor: colors.whisper,
+              borderRadius: radii.lg,
+              borderWidth: 1,
+              borderColor: colors.gold,
+              padding: spacing.lg,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: fonts.body,
+                fontSize: 13,
+                color: colors.ink,
+                lineHeight: 20,
+                textAlign: 'center',
+              }}
+            >
+              {t('listing.self_booking_notice')}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() =>
+              router.replace({
+                pathname: '/listings/[id]',
+                params: { id: listing.id },
+              })
+            }
+            style={styles.backLink}
+          >
+            <Text style={styles.backLinkText}>
+              {t('booking.back_to_listing')}
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const togglePet = (id: string) => {
     setSelectedPetIds((prev) => {
       const next = new Set(prev);

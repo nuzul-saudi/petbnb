@@ -247,6 +247,16 @@ export default function ListingDetailScreen() {
               the persona gate). Owners on listings they don't own
               always see Request booking. */}
           <View style={styles.ctaWrap}>
+            {/* R2C1 self-booking guard (Round 2 — audit §1).
+                Three states:
+                  - own listing in host persona  → Edit listing CTA
+                  - own listing in owner persona → inert notice
+                    ("switch to host mode to manage this") instead of
+                    Request booking — a host can't book their own home
+                    (would let them generate fake five-star ratings
+                    once two-way reviews ship). DB + app guards back
+                    this up; the notice is the friendly surface.
+                  - any other viewer            → Request booking CTA */}
             {isOwnListing && persona === 'host' ? (
               <Button
                 label={t('listing.edit_button')}
@@ -254,6 +264,12 @@ export default function ListingDetailScreen() {
                 variant="primary"
                 fullWidth
               />
+            ) : isOwnListing ? (
+              <View style={styles.selfBookingNotice}>
+                <Text style={styles.selfBookingNoticeText}>
+                  {t('listing.self_booking_notice')}
+                </Text>
+              </View>
             ) : (
               <Button
                 label={t('listing.request_button')}
@@ -502,6 +518,20 @@ const styles = StyleSheet.create({
   },
   ctaWrap: {
     marginTop: spacing.xl,
+  },
+  selfBookingNotice: {
+    backgroundColor: colors.whisper,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    padding: spacing.md,
+  },
+  selfBookingNoticeText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   backLink: {
     marginTop: spacing.lg,
