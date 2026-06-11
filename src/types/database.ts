@@ -891,6 +891,19 @@ export type Database = {
         Args: { p_listing_id: string; p_order: string[] };
         Returns: void;
       };
+      // Round 3 / 0032 — server-side host rating aggregation.
+      // Returns one row per host id passed in; missing hosts (no
+      // reviews) are simply absent from the result. SECURITY DEFINER
+      // so anon (R2C3 guest mode) and authenticated callers both
+      // get the same numbers.
+      get_host_ratings: {
+        Args: { host_ids: string[] };
+        Returns: {
+          host_id: string;
+          avg_rating: number;
+          review_count: number;
+        }[];
+      };
     };
 
     // These mirror the CHECK constraints in 0001_initial_schema.sql. They

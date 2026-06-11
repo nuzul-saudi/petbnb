@@ -172,41 +172,40 @@ export async function listActiveListings(
     };
   });
 
-  // S2 — review aggregate per host. Best-effort: if the reviews
-  // query fails (RLS or otherwise), we silently leave host_avg_rating
-  // unset and the card falls back to the "new host" badge. One
-  // rollup query for the full set of host_ids in the result.
+  // Host rating aggregate — server-side via the 0032 RPC since Round 3.
+  // Previously this fetched every (ratee_id, stars) row for the page's
+  // host set and averaged client-side — a "20 listings × 50 reviews
+  // per host = 1000 rows over the wire" hot path. The RPC pushes
+  // avg + count down to Postgres and returns one row per host.
+  //
+  // Best-effort: if the RPC fails (network, missing migration, etc.)
+  // we silently leave host_avg_rating unset and the card falls back
+  // to the "new host" badge. Anon callers go through the SECURITY
+  // DEFINER bypass so guest mode sees the same numbers.
   if (items.length > 0) {
     const hostIds = Array.from(
       new Set(items.map((it) => it.host_id).filter((x): x is string => !!x)),
     );
     if (hostIds.length > 0) {
       try {
-        const { data: rev } = await supabase
-          .from('reviews')
-          .select('ratee_id, stars')
-          .in('ratee_id', hostIds);
-        if (rev && rev.length > 0) {
-          const byHost = new Map<string, { sum: number; count: number }>();
-          for (const r of rev) {
-            const cur = byHost.get(r.ratee_id) ?? { sum: 0, count: 0 };
-            cur.sum += r.stars;
-            cur.count += 1;
-            byHost.set(r.ratee_id, cur);
-          }
+        const { data: ratings } = await supabase.rpc('get_host_ratings', {
+          host_ids: hostIds,
+        });
+        if (ratings && ratings.length > 0) {
+          const byHost = new Map<string, { avg: number; count: number }>(
+            ratings.map((r) => [
+              r.host_id,
+              { avg: Number(r.avg_rating), count: Number(r.review_count) },
+            ]),
+          );
           for (const it of items) {
             const agg = byHost.get(it.host_id);
-            if (agg && agg.count > 0) {
-              it.host_avg_rating = Math.round((agg.sum / agg.count) * 10) / 10;
-              it.host_review_count = agg.count;
-            } else {
-              it.host_avg_rating = null;
-              it.host_review_count = 0;
-            }
+            it.host_avg_rating = agg && agg.count > 0 ? agg.avg : null;
+            it.host_review_count = agg?.count ?? 0;
           }
         }
       } catch {
-        // RLS or network — silently skip the rating data.
+        // RPC or network — silently skip the rating data.
       }
     }
   }
