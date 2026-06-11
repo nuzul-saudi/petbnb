@@ -353,18 +353,23 @@ function OwnerFeedHome() {
       if (!opts.silent) setLoading(true);
       setError(null);
       try {
-        const rows = await listActiveListings({
-          city,
-          femaleHostsOnly: femaleOnly,
-          groomingOnly,
-          noResidentPetsOnly,
-          // Distance is also a sort, but the DB query has the haversine
-          // computation already wired to sortByDistance. Newest, price,
-          // and rating are client-side sorts (next effect) over the
-          // returned rows.
-          sortByDistance:
-            sortBy === 'distance' && coords ? coords : undefined,
-        });
+        const rows = await listActiveListings(
+          {
+            city,
+            femaleHostsOnly: femaleOnly,
+            groomingOnly,
+            noResidentPetsOnly,
+            // Distance is also a sort, but the DB query has the haversine
+            // computation already wired to sortByDistance. Newest, price,
+            // and rating are client-side sorts (next effect) over the
+            // returned rows.
+            sortByDistance:
+              sortBy === 'distance' && coords ? coords : undefined,
+          },
+          // Pagination (Round 3). Page 0, 20 per page. Load-more /
+          // infinite scroll is a follow-up.
+          { limit: 20 },
+        );
         setItems(rows);
       } catch (e) {
         logWarn('[feed.load_failed]', e);

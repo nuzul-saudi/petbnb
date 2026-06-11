@@ -98,6 +98,7 @@ export type ListingDetail = Tables<'listings'> & {
 
 export async function listActiveListings(
   filter: ListingFilter = {},
+  pagination: { limit?: number; offset?: number } = {},
 ): Promise<ListingFeedItem[]> {
   if (!supabase) return [];
 
@@ -127,6 +128,15 @@ export async function listActiveListings(
   if (filter.noResidentPetsOnly) {
     query = query.eq('has_resident_pets', false);
   }
+
+  // Pagination (Round 3 / 2026-06-XX). Default 20-per-page. Without
+  // this, the unpaginated feed was hot-pathed at "every approved
+  // listing every load" — fine at 30 listings, painful at 300.
+  // "Load more" / infinite scroll is a follow-up; the owner feed
+  // currently fetches page 0 only.
+  const pageSize = pagination.limit ?? 20;
+  const start = pagination.offset ?? 0;
+  query = query.range(start, start + pageSize - 1);
 
   const { data, error } = await query;
   if (error) throw error;
