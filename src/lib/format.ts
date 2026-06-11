@@ -15,7 +15,12 @@ export function toArabicDigits(value: number | string): string {
 }
 
 export function formatSAR(amount: number, _useArabicDigits = false): string {
-  return `${String(amount)} ر.س`;
+  // Round defensively. Founder rule: SAR is whole-integer in display
+  // everywhere, no decimals. New bookings get integer fee snapshots
+  // since R1C1, but pre-R1C1 rows still hold decimal payout/fee
+  // values that would surface as e.g. "892.5 ر.س" without this guard.
+  // The audit trail in the DB stays decimal — only the display rounds.
+  return `${String(Math.round(amount))} ر.س`;
 }
 
 /** Whole-day difference between two ISO dates (yyyy-mm-dd). 0 on invalid. */
