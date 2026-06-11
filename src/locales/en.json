@@ -575,6 +575,16 @@
     "error": "Something went wrong, please try again later",
     "retry": "Try again"
   },
+  "messages": {
+    "section_title": "Messages",
+    "placeholder": "Type your message…",
+    "send": "Send",
+    "send_short": "→",
+    "empty": "Start the conversation with the other party",
+    "send_failed": "Failed to send message, please try again",
+    "contact_warning": "Your message appears to contain contact info (phone or handle). For your protection, we recommend keeping all conversations and bookings on the platform. Send anyway?",
+    "compose_hidden_hint": "Conversation closed for this booking"
+  },
   "nav": {
     "home": "Home",
     "bookings": "My Bookings",
