@@ -17,7 +17,11 @@ import { findBreed } from '@/lib/breeds';
 import { colors } from '@/theme/tokens';
 
 export type PetAvatarProps = {
-  /** Signed URL from pets.photo_url. Highest-priority source. */
+  /** Already-signed renderable URL for the photo. Post-Round-6 the
+   *  caller signs pets.photo_url (storage path) via signPetPhotoUrl
+   *  or useSignedPetPhotoUrls; legacy `https://` rows pass through
+   *  the same plumbing. Pre-Round-6 this was a direct signed URL on
+   *  pets.photo_url. Either way it must be loadable as-is. */
   photoUrl?: string | null;
   /** Structured breed key (pets.breed). Used for the breed-thumbnail fallback. */
   breed?: string | null;

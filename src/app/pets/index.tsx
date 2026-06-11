@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { findBreed } from '@/lib/breeds';
 import { useTranslation } from '@/lib/i18n';
 import { listPetsForOwner } from '@/lib/pets';
+import { useSignedPetPhotoUrls } from '@/hooks/useSignedPetPhotoUrls';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import { toArabicDigits } from '@/lib/format';
 import type { Tables } from '@/types/database';
@@ -23,6 +24,10 @@ export default function PetsListScreen() {
   const [pets, setPets] = useState<Tables<'pets'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Round 6 — batch-sign all pet-photo paths on data-load so the
+  // FlatList renders signed URLs without N round-trips.
+  const signedPhotos = useSignedPetPhotoUrls(pets.map((p) => p.photo_url));
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -92,7 +97,11 @@ export default function PetsListScreen() {
                 }
                 style={styles.row}
               >
-                <PetAvatar photoUrl={item.photo_url} breed={item.breed} size={48} />
+                <PetAvatar
+                  photoUrl={item.photo_url ? signedPhotos.get(item.photo_url) ?? null : null}
+                  breed={item.breed}
+                  size={48}
+                />
                 <View style={styles.rowMain}>
                   <Text style={styles.rowName}>{item.name}</Text>
                   <Text style={styles.rowMeta}>

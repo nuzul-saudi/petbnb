@@ -25,6 +25,7 @@ import {
   deletePet,
   getPet,
   pickPetPhoto,
+  signPetPhotoUrl,
   updatePet,
   uploadPetPhoto,
   type PetPhotoSource,
@@ -61,10 +62,14 @@ export default function PetDetailScreen() {
   const [fvrcpVaccinatedAt, setFvrcpVaccinatedAt] = useState('');
   const [careNotes, setCareNotes] = useState('');
 
-  // photoUrl is the signed URL stored on pets.photo_url for an already-
-  // saved photo. pendingPhoto + previewUri are the just-picked photo
-  // source and the URI we render before the actual upload on Save.
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  // photoStored is whatever is on pets.photo_url today — post-Round-6
+  // that's a storage PATH, pre-Round-6 it's a `https://` signed URL.
+  // photoDisplayUrl is the actually-renderable URL (signed on render
+  // for new path-based rows; passed-through for legacy URL rows).
+  // pendingPhoto + previewUri are the just-picked photo source and
+  // the URI we render before the actual upload on Save.
+  const [photoStored, setPhotoStored] = useState<string | null>(null);
+  const [photoDisplayUrl, setPhotoDisplayUrl] = useState<string | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<PetPhotoSource | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
 
@@ -108,7 +113,14 @@ export default function PetDetailScreen() {
         setRabiesVaccinatedAt(pet.rabies_vaccinated_at ?? '');
         setFvrcpVaccinatedAt(pet.fvrcp_vaccinated_at ?? '');
         setCareNotes(pet.care_notes ?? '');
-        setPhotoUrl(pet.photo_url);
+        setPhotoStored(pet.photo_url);
+        // Round 6 — sign on render if pet.photo_url is a storage
+        // path; legacy `https://...` rows are passed through.
+        if (pet.photo_url) {
+          void signPetPhotoUrl(pet.photo_url).then((url) => {
+            if (!cancelled) setPhotoDisplayUrl(url);
+          });
+        }
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -186,9 +198,10 @@ export default function PetDetailScreen() {
           createdId = created.id;
           setPendingCreatedId(created.id);
         }
-        // 2. Upload the picked photo (if any) and write the signed URL
-        //    onto the new row. If the upload fails the pet still exists
-        //    without a photo — surface a specific error, don't roll back.
+        // 2. Upload the picked photo (if any) and write the storage
+        //    PATH (post-Round-6) onto the new row. If the upload
+        //    fails the pet still exists without a photo — surface a
+        //    specific error, don't roll back.
         if (pendingPhoto) {
           try {
             const url = await uploadPetPhoto({
@@ -204,19 +217,21 @@ export default function PetDetailScreen() {
           }
         }
       } else {
-        // Existing pet. Upload first (if a photo was picked) so we have
-        // a URL to include in the single updatePet call. A photo upload
-        // failure here surfaces the specific error and bails before the
+        // Existing pet. Upload first (if a photo was picked) so we
+        // have a storage path to include in the single updatePet
+        // call. (Post-Round-6 we store a storage path on
+        // pets.photo_url, not a signed URL.) A photo upload failure
+        // here surfaces the specific error and bails before the
         // updatePet — the other field changes will not be written yet.
-        let photoUrlForPatch = photoUrl;
+        let photoUrlForPatch = photoStored;
         if (pendingPhoto) {
           try {
-            const url = await uploadPetPhoto({
+            const path = await uploadPetPhoto({
               petId: id,
               ownerId: user.id,
               source: pendingPhoto,
             });
-            photoUrlForPatch = url;
+            photoUrlForPatch = path;
           } catch (photoErr) {
             logWarn('[pets.photo_upload_failed]', photoErr);
             setError(t('pets.photo_upload_failed'));
@@ -276,7 +291,10 @@ export default function PetDetailScreen() {
 
   // Display priority: the just-picked preview wins, then the saved URL,
   // then the 🐈 placeholder.
-  const displayUri = previewUri ?? photoUrl;
+  // Round 6 — displayUri uses the rendered (signed-on-load) URL, not
+  // the raw stored value (which is a path post-Round-6 and can't load
+  // directly). previewUri (the just-picked file) still takes priority.
+  const displayUri = previewUri ?? photoDisplayUrl;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>

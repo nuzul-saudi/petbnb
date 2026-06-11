@@ -236,6 +236,23 @@ export async function pickPetPhoto(): Promise<PetPhotoSource | null> {
  *
  * Throws on storage write failure. Returns the signed URL on success.
  */
+/**
+ * Round 6 (2026-06-XX) — upload now returns the STORAGE PATH that
+ * gets persisted in pets.photo_url, not a 7-day signed URL.
+ *
+ * Pre-this-change, the upload signed a 7-day URL and stored that.
+ * The URL silently expired on day 8 — exactly the wrong moment for
+ * the product to look untrustworthy ("the host opens a booking on
+ * day 8 and sees a broken image"). The production pattern is
+ * store-the-path + sign-on-render. Consumers either call
+ * signPetPhotoUrl(path) for one row, or signPetPhotoUrls(paths)
+ * to batch on list-load (avoids N+1 over a multi-pet view).
+ *
+ * Legacy rows that still hold a `https://...` signed URL are
+ * detected by signPetPhotoUrl and returned as-is — they'll keep
+ * working until expiry, at which point the host re-uploads and
+ * lands in the new path-based regime.
+ */
 export async function uploadPetPhoto(args: {
   petId: string;
   ownerId: string;
@@ -243,9 +260,9 @@ export async function uploadPetPhoto(args: {
 }): Promise<string> {
   if (!supabase) throw new Error('No Supabase client');
 
-  // EXIF strip + materialize (Round 3 / 2026-06-XX). A pet photo
-  // taken at home would leak the owner's address via embedded GPS
-  // without this. Output is always JPEG.
+  // EXIF strip + materialize (Round 3). A pet photo taken at home
+  // would leak the owner's address via embedded GPS without this.
+  // Output is always JPEG.
   const { blob, ext } = await materializeSourceToStrippedBlob(args.source);
 
   const path = `${args.ownerId}/${args.petId}/${Date.now()}.${ext}`;
@@ -255,11 +272,63 @@ export async function uploadPetPhoto(args: {
     .upload(path, blob, { upsert: true, contentType: blob.type || `image/${ext}` });
   if (upErr) throw upErr;
 
-  // 7-day signed URL. Long enough to comfortably exceed any MVP testing
-  // window; UI re-uploads if it ever expires in practice.
-  const { data, error: urlErr } = await supabase.storage
+  // Round 6: return the storage path, NOT a pre-signed URL. Caller
+  // persists this in pets.photo_url; render-time consumers sign on
+  // demand via signPetPhotoUrl / signPetPhotoUrls.
+  return path;
+}
+
+/**
+ * Sign one pet-photo storage path. Returns a 1-hour signed URL.
+ * Legacy rows (which hold a full `https://` signed URL from the
+ * pre-Round-6 regime) are returned as-is — no signing call, no
+ * dependency on Supabase being online.
+ *
+ * Safe for null/undefined/empty input — returns null then. Use this
+ * for a single-row consumer (e.g. the pet edit screen). For lists,
+ * prefer signPetPhotoUrls so the calls parallelize.
+ */
+export async function signPetPhotoUrl(
+  pathOrUrl: string | null | undefined,
+): Promise<string | null> {
+  if (!supabase || !pathOrUrl) return null;
+  if (pathOrUrl.startsWith('https://')) return pathOrUrl;
+  const { data } = await supabase.storage
     .from('pet-photos')
-    .createSignedUrl(path, 60 * 60 * 24 * 7);
-  if (urlErr || !data) throw urlErr ?? new Error('Failed to sign pet photo URL');
-  return data.signedUrl;
+    .createSignedUrl(pathOrUrl, 60 * 60); // 1 hour
+  return data?.signedUrl ?? null;
+}
+
+/**
+ * Batch-sign pet-photo paths for list rendering. Returns a Map
+ * keyed by the original input string → its signed URL (or the
+ * input itself for legacy `https://` rows). Missing / null inputs
+ * are simply absent from the map.
+ *
+ * The whole point of batching: a 4-pet list naively calling
+ * signPetPhotoUrl per row is 4 round-trips. This parallelizes
+ * via Promise.all → 1 round-trip wall-clock.
+ */
+export async function signPetPhotoUrls(
+  pathsOrUrls: (string | null | undefined)[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!supabase) return out;
+  const inputs = pathsOrUrls.filter((p): p is string => !!p);
+  if (inputs.length === 0) return out;
+
+  await Promise.all(
+    inputs.map(async (input) => {
+      if (input.startsWith('https://')) {
+        // Legacy signed URL — keep as-is.
+        out.set(input, input);
+        return;
+      }
+      const { data } = await supabase!.storage
+        .from('pet-photos')
+        .createSignedUrl(input, 60 * 60);
+      if (data?.signedUrl) out.set(input, data.signedUrl);
+    }),
+  );
+  return out;
 }

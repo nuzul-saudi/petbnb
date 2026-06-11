@@ -40,6 +40,7 @@ import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
 import { snapshotFees } from '@/lib/payments-policy';
 import { listPetsForOwner } from '@/lib/pets';
+import { useSignedPetPhotoUrls } from '@/hooks/useSignedPetPhotoUrls';
 import {
   ADDON_CONFIG,
   computePriceBreakdown,
@@ -89,6 +90,8 @@ export default function BookingRequestScreen() {
   const [pets, setPets] = useState<Tables<'pets'>[]>([]);
   const [blockedRanges, setBlockedRanges] = useState<BlockedRange[]>([]);
   const [loading, setLoading] = useState(true);
+  // Round 6 — batch-sign pet photos for the multi-pet picker.
+  const signedPetPhotos = useSignedPetPhotoUrls(pets.map((p) => p.photo_url));
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -630,7 +633,11 @@ export default function BookingRequestScreen() {
                   >
                     {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
                   </View>
-                  <PetAvatar photoUrl={p.photo_url} breed={p.breed} size={44} />
+                  <PetAvatar
+                    photoUrl={p.photo_url ? signedPetPhotos.get(p.photo_url) ?? null : null}
+                    breed={p.breed}
+                    size={44}
+                  />
                   <Text style={styles.petName}>{p.name}</Text>
                 </Pressable>
               );
@@ -659,7 +666,7 @@ export default function BookingRequestScreen() {
                   <View key={p.id} style={styles.petCard}>
                     <View style={styles.petCardHeader}>
                       <PetAvatar
-                        photoUrl={p.photo_url}
+                        photoUrl={p.photo_url ? signedPetPhotos.get(p.photo_url) ?? null : null}
                         breed={p.breed}
                         size={36}
                       />

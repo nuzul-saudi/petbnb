@@ -30,6 +30,7 @@ import { useBooking } from "@/hooks/useBooking";
 import { useConditionReports } from "@/hooks/useConditionReports";
 import { useDailyUpdates } from "@/hooks/useDailyUpdates";
 import { useMessages } from "@/hooks/useMessages";
+import { useSignedPetPhotoUrls } from "@/hooks/useSignedPetPhotoUrls";
 import { useAuth } from "@/lib/auth";
 import { confirmDialog } from "@/lib/confirm";
 import { sendMessage, containsContactInfo } from "@/lib/messages";
@@ -170,6 +171,14 @@ export default function BookingDetailScreen() {
       void refetchMessages();
     }, [refetchMessages]),
   );
+
+  // Round 6 — batch-sign pet photos for OwnerPetsSection. Booking
+  // pets are loaded once with the booking; signing once on data
+  // arrival is sufficient.
+  const signedBookingPetPhotos = useSignedPetPhotoUrls(
+    (booking?.pets ?? []).map((p) => p.photo_url),
+  );
+
   const [filingCheckIn, setFilingCheckIn] = useState(false);
   const [crPendingPhotos, setCrPendingPhotos] = useState<PetPhotoSource[]>([]);
   const [crNote, setCrNote] = useState("");
@@ -1098,6 +1107,7 @@ export default function BookingDetailScreen() {
             owner={booking.owner}
             pets={booking.pets}
             locale={locale}
+            signedPhotos={signedBookingPetPhotos}
             t={t}
           />
         ) : null}

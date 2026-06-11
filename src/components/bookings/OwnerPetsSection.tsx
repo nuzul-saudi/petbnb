@@ -25,6 +25,13 @@ export type OwnerPetsSectionProps = {
   pets: Tables<'pets'>[];
   locale: Locale;
   /**
+   * Map of pets.photo_url → signed renderable URL. Parent batch-signs
+   * via useSignedPetPhotoUrls and passes the result down so the
+   * component stays presentational. Round 6 — pets.photo_url is now
+   * a storage path, not a directly-loadable URL.
+   */
+  signedPhotos: Map<string, string>;
+  /**
    * Localized labels keyed by the i18n booking.* namespace. Passing
    * pre-localized strings keeps this component pure presentational
    * and avoids a useTranslation() inside a presentational component.
@@ -36,6 +43,7 @@ export function OwnerPetsSection({
   owner,
   pets,
   locale,
+  signedPhotos,
   t,
 }: OwnerPetsSectionProps) {
   const ownerName =
@@ -89,7 +97,7 @@ export function OwnerPetsSection({
             <View key={p.id} style={styles.petCard}>
               <View style={styles.petHeaderRow}>
                 <PetAvatar
-                  photoUrl={p.photo_url}
+                  photoUrl={p.photo_url ? signedPhotos.get(p.photo_url) ?? null : null}
                   breed={p.breed}
                   size={48}
                 />
