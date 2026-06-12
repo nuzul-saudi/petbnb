@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Petbnb",
-    "tagline": "رعاية القطط في الرياض"
+    "tagline": "رعاية الحيوانات الأليفة في الرياض"
   },
   "home": {
     "welcome": "مرحبا بكم في Petbnb",
@@ -11,7 +11,7 @@
     "your_role": "دورك",
     "sign_out": "تسجيل الخروج",
     "host_home_empty_title": "لم تضيفي أي إعلان بعد",
-    "host_home_empty_body": "أنشئي إعلانك الأول لبدء استضافة القطط.",
+    "host_home_empty_body": "أنشئي إعلانك الأول لبدء استضافة الحيوانات الأليفة.",
     "host_home_create_button": "إضافة إعلان جديد",
     "host_home_section_live": "منشور · للعملاء",
     "host_home_section_drafts": "مسوّدات · قيد المراجعة"
@@ -271,9 +271,9 @@
     "vaccine_fvrcp_missing": "FVRCP: —",
     "max_pets_exceeded": "هذا المضيف يستقبل حتى {count} قطط",
     "max_pets_exceeded_one": "هذا المضيف يستقبل حتى قطة واحدة",
-    "no_pets_title": "ليس لديك قطط بعد",
-    "no_pets_body": "أضف قطة من 'قططي' لتتمكن من إنشاء حجوزات",
-    "no_pets_button": "+ أضف قطة",
+    "no_pets_title": "ليس لديك حيوانات بعد",
+    "no_pets_body": "أضيفي حيواناً من 'حيواناتي الأليفة' لتتمكني من إنشاء حجوزات",
+    "no_pets_button": "+ أضيفي حيواناً",
     "processing_payment": "جارٍ معالجة الدفع…",
     "confirm_title": "تم إرسال الطلب",
     "confirm_subtitle": "بانتظار رد المضيف",
@@ -366,7 +366,7 @@
   },
   "auth": {
     "sign_in_title": "مرحباً بك في Petbnb",
-    "sign_in_subtitle": "رعاية القطط في الرياض",
+    "sign_in_subtitle": "رعاية الحيوانات الأليفة في الرياض",
     "email_label": "البريد الإلكتروني",
     "email_placeholder": "you@example.com",
     "send_otp_button": "إرسال رمز التحقق",
@@ -401,7 +401,7 @@
     "both": "كلاهما",
     "owner_title": "أبحث عن مكان لقطتي",
     "owner_desc": "ابحث عن مضيف موثوق في منطقتك",
-    "host_title": "أستضيف القطط في منزلي",
+    "host_title": "أستضيف الحيوانات الأليفة في منزلي",
     "host_desc": "استقبل الحيوانات واكسب دخلاً",
     "both_title": "كلاهما",
     "both_desc": "أحتاج كلا الدورين"
@@ -527,13 +527,13 @@
     "sign_out": "تسجيل الخروج"
   },
   "pets": {
-    "list_title": "قططي",
+    "list_title": "حيواناتي الأليفة",
     "back": "← رجوع",
     "loading": "جارٍ التحميل…",
-    "load_failed": "تعذّر تحميل القطط",
-    "empty_title": "لا توجد قطط بعد",
-    "empty_body": "أضف قطتك الأولى لتتمكن من إنشاء حجوزات",
-    "add_button": "+ إضافة قطة",
+    "load_failed": "تعذّر التحميل",
+    "empty_title": "لا توجد حيوانات بعد",
+    "empty_body": "أضيفي حيوانك الأول لتتمكني من إنشاء حجوزات",
+    "add_button": "+ إضافة حيوان",
     "species_cat": "قطة",
     "age_months": "{count} شهر",
     "age_months_one": "شهر واحد",
@@ -589,7 +589,7 @@
     "name_required": "الاسم مطلوب",
     "role_label": "الدور",
     "admin_note": "حسابك مدير. لتغيير الدور أو إلغاء الترقية، تواصل مع مدير آخر.",
-    "my_pets_link": "قططي",
+    "my_pets_link": "حيواناتي الأليفة",
     "save_changes": "حفظ التغييرات",
     "saving": "جارٍ الحفظ…",
     "save_failed": "تعذّر الحفظ"

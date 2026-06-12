@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Petbnb",
-    "tagline": "Trusted cat sitters in Riyadh"
+    "tagline": "Trusted pet sitters in Riyadh"
   },
   "home": {
     "welcome": "Welcome to Petbnb",
@@ -11,7 +11,7 @@
     "your_role": "Your role",
     "sign_out": "Sign out",
     "host_home_empty_title": "You haven't listed a place yet",
-    "host_home_empty_body": "Create your first listing to start hosting cats.",
+    "host_home_empty_body": "Create your first listing to start hosting pets.",
     "host_home_create_button": "Create a listing",
     "host_home_section_live": "Live · public",
     "host_home_section_drafts": "Drafts · pending review"
@@ -269,9 +269,9 @@
     "vaccine_fvrcp_missing": "FVRCP: —",
     "max_pets_exceeded": "This sitter accepts up to {count} cats",
     "max_pets_exceeded_one": "This sitter accepts up to {count} cat",
-    "no_pets_title": "You don't have any cats yet",
-    "no_pets_body": "Add a cat from 'My cats' to create bookings",
-    "no_pets_button": "+ Add a cat",
+    "no_pets_title": "You don't have any pets yet",
+    "no_pets_body": "Add a pet from 'My pets' to create bookings",
+    "no_pets_button": "+ Add a pet",
     "processing_payment": "Processing payment…",
     "confirm_title": "Request sent",
     "confirm_subtitle": "Awaiting sitter response",
@@ -364,7 +364,7 @@
   },
   "auth": {
     "sign_in_title": "Welcome to Petbnb",
-    "sign_in_subtitle": "Trusted cat sitters in Riyadh",
+    "sign_in_subtitle": "Trusted pet sitters in Riyadh",
     "email_label": "Email",
     "email_placeholder": "you@example.com",
     "send_otp_button": "Send verification code",
@@ -397,7 +397,7 @@
     "both": "Both",
     "owner_title": "I'm looking for a place for my cat",
     "owner_desc": "Find a trusted sitter in your area",
-    "host_title": "I sit cats at my home",
+    "host_title": "I sit pets at my home",
     "host_desc": "Welcome cats and earn income",
     "both_title": "Both",
     "both_desc": "I need both roles"
@@ -517,13 +517,13 @@
     "sign_out": "Sign out"
   },
   "pets": {
-    "list_title": "My cats",
+    "list_title": "My pets",
     "back": "← Back",
     "loading": "Loading…",
-    "load_failed": "Couldn't load cats",
-    "empty_title": "No cats yet",
-    "empty_body": "Add your first cat to start creating bookings",
-    "add_button": "+ Add a cat",
+    "load_failed": "Couldn't load pets",
+    "empty_title": "No pets yet",
+    "empty_body": "Add your first pet to start creating bookings",
+    "add_button": "+ Add a pet",
     "species_cat": "Cat",
     "age_months": "{count} months",
     "age_months_one": "{count} month",
@@ -578,7 +578,7 @@
     "name_required": "Name is required",
     "role_label": "Role",
     "admin_note": "Your account is an admin account. To change your role or revoke admin, contact another admin.",
-    "my_pets_link": "My cats",
+    "my_pets_link": "My pets",
     "save_changes": "Save changes",
     "saving": "Saving…",
     "save_failed": "Couldn't save"
