@@ -25,6 +25,12 @@ export type ListingFilter = {
   /** Only listings where has_resident_pets = false. */
   noResidentPetsOnly?: boolean;
   /**
+   * Round 12 / Step 5.7. When set, only listings whose accepts_species
+   * array contains the given species. Default unset = no constraint
+   * (returns listings for any species).
+   */
+  species?: 'cat' | 'dog';
+  /**
    * When provided, the result is sorted nearest-first by haversine
    * distance from this point. Listings without lat/lng remain in the
    * result (we don't filter — we just sort), sorted last with
@@ -127,6 +133,11 @@ export async function listActiveListings(
   if (filter.groomingOnly) query = query.eq('offers_grooming', true);
   if (filter.noResidentPetsOnly) {
     query = query.eq('has_resident_pets', false);
+  }
+  // Round 12 / Step 5.7. PostgREST's `contains` maps to the SQL `@>`
+  // operator on text[]. The GIN index from 0034 backs the lookup.
+  if (filter.species) {
+    query = query.contains('accepts_species', [filter.species]);
   }
 
   // Pagination (Round 3 / 2026-06-XX). Default 20-per-page. Without
@@ -441,6 +452,9 @@ export async function createListing(input: {
   offersGrooming: boolean;
   hostGender: 'female' | 'male';
   requiresVaccination: boolean;
+  /** Round 12 / Step 5.7. Optional for back-compat — defaults to ['cat']
+   *  which matches the DB column default. */
+  acceptsSpecies?: ('cat' | 'dog')[];
 }): Promise<{ id: string }> {
   if (!supabase) throw new Error('supabase not configured');
 
@@ -459,6 +473,7 @@ export async function createListing(input: {
       offers_grooming: input.offersGrooming,
       host_gender: input.hostGender,
       requires_vaccination: input.requiresVaccination,
+      accepts_species: input.acceptsSpecies ?? ['cat'],
       status: 'pending',
     })
     .select('id')
@@ -502,6 +517,8 @@ export type UpdateListingPatch = {
   offersGrooming?: boolean;
   hostGender?: 'female' | 'male';
   requiresVaccination?: boolean;
+  /** Round 12 / Step 5.7. text[] of accepted species. */
+  acceptsSpecies?: ('cat' | 'dog')[];
 };
 
 /**
@@ -613,6 +630,9 @@ export async function updateListing(
     if (patch.requiresVaccination !== undefined) {
       row.requires_vaccination = patch.requiresVaccination;
     }
+    if (patch.acceptsSpecies !== undefined) {
+      row.accepts_species = patch.acceptsSpecies;
+    }
 
     const { error } = await supabase
       .from('listings')
@@ -663,6 +683,9 @@ export async function updateListing(
     if (patch.requiresVaccination !== undefined) {
       draftPatch.requires_vaccination = patch.requiresVaccination;
     }
+    if (patch.acceptsSpecies !== undefined) {
+      draftPatch.accepts_species = patch.acceptsSpecies;
+    }
 
     const { error } = await supabase
       .from('listing_drafts')
@@ -699,6 +722,7 @@ export async function updateListing(
     host_gender: patch.hostGender ?? current.host_gender,
     requires_vaccination:
       patch.requiresVaccination ?? current.requires_vaccination,
+    accepts_species: patch.acceptsSpecies ?? current.accepts_species,
   };
 
   const { error: insertErr } = await supabase
@@ -738,6 +762,7 @@ export type ListingEditData = {
     offersGrooming: boolean;
     hostGender: 'female' | 'male';
     requiresVaccination: boolean;
+    acceptsSpecies: ('cat' | 'dog')[];
   };
   /**
    * The photo set the host should edit. Routes to
@@ -819,6 +844,11 @@ export async function getListingForEdit(
       offersGrooming: src.offers_grooming,
       hostGender: src.host_gender as 'female' | 'male',
       requiresVaccination: src.requires_vaccination,
+      // Round 12 / Step 5.7. Narrow the DB's string[] to the
+      // type-safe 2-element union for the form.
+      acceptsSpecies: (src.accepts_species ?? ['cat']).filter(
+        (s): s is 'cat' | 'dog' => s === 'cat' || s === 'dog',
+      ),
     },
     photos,
   };

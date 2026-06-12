@@ -31,6 +31,7 @@ import { Button } from '@/components/Button';
 import { CITIES, findCity, type CityKey } from '@/lib/cities';
 import { pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import { SPECIES_LIST, speciesEmoji } from '@/lib/species';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 type HostGender = 'female' | 'male';
@@ -68,6 +69,10 @@ export type ListingFormValues = {
   offersGrooming: boolean;
   hostGender: HostGender;
   requiresVaccination: boolean;
+  // Round 12 / Step 5.7 — at least one species must be selected. The
+  // UI prevents submission with an empty array; the DB check
+  // constraint (migration 0034) is a backstop.
+  acceptsSpecies: ('cat' | 'dog')[];
 };
 
 export type ListingFormProps = {
@@ -144,6 +149,24 @@ export function ListingForm({
   const [requiresVaccination, setRequiresVaccination] = useState(
     initialValues?.requiresVaccination ?? false,
   );
+  // Round 12 / Step 5.7. Default new listings to cats only — matches
+  // migration 0034's column default and the founder-wedge (existing
+  // hosts onboarded for cats; opting into dogs is explicit).
+  const [acceptsSpecies, setAcceptsSpecies] = useState<('cat' | 'dog')[]>(
+    initialValues?.acceptsSpecies ?? ['cat'],
+  );
+
+  const toggleSpecies = (s: 'cat' | 'dog') => {
+    setAcceptsSpecies((prev) => {
+      const has = prev.includes(s);
+      if (has) {
+        // Don't allow toggling to empty — the constraint requires ≥1.
+        if (prev.length === 1) return prev;
+        return prev.filter((x) => x !== s);
+      }
+      return [...prev, s];
+    });
+  };
 
   // Per-field validation errors. Missing key = field valid. Cleared as
   // the user edits the field. The top error band is reserved for the
@@ -257,6 +280,7 @@ export function ListingForm({
       offersGrooming,
       hostGender: hostGender!,
       requiresVaccination,
+      acceptsSpecies,
     };
 
     await onSave(values);
@@ -283,6 +307,13 @@ export function ListingForm({
   const initialHostGender = initialValues?.hostGender ?? null;
   const initialRequiresVaccination =
     initialValues?.requiresVaccination ?? false;
+  const initialAcceptsSpecies = initialValues?.acceptsSpecies ?? ['cat'];
+
+  // Set-equality on a sorted join — chip order in state doesn't
+  // matter, just membership.
+  const speciesDirty =
+    [...acceptsSpecies].sort().join(',') !==
+    [...initialAcceptsSpecies].sort().join(',');
 
   const isDirty =
     city !== initialCity ||
@@ -295,7 +326,8 @@ export function ListingForm({
     residentNote !== initialResidentNote ||
     offersGrooming !== initialOffersGrooming ||
     hostGender !== initialHostGender ||
-    requiresVaccination !== initialRequiresVaccination;
+    requiresVaccination !== initialRequiresVaccination ||
+    speciesDirty;
 
   const saveDisabled = saving || (requireDirty && !isDirty);
 
@@ -501,6 +533,31 @@ export function ListingForm({
           {t('listings.form.requires_vaccination_label')}
         </Text>
       </Pressable>
+
+      {/* Round 12 / Step 5.7 — accepts_species. Multi-select chip
+          row (cat + dog); at least one must remain selected
+          (toggleSpecies guards against empty). */}
+      <Field label={t('listings.form.accepts_species_label')} required>
+        <View style={styles.chipRow}>
+          {SPECIES_LIST.map((s) => {
+            const active = acceptsSpecies.includes(s);
+            return (
+              <Pressable
+                key={s}
+                onPress={() => toggleSpecies(s)}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text
+                  style={[styles.chipText, active && styles.chipTextActive]}
+                >
+                  {active ? '✓ ' : ''}
+                  {speciesEmoji(s)} {t(`species.${s}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Field>
 
       <Field
         label={t('listings.form.host_gender_label')}

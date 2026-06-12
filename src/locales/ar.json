@@ -87,6 +87,7 @@
       "resident_pets_note_label": "حدّثي الضيوف عن حيواناتك المقيمة",
       "offers_grooming_label": "أقدّم خدمة الاستحمام",
       "requires_vaccination_label": "أستقبل القطط المُطعّمة فقط (سعار + FVRCP)",
+      "accepts_species_label": "الحيوانات المسموح باستضافتها",
       "host_gender_label": "جنسك",
       "female_label": "أنثى",
       "male_label": "ذكر",

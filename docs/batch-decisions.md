@@ -156,3 +156,27 @@ Source: Plan v2 Round 11.
 - (Round 9 needed no migration — channel subscription is client-side only.)
 - (Round 10 needed no migration — band → minPriceSAR/maxPriceSAR happens in the client.)
 - `0033_favorites.sql` (Round 11) — favorites table + 3 RLS policies + recency index.
+
+## Round 12 (2026-06-12) — Step 5.7 multi-species (dogs)
+
+Source: CLAUDE.md §13 Test Round 2 item 10. The MVP expands from
+cat-only to cat + dog.
+
+### Phase A decisions
+
+- **`pets.species` already exists** since migration 0001 with `default 'cat'`. No new column on the pets side; `createPet` gains an optional species (defaults 'cat') and the existing rows backfill correctly.
+- **Species enum is `'cat' | 'dog'`, not a Postgres enum.** Keeping it as a TS union + a check constraint on `text[]` makes adding a third species a code-only change for everything except one ALTER CONSTRAINT.
+- **Dog breeds ship without thumbnails in Phase A.** The picker already renders text-only tiles for the existing `unknown` row; reusing that fallback gets the surface working today. Wikipedia-commons thumbnails for dogs come in a follow-up polish round.
+- **Species locked on edit.** Switching a pet's species after creation would mismatch its breed AND its vaccination schedule (rabies + FVRCP is cat-only — dogs have a different shot set). The SpeciesPicker `disabled` prop renders both tiles inert in edit mode.
+
+### Phase B decisions
+
+- **`listings.accepts_species text[]` (not two booleans).** Future species (rabbit, bird, etc.) extend without a schema change. GIN-indexed for the `contains` filter.
+- **Migration 0034 covers BOTH `listings` AND `listing_drafts`** plus a `CREATE OR REPLACE promote_listing_draft` — mirrors the exact pattern from 0026 (vaccination). A host opting INTO dogs on an already-approved listing has to flow through admin review like any other field edit.
+- **Owner-feed filter chip — cat | dog. No "all" chip.** Tapping the active chip clears back to all-species. Same pattern as the existing price-band chips (mutually exclusive, tap-active-to-clear). Saves a row of chrome.
+- **Default new listings to `['cat']`.** Existing wedge is female + cats; opting into dogs is an explicit toggle in the form, not a default. Matches the column default in 0034 — host can always add `dog` before first save.
+- **Comprehensive i18n sweep deferred to Round 12c.** The pet form, listing form, owner feed filter, species picker, and SpeciesPicker labels are all wired through new species-aware keys (species.cat / species.dog / pets.species_label / listings.form.accepts_species_label). The dozens of cat-specific phrases in older copy (e.g. "أقصى عدد للقطط", "أبحث عن مكان لقطتي", "هذا المضيف يستقبل حتى {count} قطط") stay as-is for now — generalizing them well is its own pass and would balloon this commit.
+
+### Migrations written (Round 12)
+
+- `0034_listings_accepts_species.sql` — listings + listing_drafts columns, check constraints, GIN index on listings.accepts_species, `CREATE OR REPLACE promote_listing_draft` to include the new column in the field-draft → live copy.

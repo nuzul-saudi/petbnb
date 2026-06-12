@@ -378,6 +378,7 @@ export type Database = {
           offers_grooming: boolean;
           host_gender: 'female' | 'male';
           requires_vaccination: boolean;
+          accepts_species: string[];
           created_at: string;
           updated_at: string;
         };
@@ -397,6 +398,7 @@ export type Database = {
           offers_grooming: boolean;
           host_gender: 'female' | 'male';
           requires_vaccination?: boolean;
+          accepts_species?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -416,6 +418,7 @@ export type Database = {
           offers_grooming?: boolean;
           host_gender?: 'female' | 'male';
           requires_vaccination?: boolean;
+          accepts_species?: string[];
           created_at?: string;
           updated_at?: string;
         };

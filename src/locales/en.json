@@ -87,6 +87,7 @@
       "resident_pets_note_label": "About your resident pets",
       "offers_grooming_label": "I offer grooming",
       "requires_vaccination_label": "Vaccinated pets only (rabies + FVRCP)",
+      "accepts_species_label": "Which animals you accept",
       "host_gender_label": "Your gender",
       "female_label": "Female",
       "male_label": "Male",

@@ -22,6 +22,7 @@ import { pickLocalized } from '@/lib/format';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
 import { usePersona } from '@/lib/persona';
+import { speciesEmoji } from '@/lib/species';
 import {
   listActiveListings,
   listOwnListings,
@@ -333,6 +334,10 @@ function OwnerFeedHome() {
   const [priceBand, setPriceBand] = useState<
     'budget' | 'midrange' | 'premium' | null
   >(null);
+  // Round 12 / Step 5.7 — species filter. null = any species; tap a
+  // chip to filter to that species; tap again to clear. Backed by the
+  // GIN index on listings.accepts_species (migration 0034).
+  const [speciesFilter, setSpeciesFilter] = useState<'cat' | 'dog' | null>(null);
   // City filter (7.2c). Default Riyadh — the app's historical default
   // and where every existing listing was backfilled to via migration
   // 0019. Future polish: persist the user's preferred city on profiles.
@@ -389,6 +394,7 @@ function OwnerFeedHome() {
             femaleHostsOnly: femaleOnly,
             groomingOnly,
             noResidentPetsOnly,
+            species: speciesFilter ?? undefined,
             minPriceSAR,
             maxPriceSAR,
             // Distance is also a sort, but the DB query has the haversine
@@ -411,7 +417,7 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [city, femaleOnly, groomingOnly, noResidentPetsOnly, priceBand, coords, sortBy, t],
+    [city, femaleOnly, groomingOnly, noResidentPetsOnly, priceBand, speciesFilter, coords, sortBy, t],
   );
 
   // R2C5 client-side sort over the loaded items. Distance is handled
@@ -552,6 +558,31 @@ function OwnerFeedHome() {
             {t('feed.no_resident_pets_filter')}
           </Text>
         </Pressable>
+      </View>
+
+      {/* Round 12 / Step 5.7 — species filter chips. Mutually
+          exclusive (cat | dog | all). Tapping the active chip clears
+          back to "all". Backed by the GIN index on accepts_species. */}
+      <View style={styles.filterRow}>
+        {(['cat', 'dog'] as const).map((s) => {
+          const active = speciesFilter === s;
+          return (
+            <Pressable
+              key={s}
+              onPress={() => setSpeciesFilter(active ? null : s)}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  active && styles.filterChipTextActive,
+                ]}
+              >
+                {speciesEmoji(s)} {t(`species.${s}`)}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Round 10 — price band chips. Three preset bands; tapping
