@@ -532,6 +532,7 @@
     "name_label": "Name",
     "name_placeholder": "Cat's name",
     "name_required": "Name is required",
+    "species_label": "Species",
     "breed_label": "Breed",
     "breed_placeholder": "e.g. Persian",
     "age_months_label": "Age (in months)",
@@ -561,6 +562,11 @@
     "other": "Other",
     "other_input_label": "Enter the breed name",
     "other_placeholder": "e.g. Persian mix"
+  },
+  "species": {
+    "cat": "Cat",
+    "dog": "Dog",
+    "all": "All"
   },
   "profile": {
     "title": "My account",

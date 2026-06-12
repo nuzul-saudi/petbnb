@@ -1,11 +1,16 @@
 // Horizontal scrollable breed picker. Each tile shows the breed photo +
 // Arabic name.
-//   - 'unknown' (BREEDS entry, labelled 'لا أعرف') — a plain breed
+//   - 'unknown' (breed list entry, labelled 'لا أعرف') — a plain breed
 //     selection: emits { breed: 'unknown', breedOther: null }. No text
 //     input. For users who simply don't know the breed.
-//   - 'other' (sentinel, NOT a BreedKey, labelled 'أخرى') — the ONLY
+//   - 'other' (sentinel, NOT a breed key, labelled 'أخرى') — the ONLY
 //     tile that reveals the inline free-text input. Selecting it emits
 //     { breed: null, breedOther: '' }; typing updates breedOther.
+//
+// Round 12 / Step 5.7: species-aware. The `species` prop picks which
+// curated list to render — BREEDS (cat) or DOG_BREEDS. The breed key
+// is now `string` rather than `BreedKey` to span both lists at the
+// type layer; the DB column is `text` either way.
 //
 // Fully controlled: parents own both `breed` and `breedOther` via a single
 // BreedSelection object. The picker emits one onChange with the next state
@@ -14,22 +19,27 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 
-import { BREEDS, type BreedKey } from '@/lib/breeds';
+import { BREEDS } from '@/lib/breeds';
+import { DOG_BREEDS } from '@/lib/dog-breeds';
 import { useTranslation } from '@/lib/i18n';
+import type { Species } from '@/lib/species';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export type BreedSelection = {
-  breed: BreedKey | null;
+  breed: string | null;
   breedOther: string | null;
 };
 
 type Props = {
   value: BreedSelection;
   onChange: (next: BreedSelection) => void;
+  /** Round 12 / Step 5.7. Defaults to 'cat' for callers pre-multi-species. */
+  species?: Species;
 };
 
-export function BreedPicker({ value, onChange }: Props) {
+export function BreedPicker({ value, onChange, species = 'cat' }: Props) {
   const { t } = useTranslation();
+  const breedList = species === 'dog' ? DOG_BREEDS : BREEDS;
 
   // The 'other' sentinel tile is selected when breed is null AND breedOther
   // has a value (even an empty string — that's "tile picked, not yet typed").
@@ -47,7 +57,7 @@ export function BreedPicker({ value, onChange }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
       >
-        {BREEDS.map((breed) => {
+        {breedList.map((breed) => {
           const selected = value.breed === breed.key;
           return (
             <Pressable

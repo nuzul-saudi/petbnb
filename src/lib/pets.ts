@@ -38,6 +38,10 @@ export async function getPet(id: string): Promise<Tables<'pets'> | null> {
 export type CreatePetInput = {
   ownerId: string;
   name: string;
+  // Round 12 / Step 5.7: optional, defaults to 'cat' for back-compat
+  // with every existing callsite (pets.species column exists since
+  // 0001 with a 'cat' default).
+  species?: 'cat' | 'dog';
   breed?: string | null;
   breed_other?: string | null;
   age_months?: number | null;
@@ -59,7 +63,7 @@ export async function createPet(input: CreatePetInput): Promise<Tables<'pets'>> 
     .insert({
       owner_id: input.ownerId,
       name: input.name.trim(),
-      species: 'cat',
+      species: input.species ?? 'cat',
       breed: input.breed ?? null,
       breed_other: input.breed_other ?? null,
       age_months: input.age_months ?? null,

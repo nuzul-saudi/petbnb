@@ -543,6 +543,7 @@
     "name_label": "الاسم",
     "name_placeholder": "اسم القطة",
     "name_required": "الاسم مطلوب",
+    "species_label": "النوع",
     "breed_label": "السلالة",
     "breed_placeholder": "مثال: شيرازي",
     "age_months_label": "العمر (بالأشهر)",
@@ -572,6 +573,11 @@
     "other": "أخرى",
     "other_input_label": "اكتبي اسم السلالة",
     "other_placeholder": "مثال: شيرازي مختلط"
+  },
+  "species": {
+    "cat": "قطة",
+    "dog": "كلب",
+    "all": "الكل"
   },
   "profile": {
     "title": "حسابي",

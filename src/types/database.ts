@@ -185,6 +185,10 @@ export type Database = {
           additional_pet_discount: number;
           lat: number | null;
           lng: number | null;
+          // Step 5.7 / Round 12 (migration 0034). text[] of supported
+          // species — today: 'cat' | 'dog'. Defaults to ['cat'] for
+          // backfill compatibility on every pre-12 listing.
+          accepts_species: string[];
           created_at: string;
         };
         Insert: {
@@ -208,6 +212,7 @@ export type Database = {
           additional_pet_discount?: number;
           lat?: number | null;
           lng?: number | null;
+          accepts_species?: string[];
           created_at?: string;
         };
         Update: {
@@ -231,6 +236,7 @@ export type Database = {
           additional_pet_discount?: number;
           lat?: number | null;
           lng?: number | null;
+          accepts_species?: string[];
           created_at?: string;
         };
         Relationships: [

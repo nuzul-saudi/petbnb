@@ -15,11 +15,14 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { BreedPicker, type BreedSelection } from '@/components/BreedPicker';
 import { DateField } from '@/components/DateField';
+import { SpeciesPicker } from '@/components/SpeciesPicker';
 import { useAuth } from '@/lib/auth';
 import { confirmDialog } from '@/lib/confirm';
 import { todayIso } from '@/lib/format';
 import { findBreed } from '@/lib/breeds';
+import { findDogBreed } from '@/lib/dog-breeds';
 import { useTranslation } from '@/lib/i18n';
+import { speciesEmoji, type Species } from '@/lib/species';
 import {
   createPet,
   deletePet,
@@ -45,6 +48,10 @@ export default function PetDetailScreen() {
   const isNew = id === 'new';
 
   const [name, setName] = useState('');
+  // Round 12 / Step 5.7. Species lives in form state so the breed
+  // picker can switch lists. EDIT mode hydrates from the loaded pet
+  // row and disables changes (see SpeciesPicker header for why).
+  const [species, setSpecies] = useState<Species>('cat');
   const [breedSelection, setBreedSelection] = useState<BreedSelection>({
     breed: null,
     breedOther: null,
@@ -94,13 +101,22 @@ export default function PetDetailScreen() {
           return;
         }
         setName(pet.name);
-        // pet.breed is a free-text string in the DB. findBreed validates it
-        // against the curated BREEDS list. Combined with pet.breed_other,
-        // this rehydrates whichever tile state the user previously saved:
+        // Round 12: hydrate species from the row (pre-12 rows are
+        // species='cat' by default). The species also drives which
+        // breed list findBreed looks in below.
+        const petSpecies: Species = pet.species === 'dog' ? 'dog' : 'cat';
+        setSpecies(petSpecies);
+        // pet.breed is a free-text string in the DB. findBreed/findDogBreed
+        // validates it against the curated lists. Combined with
+        // pet.breed_other, this rehydrates whichever tile state the user
+        // previously saved:
         //   structured key match → that tile selected, no free-text input
         //   breed='unknown' + breed_other text → unknown tile + input
         //   breed=null + breed_other text → 'other' tile + input
-        const matched = findBreed(pet.breed);
+        const matched =
+          petSpecies === 'dog'
+            ? findDogBreed(pet.breed)
+            : findBreed(pet.breed);
         setBreedSelection({
           breed: matched ? matched.key : null,
           breedOther: pet.breed_other,
@@ -183,6 +199,7 @@ export default function PetDetailScreen() {
           const created = await createPet({
             ownerId: user.id,
             name: name.trim(),
+            species,
             breed: breedSelection.breed,
             breed_other: breedOtherToSave,
             age_months: ageNum,
@@ -327,7 +344,9 @@ export default function PetDetailScreen() {
               />
             ) : (
               <View style={[styles.photoThumb, styles.photoPlaceholder]}>
-                <Text style={styles.photoPlaceholderEmoji}>🐈</Text>
+                <Text style={styles.photoPlaceholderEmoji}>
+                  {speciesEmoji(species)}
+                </Text>
               </View>
             )}
             <Pressable
@@ -355,10 +374,31 @@ export default function PetDetailScreen() {
           />
         </Field>
 
+        {/* Round 12 / Step 5.7: species selector. New mode only —
+            edit mode locks species so the breed picker doesn't
+            mismatch already-saved vaccination data. */}
+        <View style={styles.field}>
+          <Text style={styles.label}>{t('pets.species_label')}</Text>
+          <SpeciesPicker
+            value={species}
+            onChange={(next) => {
+              setSpecies(next);
+              // Reset breed when switching species — the saved key
+              // wouldn't exist in the other list.
+              setBreedSelection({ breed: null, breedOther: null });
+            }}
+            disabled={!isNew}
+          />
+        </View>
+
         {/* Breed picker replaces the Step 5.5 free-text input */}
         <View style={styles.field}>
           <Text style={styles.label}>{t('pets.breed_label')}</Text>
-          <BreedPicker value={breedSelection} onChange={setBreedSelection} />
+          <BreedPicker
+            value={breedSelection}
+            onChange={setBreedSelection}
+            species={species}
+          />
         </View>
 
         <Field label={t('pets.age_months_label')}>
