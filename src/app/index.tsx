@@ -318,6 +318,16 @@ function OwnerFeedHome() {
   // S2 discovery filters.
   const [groomingOnly, setGroomingOnly] = useState(false);
   const [noResidentPetsOnly, setNoResidentPetsOnly] = useState(false);
+  // Round 10 — price band filter. Three preset bands; null = no filter.
+  //   'budget'    → ≤ 200 SAR/night
+  //   'midrange'  → 201–400
+  //   'premium'   → > 400
+  // Mutually exclusive — picking a new band replaces the previous one.
+  // Schema-ready since ListingFilter's minPriceSAR/maxPriceSAR existed
+  // unwired since S2; this commit just adds the UI.
+  const [priceBand, setPriceBand] = useState<
+    'budget' | 'midrange' | 'premium' | null
+  >(null);
   // City filter (7.2c). Default Riyadh — the app's historical default
   // and where every existing listing was backfilled to via migration
   // 0019. Future polish: persist the user's preferred city on profiles.
@@ -353,12 +363,29 @@ function OwnerFeedHome() {
       if (!opts.silent) setLoading(true);
       setError(null);
       try {
+        // Round 10 — translate band → min/max SAR. ≤ 200, 201-400,
+        // > 400. Server-side filter via gte/lte on nightly_price_sar.
+        const minPriceSAR =
+          priceBand === 'midrange'
+            ? 201
+            : priceBand === 'premium'
+              ? 401
+              : undefined;
+        const maxPriceSAR =
+          priceBand === 'budget'
+            ? 200
+            : priceBand === 'midrange'
+              ? 400
+              : undefined;
+
         const rows = await listActiveListings(
           {
             city,
             femaleHostsOnly: femaleOnly,
             groomingOnly,
             noResidentPetsOnly,
+            minPriceSAR,
+            maxPriceSAR,
             // Distance is also a sort, but the DB query has the haversine
             // computation already wired to sortByDistance. Newest, price,
             // and rating are client-side sorts (next effect) over the
@@ -379,7 +406,7 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [city, femaleOnly, groomingOnly, noResidentPetsOnly, coords, sortBy, t],
+    [city, femaleOnly, groomingOnly, noResidentPetsOnly, priceBand, coords, sortBy, t],
   );
 
   // R2C5 client-side sort over the loaded items. Distance is handled
@@ -520,6 +547,32 @@ function OwnerFeedHome() {
             {t('feed.no_resident_pets_filter')}
           </Text>
         </Pressable>
+      </View>
+
+      {/* Round 10 — price band chips. Three preset bands; tapping
+          the active band clears it. Mutually exclusive — picking a
+          different band replaces the previous selection. */}
+      <View style={styles.filterRow}>
+        {(['budget', 'midrange', 'premium'] as const).map((band) => {
+          const active = priceBand === band;
+          return (
+            <Pressable
+              key={band}
+              onPress={() => setPriceBand(active ? null : band)}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  active && styles.filterChipTextActive,
+                ]}
+              >
+                {active ? '✓ ' : ''}
+                {t(`feed.price_band_${band}`)}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* R2C5 sort selector. Chip strip — same pill shape as the
