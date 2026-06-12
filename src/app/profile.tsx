@@ -128,6 +128,15 @@ export default function ProfileScreen() {
           <Text style={styles.navArrow}>‹</Text>
         </Pressable>
 
+        {/* Round 11 — Favorites shortcut. */}
+        <Pressable
+          onPress={() => router.push('/favorites')}
+          style={styles.navRow}
+        >
+          <Text style={styles.navText}>{t('favorites.title')}</Text>
+          <Text style={styles.navArrow}>‹</Text>
+        </Pressable>
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.actionGap}>

@@ -28,6 +28,8 @@
     "female_filter": "Female sitters only",
     "grooming_filter": "Grooming offered",
     "no_resident_pets_filter": "No resident pets",
+    "favorite_add": "Add to favorites",
+    "favorite_remove": "Remove from favorites",
     "price_band_budget": "Budget · ≤ 200",
     "price_band_midrange": "Mid · 201-400",
     "price_band_premium": "Premium · > 400",
@@ -582,6 +584,14 @@
     "load_failed": "Couldn't load bookings",
     "empty": "No bookings yet",
     "unread_indicator": "New update"
+  },
+  "favorites": {
+    "title": "My favorites",
+    "nav": "Favorites",
+    "back": "← Back",
+    "loading": "Loading…",
+    "empty_title": "You haven't saved any hosts yet",
+    "empty_body": "Tap the heart on any card to save it here."
   },
   "common": {
     "loading": "Loading…",

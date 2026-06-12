@@ -123,3 +123,36 @@ Source: Plan v2 Round 8.
 - `0032_host_rating_rpc.sql` (Round 3)
 - (Round 5a SKIPPED, see decision above)
 - (Round 7 needed no migration, see decision above)
+
+## Round 9 (2026-06-12) — Supabase Realtime for in-booking messaging
+
+Source: Plan v2 Round 9.
+
+### Decisions
+- **Channel-per-booking** (`messages:{bookingId}`) over a global channel so RLS gives us free isolation: a subscriber on booking A can't peek at booking B even by guessing the channel name. Postgres filter on `booking_id=eq.${bookingId}` keeps it tight.
+- **No optimistic insert in the realtime path.** We refetch on INSERT so the cached query is the single source of truth and the sender sees their own send via the same path everyone else does.
+
+## Round 10 (2026-06-12) — Price band filter chips
+
+Source: Plan v2 Round 10.
+
+### Decisions
+- **Three preset bands over a range slider.** RN Web has no clean range slider primitive and the value of a fine-grained slider on a feed of <30 listings is questionable. Three buckets — budget (≤200), midrange (201–400), premium (>400) — read as one tap, no friction.
+- **Bands wire through existing `listActiveListings({minPriceSAR, maxPriceSAR})`** — no new RPC; the helper has accepted those args since Step 5.
+
+## Round 11 (2026-06-12) — Saved listings (favorites)
+
+Source: Plan v2 Round 11.
+
+### Decisions
+- **Composite PK `(user_id, listing_id)` over a synthetic id.** The natural key is also the uniqueness constraint — no surrogate adds value, and DELETE by composite PK is cheap with the PK index.
+- **Optimistic toggle in the hook** with revert-on-error. Heart tap latency at intercontinental Supabase RTT was sluggish; the hook updates the local Set immediately and reverts on failure with `logWarn`.
+- **No UPDATE RLS policy.** Favorites are insert-or-delete only; no mutable column anyone would want to UPDATE. Three policies (select / insert / delete), not four.
+- **Favorites screen surfaced from the profile screen,** not the AppHeader. The header is already dense (Home + Bookings + Account + persona toggle + language). Adding a fifth pill crowds the nav; a profile link is the canonical "account-scoped resource" idiom and matches "My Pets" right next to it.
+- **PostgREST nested-join used for `listFavoriteListings`** so the My Favorites screen renders the same `ListingFeedItem` shape the feed uses — one round trip, one ListingCard component on both screens.
+
+## Migrations written (Round 9-11) — Omar applies after review
+
+- (Round 9 needed no migration — channel subscription is client-side only.)
+- (Round 10 needed no migration — band → minPriceSAR/maxPriceSAR happens in the client.)
+- `0033_favorites.sql` (Round 11) — favorites table + 3 RLS policies + recency index.

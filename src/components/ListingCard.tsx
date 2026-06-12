@@ -17,6 +17,15 @@ type Props = {
    * applied as the pill background, matching newBadge / TierBadge.
    */
   statusBadge?: { label: string; color: string };
+  /**
+   * Round 11 — favorites. When passed, renders the heart toggle at
+   * the top-end corner of the card. Owner feed wires it via the
+   * useFavorites hook; host home + admin views pass nothing.
+   */
+  favorite?: {
+    isFavorited: boolean;
+    onToggle: () => void;
+  };
 };
 
 // Sitter-first listing card (refactored in Step 5.5C from a photo-first
@@ -30,7 +39,12 @@ type Props = {
 // the JSDoc on the helper). Once a SECURITY DEFINER count RPC or counter
 // cache lands, this card can show real "{N} إقامة • ⭐ {avg}" stats and
 // only fall back to "جديد" for genuinely-new hosts.
-export function ListingCard({ listing, onPress, statusBadge }: Props) {
+export function ListingCard({
+  listing,
+  onPress,
+  statusBadge,
+  favorite,
+}: Props) {
   const { t, locale } = useTranslation();
 
   const host = listing.host;
@@ -59,6 +73,35 @@ export function ListingCard({ listing, onPress, statusBadge }: Props) {
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
+      {/* Round 11 — favorites heart. Absolute-positioned in the
+          top-end corner so it overlays the host photo without
+          stealing tap area from the card itself. */}
+      {favorite ? (
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation?.();
+            favorite.onToggle();
+          }}
+          style={styles.heartButton}
+          accessibilityRole="button"
+          accessibilityLabel={
+            favorite.isFavorited
+              ? t('feed.favorite_remove')
+              : t('feed.favorite_add')
+          }
+          hitSlop={10}
+        >
+          <Text
+            style={[
+              styles.heartGlyph,
+              favorite.isFavorited && styles.heartGlyphActive,
+            ]}
+          >
+            {favorite.isFavorited ? '♥' : '♡'}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {/* Sitter header — the hero of the card */}
       <View style={styles.hostRow}>
         {host?.avatar_url ? (
@@ -175,6 +218,31 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     overflow: 'hidden',
     ...shadows.card,
+  },
+  // Round 11 — heart overlay. `end` (not `right`) keeps it on the
+  // trailing edge in both LTR and RTL. zIndex above the host row so
+  // the tap target wins against the card's outer Pressable.
+  heartButton: {
+    position: 'absolute',
+    top: spacing.md,
+    end: spacing.md,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.paper,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    ...shadows.card,
+  },
+  heartGlyph: {
+    fontFamily: fonts.body,
+    fontSize: 22,
+    lineHeight: 24,
+    color: colors.inkSoft,
+  },
+  heartGlyphActive: {
+    color: colors.terracotta,
   },
   hostRow: {
     flexDirection: 'row',

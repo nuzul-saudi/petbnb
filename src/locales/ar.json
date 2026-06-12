@@ -28,6 +28,8 @@
     "female_filter": "مضيفات فقط",
     "grooming_filter": "خدمة استحمام متوفرة",
     "no_resident_pets_filter": "بدون حيوانات مقيمة",
+    "favorite_add": "أضيفي إلى المفضّلة",
+    "favorite_remove": "إزالة من المفضّلة",
     "price_band_budget": "اقتصادي · ≤ 200",
     "price_band_midrange": "متوسط · 201-400",
     "price_band_premium": "فاخر · > 400",
@@ -593,6 +595,14 @@
     "load_failed": "تعذّر تحميل الحجوزات",
     "empty": "لا توجد حجوزات بعد",
     "unread_indicator": "تحديث جديد"
+  },
+  "favorites": {
+    "title": "مفضّلتي",
+    "nav": "المفضّلة",
+    "back": "← رجوع",
+    "loading": "جارٍ التحميل…",
+    "empty_title": "لم تحفظي أيّ مضيف بعد",
+    "empty_body": "اضغطي على القلب في أي بطاقة لحفظها هنا."
   },
   "common": {
     "loading": "جارٍ التحميل…",

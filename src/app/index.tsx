@@ -15,6 +15,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { ListingCard } from '@/components/ListingCard';
+import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/lib/auth';
 import { CITIES, findCity, type CityKey } from '@/lib/cities';
 import { pickLocalized } from '@/lib/format';
@@ -307,8 +308,12 @@ function HostHome() {
 function OwnerFeedHome() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+  // Round 11 — favorites toggle. Anonymous viewers don't get the
+  // heart (no userId to attach the row to); they tap into the listing
+  // and are routed to /sign-in via the existing guest-gate.
+  const favorites = useFavorites(user?.id ?? null);
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -637,6 +642,14 @@ function OwnerFeedHome() {
             <ListingCard
               listing={item}
               onPress={() => router.push(`/listings/${item.id}`)}
+              favorite={
+                user
+                  ? {
+                      isFavorited: favorites.ids.has(item.id),
+                      onToggle: () => void favorites.toggle(item.id),
+                    }
+                  : undefined
+              }
             />
           )}
           refreshControl={

@@ -837,6 +837,29 @@ export type Database = {
         };
         Relationships: [];
       };
+
+      // ---------------------------------------------------------------------
+      // Round 11 / 0033 — saved listings. Composite PK (user_id,
+      // listing_id) doubles as the uniqueness constraint and the
+      // hot-path lookup index for "is this listing favorited".
+      favorites: {
+        Row: {
+          user_id: string;
+          listing_id: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          listing_id: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          listing_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
 
     Views: Record<string, never>;
