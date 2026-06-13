@@ -165,6 +165,24 @@ export default function AdminListingDetailScreen() {
       ? 'admin.approve_edit_confirm'
       : 'admin.approve_new_confirm';
     if (!(await confirmDialog(t(confirmKey)))) return;
+
+    // Stretch S1 (2026-06-13) — soft warn when the listing being
+    // approved has < 3 photos. The empty 🏠 placeholder card on the
+    // public feed makes a listing look abandoned; the founder wants
+    // 3 photos as the minimum bar. Soft warn (admin can override),
+    // not a hard block — some legitimate listings might have fewer
+    // photos for a real reason (host's first listing, edge cases).
+    const MIN_PHOTOS = 3;
+    if (detail.photos.length < MIN_PHOTOS) {
+      const confirmed = await confirmDialog(
+        t('admin.few_photos_warning', {
+          count: detail.photos.length,
+          min: MIN_PHOTOS,
+        }),
+      );
+      if (!confirmed) return;
+    }
+
     setBusy('approve');
     setError(null);
     try {

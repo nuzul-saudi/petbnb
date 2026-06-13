@@ -521,6 +521,7 @@
     "draft_field_host_gender": "Host gender",
     "approve_new": "Approve listing",
     "approve_new_confirm": "Approve this new listing? It will go live for customers.",
+    "few_photos_warning": "This listing has only {count} photos — recommended minimum is {min}. Continue anyway?",
     "approve_new_failed": "Couldn't approve the listing. Please try again.",
     "approving": "Approving…",
     "approve_edit": "Approve edit",
