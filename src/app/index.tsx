@@ -747,7 +747,12 @@ function OwnerFeedHome() {
       {sortMenuOpen ? (
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={false}
+          // Show the scroll indicator on touch — without it,
+          // mobile users can't tell the chips overflow (chips
+          // get clipped at the trailing edge of the device with
+          // no visual hint to swipe). iOS shows it briefly
+          // during pan; web shows a faint persistent bar.
+          showsHorizontalScrollIndicator={true}
           contentContainerStyle={styles.filterRowScrollable}
         >
           {(
@@ -794,7 +799,12 @@ function OwnerFeedHome() {
       {moreFiltersOpen ? (
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={false}
+          // Show the scroll indicator on touch — without it,
+          // mobile users can't tell the chips overflow (chips
+          // get clipped at the trailing edge of the device with
+          // no visual hint to swipe). iOS shows it briefly
+          // during pan; web shows a faint persistent bar.
+          showsHorizontalScrollIndicator={true}
           contentContainerStyle={styles.filterRowScrollable}
         >
           <Pressable
@@ -1149,7 +1159,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingHorizontal: spacing.xl,
+    // Trailing padding intentionally smaller than leading so the
+    // last (overflowing) chip peeks past the edge — a visible
+    // affordance that more content sits beyond the swipe edge.
+    // Mobile horizontal-scroll views without this look terminated.
+    paddingStart: spacing.xl,
+    paddingEnd: spacing.lg,
     paddingBottom: spacing.md,
   },
   // Compact bar (2026-06-12 progressive-disclosure). Sort dropdown

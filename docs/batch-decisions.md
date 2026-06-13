@@ -13,6 +13,23 @@ One line per decision made autonomously during the batch run.
 
 ## Future-milestone backlog (logged during batch run)
 
+- **Minimum photo count enforcement (pre-launch).** Surfaced
+  2026-06-13 on the deployed Vercel build: a listing with zero
+  photos shows the 🏠 emoji placeholder on the feed card AND
+  inside the detail mosaic, looking abandoned. Founder wants a
+  hard minimum (e.g., 3 photos) before admin approval. Two
+  enforcement points to add:
+  1. **Listing form** — disable "Save / Submit for review" until
+     ≥3 photos uploaded. Friendly inline counter ("Add 2 more
+     photos to submit"). Reuses the existing photos screen.
+  2. **Admin approve flow** — show a warning banner in the
+     admin queue if a pending listing has <3 photos; admin can
+     override but it's the deliberate friction. Cheap addition
+     to the existing approve action in admin/listings/[id].
+  Not blocking today — the deployed test has 4 listings and most
+  already have photos. Worth landing before the friends-and-
+  family broader test so first impressions aren't 🏠 placeholders.
+
 - **Change / cancellation policy engine (flight-style).** Pre-launch milestone, AFTER real payments land. Today's locked 48h-cliff refund tiers (full / 50% / none) are the launch-sufficient interim; a richer engine should support: change & cancel rules varying by host preference (Flexible / Moderate / Strict tiers à la Airbnb), date-change fees, host re-approval of changed dates (vs auto-accept inside the same booking), and host compensation on late owner cancel (so hosts who blocked their calendar aren't left empty-handed). Design as its own milestone once the gateway integration lands — change/cancel penalties are meaningless until real money moves.
 
 - **Host booking detail — owner & pet identity surface.** When a host opens a `requested` or accepted booking, the screen omits the owner's name/avatar/rating and the pet's name/breed/age/care_notes/photo/vaccination — the host has no context on who or what they're committing to. Mirrors the owner-side detail screen built in Step 5.5; host-side has been minimal since Step 7. Pre-launch milestone — a host has to know who they're hosting. Surfaced during the 2026-06-11 Round 2 smoke test when Omar accepted his first fresh request and noted the detail screen showed only listing + dates + total, no owner/pet info.
