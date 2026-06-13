@@ -62,17 +62,43 @@ export default function VerifyScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const { error: e } = await supabase.auth.verifyOtp({
+      const { data: verifyData, error: e } = await supabase.auth.verifyOtp({
         email,
         token,
         type: 'email',
       });
       if (e) throw e;
-      // Session will appear via onAuthStateChange; the home screen takes
-      // it from here (routes to /role if profile is fresh, else stays at /).
-      // R2C3: when guest mode brought the user here, send them back to
-      // the URL they came from.
-      router.replace((returnTo ?? '/') as Href);
+
+      // AUTH-2 — new-user detection. After OTP verify, look up the
+      // profile row. The on_auth_user_created trigger ensures a row
+      // exists; for a brand-new account the full_name is still empty
+      // (no role chosen yet, no password set yet). Route those to
+      // /set-password first so they finish onboarding with: password
+      // → role → home. Returning users skip straight to the
+      // requested destination.
+      const userId = verifyData?.user?.id;
+      let isNewUser = false;
+      if (userId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', userId)
+          .maybeSingle();
+        isNewUser = !profile || profile.full_name.trim() === '';
+      }
+
+      if (isNewUser) {
+        // Preserve returnTo for downstream routing (signup path
+        // doesn't normally use it but a future "set password →
+        // returnTo" link could).
+        router.replace(
+          (returnTo
+            ? `/set-password?mode=signup&returnTo=${encodeURIComponent(returnTo)}`
+            : '/set-password?mode=signup') as Href,
+        );
+      } else {
+        router.replace((returnTo ?? '/') as Href);
+      }
     } catch (err) {
       logWarn('[auth.verify_failed]', err);
       setError(t('auth.verify_failed'));
