@@ -72,6 +72,23 @@ export function AppHeader({
 
       <View style={styles.spacer} />
 
+      {/* Move 3 — Become-a-Host CTA. Supply recruitment is the
+          growth engine. Show only to owner-only users (not guests,
+          not existing hosts, not admins). Routes to /profile where
+          the RoleEditor lets them switch role to 'both'. */}
+      {!isGuest && profile?.role === 'owner' ? (
+        <Pressable
+          onPress={safeNav(() => router.push('/profile' as never))}
+          style={styles.becomeHostCta}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.become_host')}
+        >
+          <Text style={styles.becomeHostCtaText}>
+            {t('nav.become_host')}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {/* Guest path: just a Sign-in CTA. No menu, no persona, no
           language toggle in the header — guests can switch language
           from the sign-in screen. */}
@@ -261,6 +278,19 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.ink,
     borderRadius: 1,
+  },
+  // Move 3 — Become-a-Host CTA. Solid moss button to draw attention;
+  // it's the supply-side growth signal, not a neutral nav link.
+  becomeHostCta: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    backgroundColor: colors.mossDeep,
+  },
+  becomeHostCtaText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.cream,
   },
   // ── Persona toggle (kept from prior AppHeader) ────────────
   personaSwitch: {

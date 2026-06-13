@@ -644,6 +644,8 @@
     "app_name": "Petbnb",
     "menu_open": "فتح القائمة",
     "lang_toggle_to_en_full": "English",
-    "lang_toggle_to_ar_full": "العربية"
+    "lang_toggle_to_ar_full": "العربية",
+    "become_host": "كوني مُضيفة",
+    "switch_hosting": "اضبط المُضيفة"
   }
 }
