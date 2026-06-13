@@ -93,10 +93,15 @@ export async function listFavoriteListings(
       const fav = row as unknown as FavoriteRow;
       if (!fav.listing) return null;
       const l = fav.listing;
-      const photos = l.listing_photos ?? [];
-      const cover = photos.length
-        ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
-        : null;
+      const rawPhotos = (l.listing_photos ?? []) as {
+        id: string;
+        photo_url: string;
+        sort_order: number;
+      }[];
+      const sortedPhotos = [...rawPhotos].sort(
+        (a, b) => a.sort_order - b.sort_order,
+      );
+      const cover = sortedPhotos[0]?.photo_url ?? null;
       const { listing_photos: _drop, host, ...rest } = l as typeof l & {
         listing_photos?: unknown;
       };
@@ -104,6 +109,7 @@ export async function listFavoriteListings(
         ...(rest as Tables<'listings'>),
         host: host ?? null,
         cover_photo: cover,
+        photos: sortedPhotos,
         distance_km: null,
       };
     })

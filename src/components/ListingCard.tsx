@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
+import { ListingPhotoCarousel } from '@/components/ListingPhotoCarousel';
 import { findCity, findDistrict } from '@/lib/cities';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
@@ -160,19 +161,15 @@ export function ListingCard({
         </View>
       </View>
 
-      {/* Secondary home photo */}
-      {listing.cover_photo ? (
-        <Image
-          source={{ uri: listing.cover_photo }}
-          style={styles.photo}
-          contentFit="cover"
-          transition={150}
-        />
-      ) : (
-        <View style={[styles.photo, styles.photoPlaceholder]}>
-          <Text style={styles.photoPlaceholderText}>🏠</Text>
-        </View>
-      )}
+      {/* Part B (2026-06-13) — photo set rendered through the
+          carousel. Single-photo and zero-photo cases handled inside
+          the component. We pass the previous strip's aspect-ratio
+          (5/2) here so the existing card layout stays untouched;
+          Part C swaps this for a square once the dense grid lands. */}
+      <ListingPhotoCarousel
+        photos={listing.photos ?? []}
+        aspectRatio={5 / 2}
+      />
 
       {/* Footer with title + price + cap */}
       <View style={styles.footer}>

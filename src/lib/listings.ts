@@ -49,6 +49,14 @@ type PhotoSummary = Pick<Tables<'listing_photos'>, 'id' | 'photo_url' | 'sort_or
 export type ListingFeedItem = Tables<'listings'> & {
   host: HostSummary | null;
   cover_photo: string | null;
+  /**
+   * Part B (2026-06-13) — full photo set for the carousel on the
+   * listing card. Sorted by sort_order. Empty array when no photos.
+   * cover_photo is still emitted for callers that don't want the
+   * full set (and to keep the old single-image fallback wiring
+   * intact during the transition).
+   */
+  photos: PhotoSummary[];
   distance_km: number | null;
   /**
    * True when the host has a pending field draft OR photo draft for
@@ -156,10 +164,13 @@ export async function listActiveListings(
   // raw rows. Pick the lowest sort_order as the cover; compute distance
   // from the caller's location if provided.
   const items: ListingFeedItem[] = (data ?? []).map((row) => {
-    const photos = (row.listing_photos ?? []) as PhotoSummary[];
-    const cover = photos.length
-      ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
-      : null;
+    const rawPhotos = (row.listing_photos ?? []) as PhotoSummary[];
+    // Sort once, then derive cover + carousel set from the sorted
+    // array so the cover always matches photos[0].
+    const sortedPhotos = [...rawPhotos].sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
+    const cover = sortedPhotos[0]?.photo_url ?? null;
     const { listing_photos: _drop, ...rest } = row as typeof row & {
       listing_photos?: PhotoSummary[];
     };
@@ -179,6 +190,7 @@ export async function listActiveListings(
       ...typedRest,
       host: (row.host ?? null) as HostSummary | null,
       cover_photo: cover,
+      photos: sortedPhotos,
       distance_km: distance,
     };
   });
@@ -315,10 +327,11 @@ export async function listOwnListings(
   // Adds has_pending_edit derived from the draft embeds — true when
   // either a field draft or any photo draft exists for the listing.
   return (data ?? []).map((row) => {
-    const photos = (row.listing_photos ?? []) as PhotoSummary[];
-    const cover = photos.length
-      ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
-      : null;
+    const rawPhotos = (row.listing_photos ?? []) as PhotoSummary[];
+    const sortedPhotos = [...rawPhotos].sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
+    const cover = sortedPhotos[0]?.photo_url ?? null;
     const fieldDraft = (row.listing_drafts ?? null) as { id: string } | null;
     const photoDrafts = (row.listing_photo_drafts ?? []) as { id: string }[];
     const hasPendingEdit = fieldDraft !== null || photoDrafts.length > 0;
@@ -336,6 +349,7 @@ export async function listOwnListings(
       ...(rest as Tables<'listings'>),
       host: (row.host ?? null) as HostSummary | null,
       cover_photo: cover,
+      photos: sortedPhotos,
       distance_km: null,
       has_pending_edit: hasPendingEdit,
     };
