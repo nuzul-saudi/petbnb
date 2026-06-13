@@ -608,7 +608,12 @@
     "my_pets_link": "My pets",
     "save_changes": "Save changes",
     "saving": "Saving…",
-    "save_failed": "Couldn't save"
+    "save_failed": "Couldn't save",
+    "avatar_add": "Add profile photo",
+    "avatar_change": "Change photo",
+    "avatar_save": "Save photo",
+    "avatar_uploading": "Uploading…",
+    "avatar_save_failed": "Couldn't upload the photo"
   },
   "mybookings": {
     "title": "My bookings",

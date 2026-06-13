@@ -619,7 +619,12 @@
     "my_pets_link": "حيواناتي الأليفة",
     "save_changes": "حفظ التغييرات",
     "saving": "جارٍ الحفظ…",
-    "save_failed": "تعذّر الحفظ"
+    "save_failed": "تعذّر الحفظ",
+    "avatar_add": "إضافة صورة شخصية",
+    "avatar_change": "تغيير الصورة",
+    "avatar_save": "حفظ الصورة",
+    "avatar_uploading": "جارٍ الرفع…",
+    "avatar_save_failed": "تعذّر رفع الصورة"
   },
   "mybookings": {
     "title": "حجوزاتي",

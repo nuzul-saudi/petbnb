@@ -8,12 +8,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { RoleEditor, type SelectableRole } from '@/components/RoleEditor';
+import {
+  pickAvatarPhoto,
+  uploadAvatar,
+  type AvatarSource,
+} from '@/lib/avatars';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -29,6 +35,13 @@ export default function ProfileScreen() {
   const [role, setRole] = useState<SelectableRole | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Move 5 — avatar upload state. previewUri is rendered immediately
+  // after the user picks a file (object URL on web, asset URI on
+  // native); the actual upload happens on Save Photo.
+  const [pendingPhoto, setPendingPhoto] = useState<AvatarSource | null>(null);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   // Hydrate the form from the loaded profile.
   useEffect(() => {
@@ -49,6 +62,46 @@ export default function ProfileScreen() {
   const nameChanged = name.trim() !== profile.full_name;
   const roleChanged = role !== null && role !== profile.role;
   const canSave = nameChanged || roleChanged;
+
+  // Move 5 — picker only stages the file; the actual upload runs on
+  // "Save Photo" so the user sees a preview and can change their mind.
+  const onPickAvatar = async () => {
+    setError(null);
+    const source = await pickAvatarPhoto();
+    if (!source) return;
+    setPendingPhoto(source);
+    const preview =
+      source.kind === 'web-file'
+        ? URL.createObjectURL(source.file)
+        : source.uri;
+    setPreviewUri(preview);
+  };
+
+  const onSaveAvatar = async () => {
+    if (!supabase || !user || !pendingPhoto) return;
+    setAvatarSaving(true);
+    setError(null);
+    try {
+      const publicUrl = await uploadAvatar({
+        userId: user.id,
+        source: pendingPhoto,
+      });
+      const { error: e } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+      if (e) throw e;
+      await refreshProfile();
+      setPendingPhoto(null);
+      // Keep previewUri set — refreshProfile gives us the new
+      // avatar_url and the render flips to it on next paint.
+    } catch (e) {
+      logWarn('[profile.avatar_save_failed]', e);
+      setError(t('profile.avatar_save_failed'));
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
 
   const onSave = async () => {
     if (!supabase || !canSave) return;
@@ -85,6 +138,64 @@ export default function ProfileScreen() {
             <Text style={styles.backText}>{t('profile.back')}</Text>
           </Pressable>
           <Text style={styles.title}>{t('profile.title')}</Text>
+        </View>
+
+        {/* Move 5 — avatar block. Shows current avatar (or initial
+            fallback), picker button, save button when a fresh photo
+            is staged. */}
+        <View style={styles.avatarRow}>
+          {previewUri ?? profile.avatar_url ? (
+            <Image
+              source={{ uri: previewUri ?? profile.avatar_url ?? '' }}
+              style={styles.avatar}
+              contentFit="cover"
+              transition={150}
+            />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarInitial}>
+                {profile.full_name?.trim().charAt(0) ?? '?'}
+              </Text>
+            </View>
+          )}
+          <View style={styles.avatarActions}>
+            <Pressable
+              onPress={onPickAvatar}
+              disabled={avatarSaving}
+              style={[
+                styles.avatarButton,
+                avatarSaving && styles.avatarButtonDisabled,
+              ]}
+            >
+              <Text style={styles.avatarButtonText}>
+                {previewUri || profile.avatar_url
+                  ? t('profile.avatar_change')
+                  : t('profile.avatar_add')}
+              </Text>
+            </Pressable>
+            {pendingPhoto ? (
+              <Pressable
+                onPress={onSaveAvatar}
+                disabled={avatarSaving}
+                style={[
+                  styles.avatarButton,
+                  styles.avatarButtonPrimary,
+                  avatarSaving && styles.avatarButtonDisabled,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.avatarButtonText,
+                    styles.avatarButtonTextPrimary,
+                  ]}
+                >
+                  {avatarSaving
+                    ? t('profile.avatar_uploading')
+                    : t('profile.avatar_save')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {/* Read-only contact info */}
@@ -199,6 +310,58 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     padding: spacing.lg,
     ...shadows.card,
+  },
+  // Move 5 — avatar block. Avatar + actions on the trailing side.
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    ...shadows.card,
+  },
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.whisper,
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontFamily: fonts.headingBold,
+    fontSize: 36,
+    color: colors.mossDeep,
+  },
+  avatarActions: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  avatarButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    alignItems: 'center',
+  },
+  avatarButtonPrimary: {
+    backgroundColor: colors.mossDeep,
+    borderColor: colors.mossDeep,
+  },
+  avatarButtonDisabled: {
+    opacity: 0.5,
+  },
+  avatarButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  avatarButtonTextPrimary: {
+    color: colors.cream,
   },
   infoRow: {
     flexDirection: 'row',
