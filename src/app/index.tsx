@@ -15,6 +15,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
+import { CategoryStrip } from '@/components/CategoryStrip';
 import { ListingCard } from '@/components/ListingCard';
 import { useFavorites } from '@/hooks/useFavorites';
 import {
@@ -533,6 +534,9 @@ function OwnerFeedHome() {
   return (
     <SafeAreaView style={styles.safe}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
+      {/* Move 2 — top-level category strip. Pet Hosts is active;
+          the other two render as "coming soon" and absorb taps. */}
+      <CategoryStrip active="pet_hosts" onSelect={() => {}} />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.feedTitle}>

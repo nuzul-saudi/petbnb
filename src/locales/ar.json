@@ -581,6 +581,12 @@
     "dog": "كلب",
     "all": "الكل"
   },
+  "category": {
+    "pet_hosts": "مُضيفات",
+    "pet_services": "خدمات الحيوانات",
+    "merchandise": "متجر",
+    "coming_soon": "قريباً"
+  },
   "profile": {
     "title": "حسابي",
     "back": "← رجوع",

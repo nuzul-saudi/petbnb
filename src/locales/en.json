@@ -570,6 +570,12 @@
     "dog": "Dog",
     "all": "All"
   },
+  "category": {
+    "pet_hosts": "Pet Hosts",
+    "pet_services": "Pet Services",
+    "merchandise": "Merchandise",
+    "coming_soon": "Coming soon"
+  },
   "profile": {
     "title": "My account",
     "back": "← Back",
