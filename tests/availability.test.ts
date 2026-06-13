@@ -202,6 +202,48 @@ describe('isListingAvailable — search-time filter mirror (0035 RPC)', () => {
     ).toEqual({ available: true });
   });
 
+  // 0036 — host-visibility parity. The RPC must mirror the
+  // listings_select RLS predicate or the hydration step silently
+  // drops rows the RPC promised.
+
+  it('9. unverified host → hidden (host_hidden, takes precedence over availability)', () => {
+    // Even when there's no blocked range, no overlap, capacity to
+    // spare, an unverified host should NOT appear — RLS would hide
+    // the row at hydration. The RPC must agree.
+    expect(
+      isListingAvailable({
+        ...baseArgs,
+        hostIsVerified: false,
+        hostIsSuspended: false,
+      }),
+    ).toEqual({ available: false, reason: 'host_hidden' });
+  });
+
+  it('10. suspended host → hidden (host_hidden)', () => {
+    expect(
+      isListingAvailable({
+        ...baseArgs,
+        hostIsVerified: true,
+        hostIsSuspended: true,
+      }),
+    ).toEqual({ available: false, reason: 'host_hidden' });
+  });
+
+  it('11. host visibility check runs BEFORE blocked / capacity checks', () => {
+    // An unverified host + blocked range → reason must be
+    // 'host_hidden', not 'blocked'. Matches the RPC's predicate
+    // ordering (host EXISTS check is evaluated independently of
+    // the blocked + capacity NOT EXISTS subqueries; semantically
+    // both branches reject, but the JS mirror reports host first).
+    expect(
+      isListingAvailable({
+        ...baseArgs,
+        hostIsVerified: false,
+        blocked: [{ start_date: '2026-07-12', end_date: '2026-07-13' }],
+      }),
+    ).toEqual({ available: false, reason: 'host_hidden' });
+  });
+
   it('8. two overlapping committed bookings summing to max → new booking rejected', () => {
     // 2 + 1 + 1 requested = 4 > max 3.
     expect(

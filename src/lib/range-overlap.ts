@@ -86,9 +86,25 @@ export function isListingAvailable(args: {
   requestedPetCount: number;
   bookings: BookingForCapacity[];
   blocked: BlockedRangeLike[];
+  /**
+   * Host visibility predicate (mirrored from the listings_select RLS
+   * policy + migration 0036's RPC body). When EITHER is false the
+   * listing is RLS-hidden from the hydration step on the client, so
+   * the search filter must exclude it too. Defaulted to verified +
+   * not suspended so existing callers that don't pass host state get
+   * the unsurprising "show" behavior.
+   */
+  hostIsVerified?: boolean;
+  hostIsSuspended?: boolean;
 }):
   | { available: true }
-  | { available: false; reason: 'blocked' | 'over_capacity' } {
+  | { available: false; reason: 'blocked' | 'over_capacity' | 'host_hidden' } {
+  // Host visibility runs first — matches both RLS (which hides the
+  // row at hydration regardless of availability) and 0036's RPC
+  // (which short-circuits on the EXISTS check).
+  if (args.hostIsVerified === false || args.hostIsSuspended === true) {
+    return { available: false, reason: 'host_hidden' };
+  }
   if (isRangeBlocked(args.searchStart, args.searchEnd, args.blocked)) {
     return { available: false, reason: 'blocked' };
   }
