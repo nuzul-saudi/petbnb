@@ -204,6 +204,8 @@
     "report_failed": "تعذّر الإبلاغ عن المشكلة، حاولي مرة أخرى",
     "owner_section_title": "صاحب الحيوان",
     "owner_no_ratings": "بلا تقييمات بعد",
+    "host_section_title": "المُضيف",
+    "host_no_ratings": "بلا تقييمات بعد",
     "pets_section_title": "الحيوانات المحجوزة",
     "pet_age_years": "{count} سنوات",
     "pet_age_year_one": "سنة واحدة",

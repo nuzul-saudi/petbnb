@@ -149,11 +149,25 @@ export type BookingOwnerSummary = Pick<
   'id' | 'full_name' | 'full_name_en' | 'avatar_url'
 >;
 
+export type BookingHostSummary = Pick<
+  Tables<'profiles'>,
+  'id' | 'full_name' | 'full_name_en' | 'avatar_url'
+>;
+
 export type BookingDetail = Tables<'bookings'> & {
   listing: Pick<
     Tables<'listings'>,
     'id' | 'title_ar' | 'title_en' | 'neighborhood' | 'host_id'
   > | null;
+  /** Stretch S2 (2026-06-13) — host identity on the owner's view of
+   *  the booking. Mirrors the existing owner field that the host
+   *  sees. Null when the listing row was deleted (shouldn't happen
+   *  in practice; defensive). */
+  host: BookingHostSummary | null;
+  /** Host rating aggregate via the 0032 RPC. Same shape and
+   *  fallback behavior as owner_avg_rating. */
+  host_avg_rating: number | null;
+  host_review_count: number;
   owner: BookingOwnerSummary | null;
   /** Round-2-feedback polish — owner rating aggregate from the 0032
    *  RPC. Null when the owner has zero reviews (the host sees a
@@ -178,7 +192,10 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
       // exists for bookings.owner_id REFERENCES profiles.
       `
       *,
-      listing:listings(id, title_ar, title_en, neighborhood, host_id),
+      listing:listings(
+        id, title_ar, title_en, neighborhood, host_id,
+        host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url)
+      ),
       owner:profiles!bookings_owner_id_fkey(id, full_name, full_name_en, avatar_url),
       booking_addons(*),
       booking_pets(pet:pets(*))
@@ -199,21 +216,53 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
     owner?: BookingOwnerSummary | null;
   };
 
-  // Polish (Round 2 feedback) — fetch owner rating aggregate via the
-  // 0032 RPC. Best-effort: a missing RPC or network blip leaves the
+  // Pull the host out of the nested embed before we strip the
+  // embed shape from the listing record. S2 (2026-06-13) — owner's
+  // view of the booking now gets the host card too.
+  const listingWithHost = (data.listing ?? null) as
+    | (BookingDetail['listing'] & {
+        host?: BookingHostSummary | null;
+      })
+    | null;
+  const host = listingWithHost?.host ?? null;
+  const cleanListing: BookingDetail['listing'] = listingWithHost
+    ? {
+        id: listingWithHost.id,
+        title_ar: listingWithHost.title_ar,
+        title_en: listingWithHost.title_en,
+        neighborhood: listingWithHost.neighborhood,
+        host_id: listingWithHost.host_id,
+      }
+    : null;
+
+  // Polish (Round 2 feedback) — fetch owner + host rating aggregates
+  // via the 0032 RPC in a single call (the RPC accepts an array of
+  // ids). Best-effort: a missing RPC or network blip leaves the
   // card showing the "no ratings yet" affordance, which is the
   // honest fallback.
   let ownerAvgRating: number | null = null;
   let ownerReviewCount = 0;
-  if (owner) {
+  let hostAvgRating: number | null = null;
+  let hostReviewCount = 0;
+  const ratingIds: string[] = [];
+  if (owner) ratingIds.push(owner.id);
+  if (host && host.id !== owner?.id) ratingIds.push(host.id);
+  if (ratingIds.length > 0) {
     try {
       const { data: ratings } = await supabase.rpc('get_host_ratings', {
-        host_ids: [owner.id],
+        host_ids: ratingIds,
       });
-      if (ratings && ratings.length > 0) {
-        const row = ratings[0];
-        ownerAvgRating = row.review_count > 0 ? Number(row.avg_rating) : null;
-        ownerReviewCount = Number(row.review_count);
+      for (const row of ratings ?? []) {
+        const avg = row.review_count > 0 ? Number(row.avg_rating) : null;
+        const count = Number(row.review_count);
+        if (owner && row.host_id === owner.id) {
+          ownerAvgRating = avg;
+          ownerReviewCount = count;
+        }
+        if (host && row.host_id === host.id) {
+          hostAvgRating = avg;
+          hostReviewCount = count;
+        }
       }
     } catch {
       // Silent — fallback to "no ratings yet" in the UI.
@@ -222,7 +271,10 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
 
   return {
     ...(rest as Tables<'bookings'>),
-    listing: (data.listing ?? null) as BookingDetail['listing'],
+    listing: cleanListing,
+    host,
+    host_avg_rating: hostAvgRating,
+    host_review_count: hostReviewCount,
     owner: owner ?? null,
     owner_avg_rating: ownerAvgRating,
     owner_review_count: ownerReviewCount,

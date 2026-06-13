@@ -21,6 +21,7 @@ import { Button } from "@/components/Button";
 import { PetAvatar } from "@/components/PetAvatar";
 import { CheckOutSection } from "@/components/bookings/CheckOutSection";
 import { ReviewCard } from "@/components/bookings/ReviewCard";
+import { UserAvatar } from "@/components/UserAvatar";
 import { ConditionReportsSection } from "@/components/bookings/ConditionReportsSection";
 import { OwnerPetsSection } from "@/components/bookings/OwnerPetsSection";
 import { MessagesSection } from "@/components/bookings/MessagesSection";
@@ -1145,6 +1146,51 @@ export default function BookingDetailScreen() {
           />
         ) : null}
 
+        {/* Stretch S2 (2026-06-13) — host identity on the owner's
+            view. Mirror of OwnerPetsSection's owner card: avatar,
+            name, rating. Owner already knows their pets, so we don't
+            duplicate the pet block here. */}
+        {!isHostMode && booking.host ? (
+          <View style={styles.hostCard}>
+            <Text style={styles.hostCardHeading}>
+              {t('booking.host_section_title')}
+            </Text>
+            <View style={styles.hostCardRow}>
+              <UserAvatar
+                avatarUrl={booking.host.avatar_url}
+                displayName={
+                  pickLocalized(
+                    booking.host.full_name ?? '',
+                    booking.host.full_name_en,
+                    locale,
+                  ) || '—'
+                }
+                size={56}
+              />
+              <View style={styles.hostCardText}>
+                <Text style={styles.hostCardName} numberOfLines={1}>
+                  {pickLocalized(
+                    booking.host.full_name ?? '',
+                    booking.host.full_name_en,
+                    locale,
+                  ) || '—'}
+                </Text>
+                {booking.host_avg_rating != null &&
+                booking.host_review_count > 0 ? (
+                  <Text style={styles.hostCardRating}>
+                    ★ {booking.host_avg_rating.toFixed(1)} ·{' '}
+                    {booking.host_review_count}
+                  </Text>
+                ) : (
+                  <Text style={styles.hostCardMuted}>
+                    {t('booking.host_no_ratings')}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+        ) : null}
+
         {/* Round 5b — messaging. Both parties of the booking can
             send/read; visible on every status. Compose bar hides on
             declined / cancelled / disputed (canSend=false). */}
@@ -1392,6 +1438,45 @@ export default function BookingDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  // S2 (2026-06-13) — host card on owner's booking view. Mirrors the
+  // identity-card pattern from OwnerPetsSection (colors.cream
+  // background, 20-size heading, 56 px avatar).
+  hostCard: {
+    backgroundColor: colors.cream,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    ...shadows.card,
+  },
+  hostCardHeading: {
+    fontFamily: fonts.headingBold,
+    fontSize: 20,
+    color: colors.mossDeep,
+  },
+  hostCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  hostCardText: {
+    flex: 1,
+    gap: 2,
+  },
+  hostCardName: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    color: colors.ink,
+  },
+  hostCardRating: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.goldDeep,
+  },
+  hostCardMuted: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+  },
   safe: {
     flex: 1,
     // backgroundColor intentionally omitted — themed AppShell wrapper

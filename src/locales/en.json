@@ -203,6 +203,8 @@
     "report_confirm": "Report a problem with this booking? It will be reviewed by admin.",
     "report_failed": "Couldn't report the problem, please try again",
     "owner_section_title": "Pet Owner",
+    "host_section_title": "Host",
+    "host_no_ratings": "No ratings yet",
     "pet_age_years": "{count} years",
     "pet_age_year_one": "1 year",
     "pet_age_year_month": "{years}y {months}m",
