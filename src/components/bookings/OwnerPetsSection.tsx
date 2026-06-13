@@ -43,7 +43,7 @@ export type OwnerPetsSectionProps = {
    * pre-localized strings keeps this component pure presentational
    * and avoids a useTranslation() inside a presentational component.
    */
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 };
 
 export function OwnerPetsSection({
@@ -130,8 +130,22 @@ export function OwnerPetsSection({
                   <Text style={styles.petName} numberOfLines={1}>
                     {p.name}
                   </Text>
-                  {p.breed ? (
-                    <Text style={styles.petMeta}>{p.breed}</Text>
+                  {/* HD-2 (2026-06-13): show breed + age line. Pet's
+                      age_months → human-readable. Hosts had no age
+                      context pre-this; small but meaningful for
+                      accept/decline decisions (a kitten is a very
+                      different proposition from a senior cat). */}
+                  {p.breed || p.age_months != null ? (
+                    <Text style={styles.petMeta}>
+                      {[
+                        p.breed ?? null,
+                        p.age_months != null
+                          ? formatPetAge(p.age_months, t)
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
                   ) : null}
                 </View>
                 <View
@@ -173,6 +187,28 @@ export function OwnerPetsSection({
       )}
     </View>
   );
+}
+
+/** HD-2 helper — render pet age from age_months. Uses the existing
+ *  pets.age_months / age_months_one plural keys when displayed in
+ *  whole months; falls back to "Ny Nm" form past 12 months. */
+function formatPetAge(
+  months: number,
+  t: (k: string, p?: Record<string, string | number>) => string,
+): string {
+  if (months < 12) {
+    return months === 1
+      ? t('pets.age_months_one')
+      : t('pets.age_months', { count: months });
+  }
+  const years = Math.floor(months / 12);
+  const rem = months - years * 12;
+  if (rem === 0) {
+    return years === 1
+      ? t('booking.pet_age_year_one')
+      : t('booking.pet_age_years', { count: years });
+  }
+  return t('booking.pet_age_year_month', { years, months: rem });
 }
 
 function PetDetail({ label, value }: { label: string; value: string }) {

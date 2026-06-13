@@ -953,11 +953,12 @@ export default function BookingDetailScreen() {
             const services = isLegacyBooking
               ? []
               : (servicesByPet.get(p.id) ?? []);
-            const showCareDetails =
-              isHost &&
-              (booking.status === 'accepted' ||
-                booking.status === 'active' ||
-                booking.status === 'completed');
+            // HD-2 (2026-06-13): care details previously gated to
+            // post-accept statuses so hosts wouldn't see private
+            // notes pre-commitment. Founder reversed that — the host
+            // needs the context BEFORE deciding accept/decline. Now
+            // shown on every status for the host.
+            const showCareDetails = isHost;
             return (
               <View key={p.id} style={styles.petBlock}>
                 <View style={styles.petBlockHeader}>
