@@ -379,6 +379,9 @@
   },
   "auth": {
     "sign_in_title": "مرحباً بك في Petbnb",
+    "sign_in_or_signup_title": "تسجيل الدخول أو إنشاء حساب",
+    "new_here_hint": "جديد هنا؟ أدخل بريدك الإلكتروني — سننشئ حسابك تلقائياً.",
+    "continue_as_guest": "تابع كزائر",
     "sign_in_subtitle": "رعاية الحيوانات الأليفة في الرياض",
     "email_label": "البريد الإلكتروني",
     "email_placeholder": "you@example.com",

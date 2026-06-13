@@ -73,8 +73,11 @@ export default function SignInScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <Text style={styles.heading}>{t('auth.sign_in_title')}</Text>
+        <Text style={styles.heading}>{t('auth.sign_in_or_signup_title')}</Text>
         <Text style={styles.subtitle}>{t('auth.sign_in_subtitle')}</Text>
+        <Text style={styles.newHereHint}>
+          {t('auth.new_here_hint')}
+        </Text>
 
         <View style={styles.field}>
           <Text style={styles.label}>{t('auth.email_label')}</Text>
@@ -106,6 +109,19 @@ export default function SignInScreen() {
         <Text style={styles.hint}>{t('auth.send_otp_hint')}</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {/* AUTH-1 — Guest link. Routes back to the guest feed.
+            From returnTo flows this still goes to '/' (the feed)
+            because the returnTo URL was the page that triggered
+            sign-in; we want the user OUT of the auth funnel. */}
+        <Pressable
+          onPress={() => router.replace('/')}
+          style={styles.guestLink}
+        >
+          <Text style={styles.guestLinkText}>
+            {t('auth.continue_as_guest')}
+          </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -178,6 +194,26 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     textAlign: 'center',
     marginTop: spacing.sm,
+  },
+  newHereHint: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    textAlign: 'center',
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+    fontStyle: 'italic',
+  },
+  guestLink: {
+    marginTop: spacing.xl,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  guestLinkText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.mossDeep,
+    textDecorationLine: 'underline',
   },
   error: {
     fontFamily: fonts.body,
