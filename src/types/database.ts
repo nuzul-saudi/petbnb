@@ -936,6 +936,28 @@ export type Database = {
           review_count: number;
         }[];
       };
+      // Feature 1 / 0035 — search-time availability filtering.
+      // Returns plain listings rows that pass the standard feed
+      // predicates AND have both capacity and no blocked-range
+      // overlap for the searched window. Mirrors the 0027 booking
+      // capacity trigger so submit-time guard and search agree.
+      available_listings: {
+        Args: {
+          p_search_start: string;
+          p_search_end: string;
+          p_pet_count?: number;
+          p_city?: string | null;
+          p_neighborhood?: string | null;
+          p_female_only?: boolean;
+          p_grooming_only?: boolean;
+          p_no_resident_pets_only?: boolean;
+          p_min_price_sar?: number | null;
+          p_max_price_sar?: number | null;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: Database['public']['Tables']['listings']['Row'][];
+      };
     };
 
     // These mirror the CHECK constraints in 0001_initial_schema.sql. They

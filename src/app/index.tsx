@@ -552,6 +552,16 @@ function OwnerFeedHome() {
             // returned rows.
             sortByDistance:
               sortBy === 'distance' && coords ? coords : undefined,
+            // Feature 1 (2026-06-13) — when search has BOTH dates, the
+            // feed routes through the 0035 available_listings RPC and
+            // returns only listings that can actually take the booking
+            // (no blocked-range overlap, capacity fits requested pet
+            // count). When no dates, this branch is dormant and the
+            // existing undated query path runs unchanged.
+            searchStart: searchStartDate ?? undefined,
+            searchEnd: searchEndDate ?? undefined,
+            requestedPetCount:
+              searchPetIds.length > 0 ? searchPetIds.length : 1,
           },
           // Pagination (Round 3). Page 0, 20 per page. Load-more /
           // infinite scroll is a follow-up.
@@ -566,7 +576,7 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [city, searchDistrict, femaleOnly, groomingOnly, noResidentPetsOnly, priceBand, speciesFilter, coords, sortBy, t],
+    [city, searchDistrict, femaleOnly, groomingOnly, noResidentPetsOnly, priceBand, speciesFilter, coords, sortBy, t, searchStartDate, searchEndDate, searchPetIds],
   );
 
   // R2C5 client-side sort over the loaded items. Distance is handled

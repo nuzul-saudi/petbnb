@@ -39,6 +39,20 @@ export type ListingFilter = {
    * line entirely for those.
    */
   sortByDistance?: { lat: number; lng: number };
+  /**
+   * Feature 1 (2026-06-13) — search-time availability filtering. When
+   * BOTH searchStart and searchEnd are set, listActiveListings routes
+   * through the 0035 available_listings RPC, which mirrors the 0027
+   * capacity + blocked-range trigger predicates. Listings that
+   * couldn't take a booking for the given range × pet count are
+   * dropped from the result.
+   *
+   * Half-open [start, end) convention. requestedPetCount defaults to
+   * 1 ("dates but no pet count" per the founder's spec).
+   */
+  searchStart?: string;
+  searchEnd?: string;
+  requestedPetCount?: number;
 };
 
 type HostSummary = Pick<
@@ -117,49 +131,112 @@ export async function listActiveListings(
 ): Promise<ListingFeedItem[]> {
   if (!supabase) return [];
 
-  let query = supabase
-    .from('listings')
-    .select(
-      `
-      *,
-      host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url),
-      listing_photos(id, photo_url, sort_order)
-    `,
-    )
-    .eq('status', 'approved')
-    .order('created_at', { ascending: false });
-
-  if (filter.city) query = query.eq('city', filter.city);
-  if (filter.neighborhood) query = query.eq('neighborhood', filter.neighborhood);
-  if (filter.femaleHostsOnly) query = query.eq('host_gender', 'female');
-  // S2 — owner-feed discovery filters.
-  if (filter.minPriceSAR != null) {
-    query = query.gte('nightly_price_sar', filter.minPriceSAR);
-  }
-  if (filter.maxPriceSAR != null) {
-    query = query.lte('nightly_price_sar', filter.maxPriceSAR);
-  }
-  if (filter.groomingOnly) query = query.eq('offers_grooming', true);
-  if (filter.noResidentPetsOnly) {
-    query = query.eq('has_resident_pets', false);
-  }
-  // Round 12 / Step 5.7. PostgREST's `contains` maps to the SQL `@>`
-  // operator on text[]. The GIN index from 0034 backs the lookup.
-  if (filter.species) {
-    query = query.contains('accepts_species', [filter.species]);
-  }
-
-  // Pagination (Round 3 / 2026-06-XX). Default 20-per-page. Without
-  // this, the unpaginated feed was hot-pathed at "every approved
-  // listing every load" — fine at 30 listings, painful at 300.
-  // "Load more" / infinite scroll is a follow-up; the owner feed
-  // currently fetches page 0 only.
   const pageSize = pagination.limit ?? 20;
   const start = pagination.offset ?? 0;
-  query = query.range(start, start + pageSize - 1);
 
-  const { data, error } = await query;
-  if (error) throw error;
+  // Two paths — kept distinct so the no-dates feed (the high-traffic
+  // public browse) stays on the original well-tested query, and the
+  // dated path routes through the 0035 RPC for availability filtering.
+  type EmbedRow = Tables<'listings'> & {
+    host: HostSummary | null;
+    listing_photos: PhotoSummary[] | null;
+  };
+  let data: EmbedRow[] = [];
+
+  if (filter.searchStart && filter.searchEnd) {
+    // Feature 1 — RPC returns the IDs that are actually available
+    // for the date range × pet count. Same predicates as the 0027
+    // submit-time trigger, so filter + guard agree by construction.
+    //
+    // Two round-trips: (1) RPC for available IDs, (2) nested-embed
+    // select to hydrate host + photos for those IDs. Keeps the RPC
+    // narrow ("which are available?") and reuses the existing
+    // hydration shape.
+    //
+    // Note: filter.species is NOT yet plumbed into the RPC. Today
+    // SPECIES_ENABLED is false at the call site, so species is
+    // never set when this branch runs. When dogs land, extend the
+    // RPC signature + this call together.
+    const { data: availRaw, error: rpcErr } = await supabase.rpc(
+      'available_listings',
+      {
+        p_search_start: filter.searchStart,
+        p_search_end: filter.searchEnd,
+        p_pet_count: filter.requestedPetCount ?? 1,
+        p_city: filter.city ?? null,
+        p_neighborhood: filter.neighborhood ?? null,
+        p_female_only: filter.femaleHostsOnly ?? false,
+        p_grooming_only: filter.groomingOnly ?? false,
+        p_no_resident_pets_only: filter.noResidentPetsOnly ?? false,
+        p_min_price_sar: filter.minPriceSAR ?? null,
+        p_max_price_sar: filter.maxPriceSAR ?? null,
+        p_limit: pageSize,
+        p_offset: start,
+      },
+    );
+    if (rpcErr) throw rpcErr;
+    const availableIds = (availRaw ?? []).map(
+      (r: Tables<'listings'>) => r.id,
+    );
+    if (availableIds.length === 0) {
+      data = [];
+    } else {
+      const { data: hydrated, error: hydrErr } = await supabase
+        .from('listings')
+        .select(
+          `
+          *,
+          host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url),
+          listing_photos(id, photo_url, sort_order)
+        `,
+        )
+        .in('id', availableIds)
+        .order('created_at', { ascending: false });
+      if (hydrErr) throw hydrErr;
+      data = (hydrated ?? []) as EmbedRow[];
+    }
+  } else {
+    // Undated path — original single-query shape, unchanged.
+    let query = supabase
+      .from('listings')
+      .select(
+        `
+        *,
+        host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url),
+        listing_photos(id, photo_url, sort_order)
+      `,
+      )
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false });
+
+    if (filter.city) query = query.eq('city', filter.city);
+    if (filter.neighborhood) {
+      query = query.eq('neighborhood', filter.neighborhood);
+    }
+    if (filter.femaleHostsOnly) query = query.eq('host_gender', 'female');
+    if (filter.minPriceSAR != null) {
+      query = query.gte('nightly_price_sar', filter.minPriceSAR);
+    }
+    if (filter.maxPriceSAR != null) {
+      query = query.lte('nightly_price_sar', filter.maxPriceSAR);
+    }
+    if (filter.groomingOnly) query = query.eq('offers_grooming', true);
+    if (filter.noResidentPetsOnly) {
+      query = query.eq('has_resident_pets', false);
+    }
+    // Round 12 / Step 5.7. PostgREST's `contains` maps to the SQL
+    // `@>` operator on text[]. The GIN index from 0034 backs the
+    // lookup.
+    if (filter.species) {
+      query = query.contains('accepts_species', [filter.species]);
+    }
+
+    query = query.range(start, start + pageSize - 1);
+
+    const { data: queryData, error } = await query;
+    if (error) throw error;
+    data = (queryData ?? []) as EmbedRow[];
+  }
 
   // The nested select returns a typed shape but with `listing_photos` as the
   // raw rows. Pick the lowest sort_order as the cover; compute distance
