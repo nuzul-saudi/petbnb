@@ -68,7 +68,17 @@
     "edit_button": "Edit listing",
     "back": "← Back",
     "stay_dates_label": "Stay dates",
-    "stay_dates_hint": "Add stay dates"
+    "stay_dates_hint": "Add stay dates",
+    "section": {
+      "about": "About this place",
+      "host": "Host",
+      "amenities": "What this place offers",
+      "reviews": "Reviews",
+      "location": "Location"
+    },
+    "photos_plus": "+{n} photos",
+    "reviews_empty": "No reviews yet",
+    "location_privacy_note": "Showing the district only — the exact location is shared after a booking is accepted."
   },
   "listings": {
     "form": {

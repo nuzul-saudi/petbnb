@@ -68,7 +68,17 @@
     "edit_button": "تعديل الإعلان",
     "back": "← رجوع",
     "stay_dates_label": "تواريخ الإقامة",
-    "stay_dates_hint": "أضيفي تواريخ الإقامة"
+    "stay_dates_hint": "أضيفي تواريخ الإقامة",
+    "section": {
+      "about": "نبذة عن المكان",
+      "host": "المُضيفة",
+      "amenities": "ما يميّز هذا المكان",
+      "reviews": "التقييمات",
+      "location": "الموقع"
+    },
+    "photos_plus": "+{n} صورة",
+    "reviews_empty": "لا توجد تقييمات بعد",
+    "location_privacy_note": "نعرض الحي فقط — الموقع الدقيق يُرسَل بعد قبول الحجز."
   },
   "listings": {
     "form": {

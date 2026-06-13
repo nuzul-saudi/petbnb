@@ -7,11 +7,14 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
-import { PhotoGallery } from '@/components/PhotoGallery';
+import { PhotoLightbox } from '@/components/PhotoLightbox';
+import { PhotoMosaic } from '@/components/PhotoMosaic';
 import { SearchWhenModal } from '@/components/SearchWhenModal';
+import { findCity, findDistrict } from '@/lib/cities';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
+import { listReviewsForHost, type HostReview } from '@/lib/reviews';
 import { useAuth } from '@/lib/auth';
 import { usePersona } from '@/lib/persona';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -76,6 +79,17 @@ export default function ListingDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Rich detail page (2026-06-13). Reviews are loaded as a follow-up
+  // fetch once the listing resolves — keyed by the host id, which
+  // means a listing-detail open and a host-profile open could share
+  // the cache (today they don't; trivial follow-up).
+  const [reviews, setReviews] = useState<HostReview[]>([]);
+
+  // Lightbox state. Opens when any mosaic tile is tapped; closes
+  // via X or the system back gesture.
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -98,6 +112,21 @@ export default function ListingDetailScreen() {
       cancelled = true;
     };
   }, [id, t]);
+
+  // Fetch host reviews once we know the host_id. Best-effort —
+  // listReviewsForHost returns [] on error so the section just
+  // shows the empty state rather than blocking the page.
+  useEffect(() => {
+    const hostId = listing?.host_id;
+    if (!hostId) return;
+    let cancelled = false;
+    void listReviewsForHost(hostId).then((rows) => {
+      if (!cancelled) setReviews(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing?.host_id]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   // R2C3 guest mode (2026-06-11): listing detail is browsable by anon.
@@ -169,87 +198,20 @@ export default function ListingDetailScreen() {
             </Pressable>
           </View>
         ) : null}
-        {/* Sitter-first header — hero of the detail screen. */}
-        <View style={styles.sitterHeader}>
-          {listing.host?.avatar_url ? (
-            <Image
-              source={{ uri: listing.host.avatar_url }}
-              style={styles.avatar}
-              contentFit="cover"
-              transition={150}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback]}>
-              <Text style={styles.avatarInitial}>
-                {(listing.host
-                  ? pickLocalized(
-                      listing.host.full_name,
-                      listing.host.full_name_en,
-                      locale,
-                    )
-                  : null
-                )
-                  ?.trim()
-                  .charAt(0) ?? '?'}
-              </Text>
-            </View>
-          )}
-          <View style={styles.sitterText}>
-            <View style={styles.sitterNameRow}>
-              <Text style={styles.sitterName} numberOfLines={1}>
-                {listing.host
-                  ? pickLocalized(
-                      listing.host.full_name,
-                      listing.host.full_name_en,
-                      locale,
-                    )
-                  : '—'}
-              </Text>
-              <Text style={styles.verifiedMark}>✓</Text>
-            </View>
-            <Text style={styles.sitterMeta}>
-              {t(
-                listing.host_gender === 'female'
-                  ? 'listing.host_female'
-                  : 'listing.host_male',
-              )}{' '}
-              • 📍 {listing.neighborhood}
-            </Text>
-            <View style={styles.badgeRow}>
-              <View
-                style={[
-                  styles.tier,
-                  listing.tier === 'gold'
-                    ? styles.tierGold
-                    : listing.tier === 'silver'
-                      ? styles.tierSilver
-                      : styles.tierBronze,
-                ]}
-              >
-                <Text style={styles.tierText}>
-                  {t(`listing.tier_${listing.tier}`)}
-                </Text>
-              </View>
-              <View style={styles.newBadge}>
-                <Text style={styles.newBadgeText}>
-                  {t('listing.host_new_badge')}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Photos as secondary evidence. 4:3 (taller than the 5:2
-            card thumbnail) so the customer can actually see the home
-            on the detail screen; PhotoGallery's height cap keeps it
-            from dominating the page on a wide desktop browser. */}
-        <PhotoGallery photos={listing.photos} aspectRatio={4 / 3} />
+        {/* Section 1: photo mosaic (hero). */}
+        <PhotoMosaic
+          photos={listing.photos}
+          onPressPhoto={(idx) => {
+            setLightboxIndex(idx);
+            setLightboxOpen(true);
+          }}
+        />
 
         <View style={styles.body}>
+          {/* Section 2: title + price. */}
           <Text style={styles.title}>
             {pickLocalized(listing.title_ar, listing.title_en, locale)}
           </Text>
-
           <View style={styles.priceRow}>
             <Text style={styles.price}>
               {formatSAR(listing.nightly_price_sar)}{' '}
@@ -259,20 +221,120 @@ export default function ListingDetailScreen() {
             </Text>
           </View>
 
+          {/* Section 3: host card — the trust anchor. */}
+          <View style={styles.sectionDivider} />
+          <View style={styles.hostCard}>
+            {listing.host?.avatar_url ? (
+              <Image
+                source={{ uri: listing.host.avatar_url }}
+                style={styles.hostAvatar}
+                contentFit="cover"
+                transition={150}
+              />
+            ) : (
+              <View style={[styles.hostAvatar, styles.hostAvatarFallback]}>
+                <Text style={styles.hostAvatarInitial}>
+                  {(listing.host
+                    ? pickLocalized(
+                        listing.host.full_name,
+                        listing.host.full_name_en,
+                        locale,
+                      )
+                    : null
+                  )
+                    ?.trim()
+                    .charAt(0) ?? '?'}
+                </Text>
+              </View>
+            )}
+            <View style={styles.hostText}>
+              <Text style={styles.sectionLabel}>
+                {t('listing.section.host')}
+              </Text>
+              <View style={styles.hostNameRow}>
+                <Text style={styles.hostName} numberOfLines={1}>
+                  {listing.host
+                    ? pickLocalized(
+                        listing.host.full_name,
+                        listing.host.full_name_en,
+                        locale,
+                      )
+                    : '—'}
+                </Text>
+                <Text style={styles.verifiedMark}>✓</Text>
+              </View>
+              <Text style={styles.hostMeta}>
+                {t(
+                  listing.host_gender === 'female'
+                    ? 'listing.host_female'
+                    : 'listing.host_male',
+                )}
+              </Text>
+              <View style={styles.hostBadgeRow}>
+                <View
+                  style={[
+                    styles.tier,
+                    listing.tier === 'gold'
+                      ? styles.tierGold
+                      : listing.tier === 'silver'
+                        ? styles.tierSilver
+                        : styles.tierBronze,
+                  ]}
+                >
+                  <Text style={styles.tierText}>
+                    {t(`listing.tier_${listing.tier}`)}
+                  </Text>
+                </View>
+                {reviews.length > 0 ? (
+                  <View style={styles.ratingPill}>
+                    <Text style={styles.ratingPillText}>
+                      ★{' '}
+                      {(
+                        reviews.reduce((s, r) => s + r.stars, 0) /
+                        reviews.length
+                      ).toFixed(1)}{' '}
+                      · {toArabicDigits(reviews.length)}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.newBadge}>
+                    <Text style={styles.newBadgeText}>
+                      {t('listing.host_new_badge')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* Section 4: description. */}
           {listing.description_ar || listing.description_en ? (
-            <Text style={styles.description}>
-              {pickLocalized(
-                listing.description_ar ?? '',
-                listing.description_en,
-                locale,
-              )}
-            </Text>
+            <>
+              <View style={styles.sectionDivider} />
+              <Text style={styles.sectionHeading}>
+                {t('listing.section.about')}
+              </Text>
+              <Text style={styles.description}>
+                {pickLocalized(
+                  listing.description_ar ?? '',
+                  listing.description_en,
+                  locale,
+                )}
+              </Text>
+            </>
           ) : null}
 
+          {/* Section 5: amenities. */}
+          <View style={styles.sectionDivider} />
+          <Text style={styles.sectionHeading}>
+            {t('listing.section.amenities')}
+          </Text>
           <View style={styles.amenities}>
-            <Amenity label={t('listing.max_pets', {
-              count: toArabicDigits(listing.max_concurrent_pets),
-            })} />
+            <Amenity
+              label={t('listing.max_pets', {
+                count: toArabicDigits(listing.max_concurrent_pets),
+              })}
+            />
             <Amenity
               label={t(
                 listing.has_resident_pets
@@ -285,6 +347,61 @@ export default function ListingDetailScreen() {
               <Amenity label={t('listing.offers_grooming')} />
             ) : null}
           </View>
+
+          {/* Section 6: reviews. */}
+          <View style={styles.sectionDivider} />
+          <View style={styles.sectionHeadingRow}>
+            <Text style={styles.sectionHeading}>
+              {t('listing.section.reviews')}
+            </Text>
+            {reviews.length > 0 ? (
+              <Text style={styles.sectionHeadingMeta}>
+                ★{' '}
+                {(
+                  reviews.reduce((s, r) => s + r.stars, 0) / reviews.length
+                ).toFixed(1)}{' '}
+                · {toArabicDigits(reviews.length)}
+              </Text>
+            ) : null}
+          </View>
+          {reviews.length === 0 ? (
+            <Text style={styles.muted}>{t('listing.reviews_empty')}</Text>
+          ) : (
+            <View style={styles.reviewsList}>
+              {reviews.map((rv) => (
+                <View key={rv.id} style={styles.reviewItem}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={styles.reviewerName}>
+                      {rv.rater_name ?? '—'}
+                    </Text>
+                    <Text style={styles.reviewStars}>
+                      {'★'.repeat(rv.stars)}
+                      <Text style={styles.reviewStarsDim}>
+                        {'★'.repeat(5 - rv.stars)}
+                      </Text>
+                    </Text>
+                  </View>
+                  {rv.text_ar ? (
+                    <Text style={styles.reviewText}>{rv.text_ar}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Section 7: location — DISTRICT + city only, NO exact
+              address, NO precise pin. A female host's exact home
+              location stays private until a booking is confirmed. */}
+          <View style={styles.sectionDivider} />
+          <Text style={styles.sectionHeading}>
+            {t('listing.section.location')}
+          </Text>
+          <Text style={styles.locationText}>
+            📍 {formatApproximateLocation(listing.city, listing.neighborhood, locale)}
+          </Text>
+          <Text style={styles.locationPrivacy}>
+            {t('listing.location_privacy_note')}
+          </Text>
 
           {/* Feature 2 — stay-dates widget. Read-only summary
               when dates are set; tap to edit (opens RangeCalendar
@@ -388,8 +505,42 @@ export default function ListingDetailScreen() {
         }}
         onClose={() => setWhenOpen(false)}
       />
+
+      {/* Rich detail page — full-screen lightbox. Mounted at the
+          screen level so it overlays everything. */}
+      <PhotoLightbox
+        visible={lightboxOpen}
+        photos={listing.photos}
+        initialIndex={lightboxIndex}
+        onClose={() => setLightboxOpen(false)}
+      />
     </SafeAreaView>
   );
+}
+
+/** District + city display for the approximate-location section.
+ *  Falls back to raw neighborhood string for legacy listings whose
+ *  neighborhood column wasn't migrated to a district slug. */
+function formatApproximateLocation(
+  city: string,
+  neighborhood: string,
+  locale: 'ar' | 'en',
+): string {
+  const cityRec = findCity(city as 'riyadh' | 'dammam');
+  const districtRec = cityRec
+    ? findDistrict(city as 'riyadh' | 'dammam', neighborhood)
+    : undefined;
+  const cityName = cityRec
+    ? locale === 'ar'
+      ? cityRec.name_ar
+      : cityRec.name_en
+    : city;
+  const districtName = districtRec
+    ? locale === 'ar'
+      ? districtRec.name_ar
+      : districtRec.name_en
+    : neighborhood;
+  return `${districtName}, ${cityName}`;
 }
 
 /** Long date format for the detail-page stay-dates widget. "Jul 1" /
@@ -479,6 +630,142 @@ const styles = StyleSheet.create({
   body: {
     padding: spacing.xl,
     gap: spacing.md,
+  },
+  // Rich detail page (2026-06-13) — section structure.
+  sectionDivider: {
+    height: 1,
+    backgroundColor: colors.whisper,
+    marginVertical: spacing.lg,
+  },
+  sectionHeading: {
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.mossDeep,
+    marginBottom: spacing.sm,
+  },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  sectionHeadingMeta: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.inkSoft,
+  },
+  sectionLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    color: colors.inkSoft,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  hostCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+  },
+  hostAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.whisper,
+  },
+  hostAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hostAvatarInitial: {
+    fontFamily: fonts.headingBold,
+    fontSize: 28,
+    color: colors.mossDeep,
+  },
+  hostText: {
+    flex: 1,
+    gap: 2,
+  },
+  hostNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  hostName: {
+    flex: 1,
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.mossDeep,
+  },
+  hostMeta: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+  },
+  hostBadgeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  ratingPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.whisper,
+  },
+  ratingPillText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    color: colors.mossDeep,
+    letterSpacing: 0.3,
+  },
+  reviewsList: {
+    gap: spacing.md,
+  },
+  reviewItem: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  reviewerName: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  reviewStars: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.gold,
+  },
+  reviewStarsDim: {
+    color: colors.whisper,
+  },
+  reviewText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+    lineHeight: 20,
+  },
+  locationText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    color: colors.ink,
+  },
+  locationPrivacy: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
   },
   title: {
     fontFamily: fonts.headingBold,
