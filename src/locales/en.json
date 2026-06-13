@@ -576,6 +576,13 @@
     "merchandise": "Merchandise",
     "coming_soon": "Coming soon"
   },
+  "rangeCalendar": {
+    "prev_month": "Previous month",
+    "next_month": "Next month",
+    "hint_pick_start": "Pick your arrival date",
+    "hint_pick_end": "Pick your departure date",
+    "hint_complete": "✓ Dates ready"
+  },
   "search": {
     "where": "Where",
     "where_hint": "Search district or city",

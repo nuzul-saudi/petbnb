@@ -1,16 +1,14 @@
-// Move 4 — When modal. Picks start + end dates for the stay.
+// Move 4 — When modal (date-picker round, 2026-06-13).
 //
-// Reuses the existing DateField (web HTML5 picker / native TextInput).
-// Dates DO NOT filter the feed today — they're captured here and
-// forwarded as URL params when the user opens a sitter's request
-// screen so the booking flow prefills. The spec made that scope
-// explicit (date-based availability filtering is a separate feature).
+// Now backed by the custom RangeCalendar (two-tap selection with
+// connected mid-range highlight). The browser-native date picker
+// in DateField can't render that band, so this modal replaces the
+// two DateField inputs with a single RangeCalendar.
 
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { DateField } from '@/components/DateField';
-import { todayIso } from '@/lib/format';
+import { RangeCalendar } from '@/components/RangeCalendar';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
@@ -30,41 +28,40 @@ export function SearchWhenModal({
   onClose,
 }: SearchWhenModalProps) {
   const { t } = useTranslation();
-  const [draftStart, setDraftStart] = useState<string>(startDate ?? '');
-  const [draftEnd, setDraftEnd] = useState<string>(endDate ?? '');
-  const [error, setError] = useState<string | null>(null);
+  const [draftStart, setDraftStart] = useState<string | null>(startDate);
+  const [draftEnd, setDraftEnd] = useState<string | null>(endDate);
 
   useEffect(() => {
     if (visible) {
-      setDraftStart(startDate ?? '');
-      setDraftEnd(endDate ?? '');
-      setError(null);
+      setDraftStart(startDate);
+      setDraftEnd(endDate);
     }
   }, [visible, startDate, endDate]);
 
-  const onApplyPress = () => {
-    // Allow clearing both → "no dates set" is valid (resets search dates).
-    if (!draftStart && !draftEnd) {
-      onApply({ startDate: null, endDate: null });
-      onClose();
-      return;
-    }
-    if (!draftStart || !draftEnd) {
-      setError(t('search.when_both_required'));
-      return;
-    }
-    if (draftEnd <= draftStart) {
-      setError(t('search.when_invalid_range'));
-      return;
-    }
-    onApply({ startDate: draftStart, endDate: draftEnd });
-    onClose();
+  const onClear = () => {
+    setDraftStart(null);
+    setDraftEnd(null);
   };
 
-  const onClear = () => {
-    setDraftStart('');
-    setDraftEnd('');
-    setError(null);
+  // Auto-apply + close when the user completes a range. The
+  // RangeCalendar signals via onRangeComplete after the end tap.
+  const onRangeComplete = () => {
+    // Use the latest draft via a microtask — the setStart/setEnd
+    // setter ran synchronously just before, so reading draft state
+    // directly here might still see the old snapshot in React's
+    // batched update. Push the apply behind a 0ms timer.
+    setTimeout(() => {
+      onApply({ startDate: draftStart, endDate: draftEnd });
+      onClose();
+    }, 0);
+  };
+
+  // The onApply path on the explicit "Apply" button reads the
+  // current draft directly (no race with batched state). Used when
+  // user clears or wants to confirm without two-tap completion.
+  const onApplyPress = () => {
+    onApply({ startDate: draftStart, endDate: draftEnd });
+    onClose();
   };
 
   return (
@@ -78,25 +75,15 @@ export function SearchWhenModal({
         <Pressable style={styles.sheet} onPress={() => {}}>
           <Text style={styles.title}>{t('search.when')}</Text>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>{t('search.start_date_label')}</Text>
-            <DateField
-              value={draftStart}
-              onChange={setDraftStart}
-              min={todayIso()}
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>{t('search.end_date_label')}</Text>
-            <DateField
-              value={draftEnd}
-              onChange={setDraftEnd}
-              min={draftStart || todayIso()}
-            />
-          </View>
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <RangeCalendar
+            startDate={draftStart}
+            endDate={draftEnd}
+            onChange={({ startDate: s, endDate: e }) => {
+              setDraftStart(s);
+              setDraftEnd(e);
+            }}
+            onRangeComplete={onRangeComplete}
+          />
 
           <View style={styles.footer}>
             <Pressable onPress={onClear} style={styles.clearButton}>
@@ -137,25 +124,11 @@ const styles = StyleSheet.create({
     color: colors.mossDeep,
     marginBottom: spacing.md,
   },
-  field: {
-    marginBottom: spacing.md,
-  },
-  label: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 13,
-    color: colors.ink,
-    marginBottom: spacing.xs,
-  },
-  error: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.terracotta,
-    marginBottom: spacing.sm,
-  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    marginTop: spacing.md,
   },
   footerSpacer: {
     flex: 1,

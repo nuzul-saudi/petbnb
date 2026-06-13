@@ -587,6 +587,13 @@
     "merchandise": "متجر",
     "coming_soon": "قريباً"
   },
+  "rangeCalendar": {
+    "prev_month": "الشهر السابق",
+    "next_month": "الشهر التالي",
+    "hint_pick_start": "اختاري تاريخ الوصول",
+    "hint_pick_end": "اختاري تاريخ المغادرة",
+    "hint_complete": "✓ التاريخان جاهزان"
+  },
   "search": {
     "where": "أين",
     "where_hint": "ابحثي عن حي أو مدينة",
