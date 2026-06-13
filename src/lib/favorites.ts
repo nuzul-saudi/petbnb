@@ -79,7 +79,7 @@ export async function listFavoriteListings(
       created_at,
       listing:listings(
         *,
-        host:profiles(id, full_name, full_name_en, avatar_url),
+        host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url),
         listing_photos(id, photo_url, sort_order)
       )
     `,

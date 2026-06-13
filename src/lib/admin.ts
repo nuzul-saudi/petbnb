@@ -168,7 +168,7 @@ export async function listPendingReviews(): Promise<AdminReview[]> {
     .select(
       `
       *,
-      host:profiles(id, full_name, is_verified, is_suspended),
+      host:profiles!listings_host_id_fkey(id, full_name, is_verified, is_suspended),
       listing_photos(photo_url, sort_order),
       listing_drafts(updated_at),
       listing_photo_drafts(created_at)
@@ -300,7 +300,7 @@ export async function getAdminListingReview(
     .select(
       `
       *,
-      host:profiles(id, full_name, is_verified, is_suspended),
+      host:profiles!listings_host_id_fkey(id, full_name, is_verified, is_suspended),
       listing_photos(id, photo_url, sort_order),
       listing_drafts(*),
       listing_photo_drafts(id, photo_url, sort_order)

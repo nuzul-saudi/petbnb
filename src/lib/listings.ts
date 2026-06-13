@@ -113,7 +113,7 @@ export async function listActiveListings(
     .select(
       `
       *,
-      host:profiles(id, full_name, full_name_en, avatar_url),
+      host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url),
       listing_photos(id, photo_url, sort_order)
     `,
     )
@@ -242,7 +242,7 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
     .select(
       `
       *,
-      host:profiles(id, full_name, full_name_en, avatar_url),
+      host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url),
       listing_photos(id, photo_url, sort_order),
       listing_drafts(id),
       listing_photo_drafts(id)
@@ -300,7 +300,7 @@ export async function listOwnListings(
     .select(
       `
       *,
-      host:profiles(id, full_name, full_name_en, avatar_url),
+      host:profiles!listings_host_id_fkey(id, full_name, full_name_en, avatar_url),
       listing_photos(id, photo_url, sort_order),
       listing_drafts(id),
       listing_photo_drafts(id)
