@@ -11,6 +11,77 @@ One line per decision made autonomously during the batch run.
 - **Milestone A — care_notes visibility** — shown to host only when `booking.status IN ('accepted','active','completed')`. Pre-accept the host shouldn't see private care notes; they only need them once committed. (Owner already knows their own pet's notes — only host gets the display.)
 - **Milestone A — vaccination_doc_url** — column was already in 0001's pets schema; not adding upload UI in this batch (would need pet-photo bucket pattern replication). Deferred to a polish pass after the data model proves out.
 
+## Overnight batch (2026-06-13 → 14)
+
+Six AUTH milestones + three HD milestones + two stretch items, all
+committed. CI green at end (46 tests, i18n parity OK, tsc clean).
+
+### AUTH decisions
+- **Migration numbering**: brief said next is 0031, but the live
+  highest is 0038. Continuing from 0039 if needed (none in this
+  batch — all AUTH work is client-only via Supabase APIs).
+- **Arabic register**: kept masculine (founder's last call). The
+  brief mentioned feminine but the live decision was masculine.
+- **Password minimum**: 8 characters (per AUTH-2 spec).
+- **New-vs-returning user detection** (AUTH-2): check whether
+  profile.full_name is empty after OTP verify. Brand-new accounts
+  have an empty full_name (the on_auth_user_created trigger
+  creates the row with defaults). Cleaner than reading
+  auth.created_at or user_metadata.
+- **Forgot-password routing** (AUTH-4): the `flow=reset` URL param
+  on /verify tells the verify screen to forward into
+  /set-password?mode=reset instead of the signup flow. No
+  separate forgot-password screen — the existing OTP and
+  set-password screens compose into the reset flow.
+- **Google OAuth gate** (AUTH-5): EXPO_PUBLIC_GOOGLE_AUTH_ENABLED
+  must equal the literal string 'true' to render the button. The
+  default (env var absent) hides the button, so the button doesn't
+  accidentally appear before Omar configures the OAuth client in
+  Supabase Dashboard. The redirect URL uses window.location.origin
+  + returnTo so it works from both the local dev URL and the
+  Vercel-deployed URL without code change.
+- **Guest link** (AUTH-1): "Continue as guest" always routes to
+  '/' (the feed) regardless of returnTo. The intent is to exit
+  the auth funnel; sending the user back to the page that
+  triggered sign-in would re-enter it.
+
+### HD decisions
+- **Care notes pre-accept** (HD-2): removed the
+  `status in ('accepted','active','completed')` gate so the host
+  sees care_notes on every booking status. This is a deliberate
+  reversal of the original Milestone A posture — the founder
+  decided the host needs the context BEFORE accepting, not after.
+- **Pet age display** (HD-2): added a `Ny Nm` form when months
+  ≥ 12 + remainder > 0; plain "N months" / "N years" otherwise.
+  Reused existing pets.age_months / age_months_one i18n keys for
+  the < 12 path; added pet_age_years / pet_age_year_one /
+  pet_age_year_month for the new path. Feminine→masculine
+  baseline maintained.
+- **Completed-bookings-as-owner count**: deferred. The naive
+  count(*) from bookings query is RLS-gated to the participant,
+  so a host querying another owner's completed-booking count
+  returns 0. Doing it right needs a SECURITY DEFINER RPC
+  (mirror of get_host_ratings). Logged as a follow-up below.
+
+### Stretch decisions
+- **S1 photo-count warning**: SOFT warn (admin can override),
+  not a hard block. Confirm dialog with count + recommended
+  minimum. Threshold = 3 photos (per founder's note in the prior
+  batch's batch-decisions backlog).
+- **S2 host card**: same identity-card pattern as OwnerPetsSection's
+  owner block. Same 56 px avatar, same colors.cream background,
+  same 20-size heading. Visual consistency over inventing a new
+  shape.
+- **S3 "New here?" hint**: folded into AUTH-1 directly (italic
+  hint line below the subtitle). Same wording in both locales.
+
+### Deferred (still worth doing later)
+- **completed-bookings-as-owner count RPC**: mirror of
+  get_host_ratings — `get_completed_booking_counts(user_ids)`
+  returning per-id counts via SECURITY DEFINER. Would let the
+  host see "X completed bookings as owner" on the OwnerPetsSection
+  card. Cheap migration; logged for the next batch.
+
 ## Future-milestone backlog (logged during batch run)
 
 - **Minimum photo count enforcement (pre-launch).** Surfaced

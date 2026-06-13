@@ -9,34 +9,34 @@ feminine but masculine is the live decision.
 
 ## AUTH milestone
 
-- [ ] AUTH-1: sign-in screen relabel ("Sign in or Sign up"),
+- [x] AUTH-1: sign-in screen relabel ("Sign in or Sign up"),
       subtitle hint, "Continue as guest" link
-- [ ] AUTH-2: password set step after OTP verification (new users
+- [x] AUTH-2: password set step after OTP verification (new users
       only; detected by checking the profile row)
-- [ ] AUTH-3: sign-in screen dual path (OTP vs password) + Sign in
+- [x] AUTH-3: sign-in screen dual path (OTP vs password) + Sign in
       with password
-- [ ] AUTH-4: Forgot password — OTP-based reset back into the
+- [x] AUTH-4: Forgot password — OTP-based reset back into the
       password set step
-- [ ] AUTH-5: Google OAuth scaffold (env-flagged off by default)
+- [x] AUTH-5: Google OAuth scaffold (env-flagged off by default)
 - [x] AUTH-6: chip overflow — already shipped in 9ea7e98 (verify
       and note in batch-decisions)
 
 ## HOST DETAIL milestone
 
-- [ ] HD-1: owner identity (name, avatar, rating, completed-as-
+- [x] HD-1: owner identity (name, avatar, rating, completed-as-
       owner count) on the host's booking detail
-- [ ] HD-2: pet details (name, breed, age, photo, vaccination
+- [x] HD-2: pet details (name, breed, age, photo, vaccination
       indicators, care notes) on the host's booking detail. Care
       notes UNGATED — show pre-accept (decision change vs current).
-- [ ] HD-3: visual section grouping + polish to match owner-side
+- [x] HD-3: visual section grouping + polish to match owner-side
       detail patterns
 
 ## STRETCH
 
-- [ ] S1: admin approval — soft warn when listing has <3 photos
-- [ ] S2: host identity (mirror of HD-1) on the OWNER's booking
+- [x] S1: admin approval — soft warn when listing has <3 photos
+- [x] S2: host identity (mirror of HD-1) on the OWNER's booking
       detail — host's rating + completed-stays count
-- [ ] S3: "New here?" hint on sign-in — folded into AUTH-1
+- [x] S3: "New here?" hint on sign-in — folded into AUTH-1
 
 ## Execution rules
 
