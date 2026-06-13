@@ -583,6 +583,9 @@
     "dog": "كلب",
     "all": "الكل"
   },
+  "lightbox": {
+    "close": "إغلاق"
+  },
   "category": {
     "pet_hosts": "مُضيفات",
     "pet_services": "خدمات الحيوانات",

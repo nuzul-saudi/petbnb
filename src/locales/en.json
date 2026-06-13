@@ -572,6 +572,9 @@
     "dog": "Dog",
     "all": "All"
   },
+  "lightbox": {
+    "close": "Close"
+  },
   "category": {
     "pet_hosts": "Pet Hosts",
     "pet_services": "Pet Services",
