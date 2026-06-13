@@ -33,6 +33,14 @@ export default function SignInScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // AUTH-3 — dual sign-in path. After the user enters an email
+  // they can choose either OTP (Send code) or password sign-in.
+  // showPassword reveals the password field + Sign-in-with-password
+  // button. The OTP path is the default — it's also the right path
+  // for first-time signup (the OTP flow auto-creates the account).
+  const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState('');
+
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (session) return <Redirect href={(returnTo ?? '/') as Href} />;
 
@@ -68,6 +76,77 @@ export default function SignInScreen() {
     }
   };
 
+  // AUTH-3 — password sign-in path. signInWithPassword authenticates
+  // without an OTP round trip. On wrong creds, the "Forgot password?"
+  // link below the field triggers the OTP flow as a reset bootstrap.
+  const onSubmitPassword = async () => {
+    if (!supabase) {
+      setError(t('supabase.missing_config'));
+      return;
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(cleanEmail)) {
+      setError(t('auth.invalid_email'));
+      return;
+    }
+    if (password.length < 8) {
+      setError(t('auth.password_too_short', { min: 8 }));
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { error: e } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+      if (e) throw e;
+      router.replace((returnTo ?? '/') as Href);
+    } catch (err) {
+      logWarn('[auth.password_sign_in_failed]', err);
+      setError(t('auth.password_sign_in_failed'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // AUTH-4 entry — forgot password sends an OTP, then verify routes
+  // into /set-password?mode=reset (see verify.tsx).
+  const onForgotPassword = async () => {
+    if (!supabase) {
+      setError(t('supabase.missing_config'));
+      return;
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(cleanEmail)) {
+      setError(t('auth.invalid_email'));
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { error: e } = await supabase.auth.signInWithOtp({
+        email: cleanEmail,
+        options: { shouldCreateUser: false },
+      });
+      if (e) throw e;
+      router.push({
+        pathname: '/verify',
+        params: {
+          email: cleanEmail,
+          // Reset mode signal that verify forwards into set-password.
+          flow: 'reset',
+          ...(returnTo ? { returnTo } : {}),
+        },
+      });
+    } catch (err) {
+      logWarn('[auth.forgot_password_failed]', err);
+      setError(t('auth.send_failed'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const canSubmit = email.trim().length > 0 && !submitting;
 
   return (
@@ -96,6 +175,8 @@ export default function SignInScreen() {
           />
         </View>
 
+        {/* Default path — Send OTP. Single-tap for both signup and
+            sign-in. */}
         <Pressable
           onPress={onSubmit}
           disabled={!canSubmit}
@@ -107,6 +188,55 @@ export default function SignInScreen() {
         </Pressable>
 
         <Text style={styles.hint}>{t('auth.send_otp_hint')}</Text>
+
+        {/* AUTH-3 — alternate path: sign in with password. Tap the
+            link to reveal the password field + Sign-in button. */}
+        {showPassword ? (
+          <View style={styles.passwordSection}>
+            <View style={styles.field}>
+              <Text style={styles.label}>{t('auth.password_label')}</Text>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder={t('auth.password_placeholder')}
+                placeholderTextColor={colors.inkSoft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                style={styles.input}
+                onSubmitEditing={onSubmitPassword}
+                returnKeyType="send"
+              />
+            </View>
+            <Pressable
+              onPress={onSubmitPassword}
+              disabled={!canSubmit || password.length < 8}
+              style={[
+                styles.button,
+                styles.buttonOutline,
+                (!canSubmit || password.length < 8) && styles.buttonDisabled,
+              ]}
+            >
+              <Text style={[styles.buttonText, styles.buttonOutlineText]}>
+                {t('auth.sign_in_with_password')}
+              </Text>
+            </Pressable>
+            <Pressable onPress={onForgotPassword} style={styles.forgotLink}>
+              <Text style={styles.forgotLinkText}>
+                {t('auth.forgot_password')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setShowPassword(true)}
+            style={styles.altPathLink}
+          >
+            <Text style={styles.altPathLinkText}>
+              {t('auth.use_password_instead')}
+            </Text>
+          </Pressable>
+        )}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -187,6 +317,39 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     color: colors.cream,
+  },
+  buttonOutline: {
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.moss,
+  },
+  buttonOutlineText: {
+    color: colors.mossDeep,
+  },
+  passwordSection: {
+    marginTop: spacing.lg,
+    gap: spacing.md,
+  },
+  altPathLink: {
+    marginTop: spacing.lg,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  altPathLinkText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.mossDeep,
+    textDecorationLine: 'underline',
+  },
+  forgotLink: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  forgotLinkText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    textDecorationLine: 'underline',
   },
   hint: {
     fontFamily: fonts.body,

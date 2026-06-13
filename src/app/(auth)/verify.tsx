@@ -20,8 +20,16 @@ export default function VerifyScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session } = useAuth();
-  const params = useLocalSearchParams<{ email?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{
+    email?: string;
+    returnTo?: string;
+    flow?: string;
+  }>();
   const email = typeof params.email === 'string' ? params.email : '';
+  // AUTH-4 — flow=reset means the user came in via "Forgot password?".
+  // After OTP verification, route into /set-password?mode=reset
+  // instead of the signup/normal flow.
+  const isResetFlow = params.flow === 'reset';
   // R2C3 — preserve the returnTo from the sign-in step so a guest who
   // started on a listing detail page ends up back there after auth.
   const returnTo =
@@ -87,10 +95,18 @@ export default function VerifyScreen() {
         isNewUser = !profile || profile.full_name.trim() === '';
       }
 
-      if (isNewUser) {
-        // Preserve returnTo for downstream routing (signup path
-        // doesn't normally use it but a future "set password →
-        // returnTo" link could).
+      if (isResetFlow) {
+        // AUTH-4 — forgot-password OTP. Go straight to the
+        // set-password screen in reset mode regardless of new/
+        // returning. The user already has an account; we're
+        // resetting their password.
+        router.replace(
+          (returnTo
+            ? `/set-password?mode=reset&returnTo=${encodeURIComponent(returnTo)}`
+            : '/set-password?mode=reset') as Href,
+        );
+      } else if (isNewUser) {
+        // Signup path: password → role → home.
         router.replace(
           (returnTo
             ? `/set-password?mode=signup&returnTo=${encodeURIComponent(returnTo)}`
