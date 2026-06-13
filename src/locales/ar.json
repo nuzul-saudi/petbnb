@@ -401,6 +401,8 @@
     "sign_in_with_password": "تسجيل الدخول بكلمة المرور",
     "password_sign_in_failed": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
     "forgot_password": "نسيت كلمة المرور؟",
+    "sign_in_with_google": "تسجيل الدخول بجوجل",
+    "google_oauth_failed": "تعذّر تسجيل الدخول بجوجل",
     "sign_in_subtitle": "رعاية الحيوانات الأليفة في الرياض",
     "email_label": "البريد الإلكتروني",
     "email_placeholder": "you@example.com",

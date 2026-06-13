@@ -240,6 +240,46 @@ export default function SignInScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+        {/* AUTH-5 — Google OAuth scaffold. Gated behind
+            EXPO_PUBLIC_GOOGLE_AUTH_ENABLED. Defaults to hidden;
+            flip the env var to true once Omar has configured
+            the Google OAuth client ID + secret in Supabase
+            Dashboard → Auth → Providers → Google.
+            TODO: Omar must configure Google OAuth in Supabase
+            Dashboard → Auth → Providers → Google (client ID +
+            secret from Google Cloud Console). Until that's done,
+            tapping this button will fail at runtime. */}
+        {process.env.EXPO_PUBLIC_GOOGLE_AUTH_ENABLED === 'true' ? (
+          <Pressable
+            onPress={async () => {
+              if (!supabase) return;
+              setError(null);
+              try {
+                const { error: e } = await supabase.auth.signInWithOAuth({
+                  provider: 'google',
+                  options: {
+                    redirectTo: returnTo
+                      ? `${window.location.origin}${returnTo}`
+                      : `${window.location.origin}/`,
+                  },
+                });
+                if (e) throw e;
+              } catch (err) {
+                logWarn('[auth.google_oauth_failed]', err);
+                setError(t('auth.google_oauth_failed'));
+              }
+            }}
+            style={styles.googleButton}
+          >
+            <View style={styles.googleLogo}>
+              <Text style={styles.googleLogoText}>G</Text>
+            </View>
+            <Text style={styles.googleButtonText}>
+              {t('auth.sign_in_with_google')}
+            </Text>
+          </Pressable>
+        ) : null}
+
         {/* AUTH-1 — Guest link. Routes back to the guest feed.
             From returnTo flows this still goes to '/' (the feed)
             because the returnTo URL was the page that triggered
@@ -350,6 +390,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkSoft,
     textDecorationLine: 'underline',
+  },
+  // AUTH-5 — Google sign-in button. Follows Google's brand
+  // guidelines (white background, official "G" mark, readable
+  // type). Hidden until env flag is true.
+  googleButton: {
+    marginTop: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DADCE0',
+    borderRadius: radii.lg,
+  },
+  googleLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4285F4',
+  },
+  googleLogoText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: '#FFFFFF',
+    lineHeight: 14,
+  },
+  googleButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: '#3C4043',
   },
   hint: {
     fontFamily: fonts.body,
