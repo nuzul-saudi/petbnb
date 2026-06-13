@@ -33,6 +33,13 @@ export type FeedFilterPrefs = {
   speciesFilter: 'cat' | 'dog' | null;
   priceBand: 'budget' | 'midrange' | 'premium' | null;
   sortBy: SortBy;
+  // Move 4 — search-derived state. District + petId + guest species
+  // persist across sessions so the user lands back in the same
+  // search context. Dates do NOT persist (per spec — date intent
+  // is per-visit).
+  searchDistrict: string | null;
+  searchPetId: string | null;
+  searchGuestSpecies: 'cat' | 'dog' | null;
 };
 
 /**
@@ -69,6 +76,17 @@ export async function getFeedFilterPrefs(): Promise<FeedFilterPrefs | null> {
         parsed.sortBy === 'distance'
           ? parsed.sortBy
           : 'newest',
+      searchDistrict:
+        typeof parsed.searchDistrict === 'string'
+          ? parsed.searchDistrict
+          : null,
+      searchPetId:
+        typeof parsed.searchPetId === 'string' ? parsed.searchPetId : null,
+      searchGuestSpecies:
+        parsed.searchGuestSpecies === 'cat' ||
+        parsed.searchGuestSpecies === 'dog'
+          ? parsed.searchGuestSpecies
+          : null,
     };
   } catch (e) {
     logWarn('[feed-filters.read_failed]', e);

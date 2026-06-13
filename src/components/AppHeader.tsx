@@ -205,7 +205,7 @@ export function AppHeader({
             <View style={styles.menuDivider} />
 
             <MenuItem
-              label={t('profile.sign_out')}
+              label={t('home.sign_out')}
               destructive
               onPress={async () => {
                 setMenuOpen(false);

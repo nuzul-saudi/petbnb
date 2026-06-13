@@ -82,6 +82,10 @@ export default function BookingRequestScreen() {
     id?: string;
     editBooking?: string;
     rebookFrom?: string;
+    // Move 4 — search-context prefill from the feed.
+    startDate?: string;
+    endDate?: string;
+    petId?: string;
   }>();
   const listingId = typeof params.id === 'string' ? params.id : '';
   const editBookingId =
@@ -230,6 +234,30 @@ export default function BookingRequestScreen() {
       cancelled = true;
     };
   }, [rebookFromId, pets]);
+
+  // Move 4 — prefill from the search context the feed forwarded.
+  // Skipped in edit / rebook modes because those have their own
+  // prefill paths and the user's intent there is different.
+  // Pets-aware on petId: only auto-select if the pet still exists.
+  useEffect(() => {
+    if (isEditMode || isRebookMode) return;
+    if (typeof params.startDate === 'string' && params.startDate) {
+      setStartDate(params.startDate);
+    }
+    if (typeof params.endDate === 'string' && params.endDate) {
+      setEndDate(params.endDate);
+    }
+    if (typeof params.petId === 'string' && params.petId) {
+      if (pets.some((p) => p.id === params.petId)) {
+        setSelectedPetIds(new Set([params.petId]));
+      }
+    }
+    // Empty deps after first hydration is the right shape — we don't
+    // want the prefill to fight the user's subsequent edits. params.*
+    // are stable URL params; pets becomes available asynchronously,
+    // hence its inclusion.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pets, isEditMode, isRebookMode]);
 
   // Calendar UX: when user picks arrival, focus the departure field so
   // they can continue without an extra tap. Web-only; native picker

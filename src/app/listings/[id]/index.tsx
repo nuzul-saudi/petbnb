@@ -24,8 +24,30 @@ export default function ListingDetailScreen() {
 
   // Bilingual content fallback — _en field if present in current locale,
   // else the Arabic primary. listing/host may be null on first render.
-  const params = useLocalSearchParams<{ id?: string }>();
+  // Move 4 — search context forwarded from the owner feed lives in
+  // these URL params. We thread them through to /request when the
+  // user taps the "Request booking" button, so the booking form
+  // prefills the dates and pet they searched with.
+  const params = useLocalSearchParams<{
+    id?: string;
+    startDate?: string;
+    endDate?: string;
+    petId?: string;
+  }>();
   const id = typeof params.id === 'string' ? params.id : '';
+  const searchForward = (() => {
+    const parts: string[] = [];
+    if (typeof params.startDate === 'string' && params.startDate) {
+      parts.push(`startDate=${params.startDate}`);
+    }
+    if (typeof params.endDate === 'string' && params.endDate) {
+      parts.push(`endDate=${params.endDate}`);
+    }
+    if (typeof params.petId === 'string' && params.petId) {
+      parts.push(`petId=${params.petId}`);
+    }
+    return parts.length ? `?${parts.join('&')}` : '';
+  })();
 
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -278,7 +300,7 @@ export default function ListingDetailScreen() {
                 label={t('listing.guest_sign_in_to_book')}
                 onPress={() =>
                   router.push(
-                    `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}/request`)}`,
+                    `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}/request${searchForward}`)}`,
                   )
                 }
                 variant="primary"
@@ -287,7 +309,11 @@ export default function ListingDetailScreen() {
             ) : (
               <Button
                 label={t('listing.request_button')}
-                onPress={() => router.push(`/listings/${listing.id}/request`)}
+                onPress={() =>
+                  router.push(
+                    `/listings/${listing.id}/request${searchForward}`,
+                  )
+                }
                 variant="primary"
                 fullWidth
               />

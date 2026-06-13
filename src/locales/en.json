@@ -576,6 +576,26 @@
     "merchandise": "Merchandise",
     "coming_soon": "Coming soon"
   },
+  "search": {
+    "where": "Where",
+    "where_hint": "Search district or city",
+    "when": "When",
+    "when_hint": "Add dates",
+    "which_pet": "Which pet",
+    "which_hint": "Choose your pet",
+    "button": "Search",
+    "district_search_hint": "District name…",
+    "any_district": "All districts",
+    "any_pet": "Any pet",
+    "no_pets_hint": "You haven't added a pet yet — you can continue without selecting.",
+    "start_date_label": "Arrival",
+    "end_date_label": "Departure",
+    "when_both_required": "Please pick both dates",
+    "when_invalid_range": "Departure must be after arrival",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "clear": "Clear"
+  },
   "profile": {
     "title": "My account",
     "back": "← Back",

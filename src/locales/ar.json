@@ -587,6 +587,26 @@
     "merchandise": "متجر",
     "coming_soon": "قريباً"
   },
+  "search": {
+    "where": "أين",
+    "where_hint": "ابحثي عن حي أو مدينة",
+    "when": "متى",
+    "when_hint": "أضيفي التاريخ",
+    "which_pet": "أي حيوان",
+    "which_hint": "اختاري حيوانكِ",
+    "button": "ابحثي",
+    "district_search_hint": "اسم الحي…",
+    "any_district": "كل الأحياء",
+    "any_pet": "أي حيوان",
+    "no_pets_hint": "لم تُضيفي حيواناً بعد — يمكنكِ المتابعة بدون اختيار.",
+    "start_date_label": "تاريخ الوصول",
+    "end_date_label": "تاريخ المغادرة",
+    "when_both_required": "يرجى اختيار التاريخين",
+    "when_invalid_range": "تاريخ المغادرة يجب أن يكون بعد الوصول",
+    "apply": "تطبيق",
+    "cancel": "إلغاء",
+    "clear": "مسح"
+  },
   "profile": {
     "title": "حسابي",
     "back": "← رجوع",

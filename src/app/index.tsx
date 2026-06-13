@@ -17,6 +17,12 @@ import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { CategoryStrip } from '@/components/CategoryStrip';
 import { ListingCard } from '@/components/ListingCard';
+import { SearchHero } from '@/components/SearchHero';
+import { SearchWhereModal } from '@/components/SearchWhereModal';
+import { SearchWhenModal } from '@/components/SearchWhenModal';
+import { SearchWhichPetModal } from '@/components/SearchWhichPetModal';
+import { listPetsForOwner } from '@/lib/pets';
+import type { Tables } from '@/types/database';
 import { useFavorites } from '@/hooks/useFavorites';
 import {
   getFeedFilterPrefs,
@@ -365,6 +371,47 @@ function OwnerFeedHome() {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
 
+  // Move 4 (2026-06-13) — search-as-hero state. Where (district —
+  // city already lives above) + When (start/end dates) + Which pet
+  // (signed-in pet id or guest species). Dates do NOT persist
+  // across sessions (per spec); district/pet/guest-species do.
+  const [searchDistrict, setSearchDistrict] = useState<string | null>(null);
+  const [searchStartDate, setSearchStartDate] = useState<string | null>(null);
+  const [searchEndDate, setSearchEndDate] = useState<string | null>(null);
+  const [searchPetId, setSearchPetId] = useState<string | null>(null);
+  const [searchGuestSpecies, setSearchGuestSpecies] = useState<
+    'cat' | 'dog' | null
+  >(null);
+  const [ownerPets, setOwnerPets] = useState<Tables<'pets'>[]>([]);
+
+  // Which modal is open. Mutually exclusive — only one search modal
+  // visible at a time.
+  const [whereOpen, setWhereOpen] = useState(false);
+  const [whenOpen, setWhenOpen] = useState(false);
+  const [whichPetOpen, setWhichPetOpen] = useState(false);
+
+  // Pull the user's pets once, when signed-in. The WhichPet modal
+  // needs them; we hold the array here so the modal doesn't refetch
+  // every open. Guest users skip the fetch (no rows visible anyway).
+  useEffect(() => {
+    if (!user) {
+      setOwnerPets([]);
+      return;
+    }
+    let cancelled = false;
+    void listPetsForOwner(user.id)
+      .then((rows) => {
+        if (cancelled) return;
+        setOwnerPets(rows);
+      })
+      .catch((e) => {
+        logWarn('[feed.pets_load_failed]', e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   // Count of active filters that live inside the collapsed panel. The
   // toggle label surfaces this so the user can see "results are
   // filtered" without expanding (female-only especially must be
@@ -410,6 +457,9 @@ function OwnerFeedHome() {
         setSpeciesFilter(prefs.speciesFilter);
         setPriceBand(prefs.priceBand);
         setSortBy(prefs.sortBy);
+        setSearchDistrict(prefs.searchDistrict);
+        setSearchPetId(prefs.searchPetId);
+        setSearchGuestSpecies(prefs.searchGuestSpecies);
       }
       setHydrated(true);
     });
@@ -431,6 +481,9 @@ function OwnerFeedHome() {
       speciesFilter,
       priceBand,
       sortBy,
+      searchDistrict,
+      searchPetId,
+      searchGuestSpecies,
     });
   }, [
     hydrated,
@@ -441,6 +494,9 @@ function OwnerFeedHome() {
     speciesFilter,
     priceBand,
     sortBy,
+    searchDistrict,
+    searchPetId,
+    searchGuestSpecies,
   ]);
 
   const load = useCallback(
@@ -466,6 +522,10 @@ function OwnerFeedHome() {
         const rows = await listActiveListings(
           {
             city,
+            // Move 4 — neighborhood comes from the Where modal's
+            // district pick. listActiveListings has accepted this
+            // filter since Step 7.2; we just wire it now.
+            neighborhood: searchDistrict ?? undefined,
             femaleHostsOnly: femaleOnly,
             groomingOnly,
             noResidentPetsOnly,
@@ -492,7 +552,7 @@ function OwnerFeedHome() {
         setRefreshing(false);
       }
     },
-    [city, femaleOnly, groomingOnly, noResidentPetsOnly, priceBand, speciesFilter, coords, sortBy, t],
+    [city, searchDistrict, femaleOnly, groomingOnly, noResidentPetsOnly, priceBand, speciesFilter, coords, sortBy, t],
   );
 
   // R2C5 client-side sort over the loaded items. Distance is handled
@@ -537,30 +597,35 @@ function OwnerFeedHome() {
       {/* Move 2 — top-level category strip. Pet Hosts is active;
           the other two render as "coming soon" and absorb taps. */}
       <CategoryStrip active="pet_hosts" onSelect={() => {}} />
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.feedTitle}>
-            {t('feed.title', {
-              city: pickLocalized(
-                findCity(city)?.name_ar ?? '',
-                findCity(city)?.name_en ?? '',
-                locale,
-              ),
-            })}
-          </Text>
-          {/* Greeting line — signed-in users see "أهلاً، <name>".
-              Guests (R2C3) see a hint that they can sign in for more. */}
-          {profile ? (
-            <Text style={styles.greetingSmall}>
-              {t('home.signed_in_greeting', { name: profile.full_name })}
-            </Text>
-          ) : (
-            <Text style={styles.greetingSmall}>
-              {t('home.guest_greeting')}
-            </Text>
-          )}
-        </View>
-      </View>
+
+      {/* Move 4 — search-as-hero. Replaces the old "Sitters in
+          <city>" title + greeting block; the search bar is the
+          headline now. State + persistence handled above; modals
+          mounted at the end of the return. */}
+      <SearchHero
+        city={city}
+        district={searchDistrict}
+        startDate={searchStartDate}
+        endDate={searchEndDate}
+        petName={
+          searchPetId
+            ? ownerPets.find((p) => p.id === searchPetId)?.name ?? null
+            : null
+        }
+        guestSpecies={searchGuestSpecies}
+        onPressWhere={() => setWhereOpen(true)}
+        onPressWhen={() => setWhenOpen(true)}
+        onPressPet={() => setWhichPetOpen(true)}
+        onPressSearch={() => {
+          // State-driven feed: changing search.* already retriggers
+          // load() via dependency. The search button is ceremonial —
+          // close any open modal and let the existing query refresh
+          // pick up the latest filters.
+          setWhereOpen(false);
+          setWhenOpen(false);
+          setWhichPetOpen(false);
+        }}
+      />
 
       {/* City selector (7.2c). Mirrors the femaleOnly filter-chip
           pattern below — same pill shape, active = filled. Placed
@@ -832,7 +897,25 @@ function OwnerFeedHome() {
           renderItem={({ item }) => (
             <ListingCard
               listing={item}
-              onPress={() => router.push(`/listings/${item.id}`)}
+              onPress={() => {
+                // Move 4 — forward search context as URL params so
+                // the request screen can prefill. Only append the
+                // params that are actually set; an empty string in a
+                // URL param is worse than no param at all (the
+                // request screen would have to filter empties).
+                const params: string[] = [];
+                if (searchStartDate) {
+                  params.push(`startDate=${searchStartDate}`);
+                }
+                if (searchEndDate) {
+                  params.push(`endDate=${searchEndDate}`);
+                }
+                if (searchPetId) {
+                  params.push(`petId=${searchPetId}`);
+                }
+                const qs = params.length ? `?${params.join('&')}` : '';
+                router.push(`/listings/${item.id}${qs}`);
+              }}
               favorite={
                 user
                   ? {
@@ -848,6 +931,54 @@ function OwnerFeedHome() {
           }
         />
       )}
+
+      {/* Move 4 — search modals. Mutually exclusive via separate
+          visible flags; only one renders content at a time. */}
+      <SearchWhereModal
+        visible={whereOpen}
+        city={city}
+        district={searchDistrict}
+        onApply={({ city: nextCity, district: nextDistrict }) => {
+          setCity(nextCity);
+          setSearchDistrict(nextDistrict);
+        }}
+        onClose={() => setWhereOpen(false)}
+      />
+      <SearchWhenModal
+        visible={whenOpen}
+        startDate={searchStartDate}
+        endDate={searchEndDate}
+        onApply={({ startDate, endDate }) => {
+          setSearchStartDate(startDate);
+          setSearchEndDate(endDate);
+        }}
+        onClose={() => setWhenOpen(false)}
+      />
+      <SearchWhichPetModal
+        visible={whichPetOpen}
+        pets={ownerPets}
+        petId={searchPetId}
+        guestSpecies={searchGuestSpecies}
+        isGuest={!user}
+        onApply={({ petId, guestSpecies }) => {
+          setSearchPetId(petId);
+          setSearchGuestSpecies(guestSpecies);
+          // Sync species filter so the feed reflects the user's pet
+          // choice. The species chip in "More filters" can still be
+          // toggled to override.
+          if (petId) {
+            const pet = ownerPets.find((p) => p.id === petId);
+            if (pet?.species === 'dog' || pet?.species === 'cat') {
+              setSpeciesFilter(pet.species);
+            }
+          } else if (guestSpecies) {
+            setSpeciesFilter(guestSpecies);
+          } else {
+            setSpeciesFilter(null);
+          }
+        }}
+        onClose={() => setWhichPetOpen(false)}
+      />
     </SafeAreaView>
   );
 }
