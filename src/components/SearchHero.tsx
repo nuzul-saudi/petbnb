@@ -28,6 +28,13 @@ export type SearchHeroProps = {
   onPressWhen: () => void;
   onPressPet: () => void;
   onPressSearch: () => void;
+  /**
+   * Hide the "Which pet" field entirely. Used when species
+   * support is gated off AND the viewer is a guest — guests have
+   * no signed-in pets to pick from, and the cat/dog stand-in only
+   * makes sense when species filtering is live.
+   */
+  hideWhichPet?: boolean;
 };
 
 export function SearchHero({
@@ -41,6 +48,7 @@ export function SearchHero({
   onPressWhen,
   onPressPet,
   onPressSearch,
+  hideWhichPet,
 }: SearchHeroProps) {
   const { t, locale } = useTranslation();
 
@@ -99,20 +107,23 @@ export function SearchHero({
         </Text>
       </Pressable>
 
-      <View style={styles.divider} />
-
-      <Pressable onPress={onPressPet} style={styles.field}>
-        <Text style={styles.fieldLabel}>{t('search.which_pet')}</Text>
-        <Text
-          style={[
-            styles.fieldValue,
-            !petSummary && styles.fieldValuePlaceholder,
-          ]}
-          numberOfLines={1}
-        >
-          {petSummary ?? t('search.which_hint')}
-        </Text>
-      </Pressable>
+      {hideWhichPet ? null : (
+        <>
+          <View style={styles.divider} />
+          <Pressable onPress={onPressPet} style={styles.field}>
+            <Text style={styles.fieldLabel}>{t('search.which_pet')}</Text>
+            <Text
+              style={[
+                styles.fieldValue,
+                !petSummary && styles.fieldValuePlaceholder,
+              ]}
+              numberOfLines={1}
+            >
+              {petSummary ?? t('search.which_hint')}
+            </Text>
+          </Pressable>
+        </>
+      )}
 
       <Pressable
         onPress={onPressSearch}

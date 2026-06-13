@@ -3,6 +3,7 @@ import { logWarn } from '@/lib/log';
 // Inserts/updates land in Step 7 (host create-listing flow).
 
 import type { CityKey } from '@/lib/cities';
+import { SPECIES_ENABLED } from '@/lib/features';
 import { listingPhotoStoragePathFromUrl } from '@/lib/listing-photos';
 import { supabase } from '@/lib/supabase';
 import type { Tables, TablesInsert, TablesUpdate } from '@/types/database';
@@ -487,7 +488,12 @@ export async function createListing(input: {
       offers_grooming: input.offersGrooming,
       host_gender: input.hostGender,
       requires_vaccination: input.requiresVaccination,
-      accepts_species: input.acceptsSpecies ?? ['cat'],
+      // Gated: when species support is off, the column doesn't
+      // exist on the listings table and including it errors the
+      // INSERT. The DB default (when applied) covers it.
+      ...(SPECIES_ENABLED
+        ? { accepts_species: input.acceptsSpecies ?? ['cat'] }
+        : {}),
       status: 'pending',
     })
     .select('id')
@@ -644,7 +650,7 @@ export async function updateListing(
     if (patch.requiresVaccination !== undefined) {
       row.requires_vaccination = patch.requiresVaccination;
     }
-    if (patch.acceptsSpecies !== undefined) {
+    if (SPECIES_ENABLED && patch.acceptsSpecies !== undefined) {
       row.accepts_species = patch.acceptsSpecies;
     }
 
@@ -697,7 +703,7 @@ export async function updateListing(
     if (patch.requiresVaccination !== undefined) {
       draftPatch.requires_vaccination = patch.requiresVaccination;
     }
-    if (patch.acceptsSpecies !== undefined) {
+    if (SPECIES_ENABLED && patch.acceptsSpecies !== undefined) {
       draftPatch.accepts_species = patch.acceptsSpecies;
     }
 
@@ -736,7 +742,15 @@ export async function updateListing(
     host_gender: patch.hostGender ?? current.host_gender,
     requires_vaccination:
       patch.requiresVaccination ?? current.requires_vaccination,
-    accepts_species: patch.acceptsSpecies ?? current.accepts_species,
+    // Gated — listing_drafts has no accepts_species column when
+    // 0034 isn't applied. Including it would error the snapshot
+    // insert.
+    ...(SPECIES_ENABLED
+      ? {
+          accepts_species:
+            patch.acceptsSpecies ?? current.accepts_species,
+        }
+      : {}),
   };
 
   const { error: insertErr } = await supabase

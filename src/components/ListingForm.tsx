@@ -29,6 +29,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
 import { CITIES, findCity, type CityKey } from '@/lib/cities';
+import { SPECIES_ENABLED } from '@/lib/features';
 import { pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { SPECIES_LIST, speciesEmoji } from '@/lib/species';
@@ -536,28 +537,37 @@ export function ListingForm({
 
       {/* Round 12 / Step 5.7 — accepts_species. Multi-select chip
           row (cat + dog); at least one must remain selected
-          (toggleSpecies guards against empty). */}
-      <Field label={t('listings.form.accepts_species_label')} required>
-        <View style={styles.chipRow}>
-          {SPECIES_LIST.map((s) => {
-            const active = acceptsSpecies.includes(s);
-            return (
-              <Pressable
-                key={s}
-                onPress={() => toggleSpecies(s)}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text
-                  style={[styles.chipText, active && styles.chipTextActive]}
+          (toggleSpecies guards against empty). Hidden while
+          SPECIES_ENABLED is false — the column doesn't exist on
+          the listings table, and the existing form value defaults
+          to ['cat'] which the lib layer drops from the write
+          payload behind the gate. */}
+      {SPECIES_ENABLED ? (
+        <Field label={t('listings.form.accepts_species_label')} required>
+          <View style={styles.chipRow}>
+            {SPECIES_LIST.map((s) => {
+              const active = acceptsSpecies.includes(s);
+              return (
+                <Pressable
+                  key={s}
+                  onPress={() => toggleSpecies(s)}
+                  style={[styles.chip, active && styles.chipActive]}
                 >
-                  {active ? '✓ ' : ''}
-                  {speciesEmoji(s)} {t(`species.${s}`)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Field>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      active && styles.chipTextActive,
+                    ]}
+                  >
+                    {active ? '✓ ' : ''}
+                    {speciesEmoji(s)} {t(`species.${s}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Field>
+      ) : null}
 
       <Field
         label={t('listings.form.host_gender_label')}

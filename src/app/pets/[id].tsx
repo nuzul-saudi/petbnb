@@ -18,6 +18,7 @@ import { DateField } from '@/components/DateField';
 import { SpeciesPicker } from '@/components/SpeciesPicker';
 import { useAuth } from '@/lib/auth';
 import { confirmDialog } from '@/lib/confirm';
+import { SPECIES_ENABLED } from '@/lib/features';
 import { todayIso } from '@/lib/format';
 import { findBreed } from '@/lib/breeds';
 import { findDogBreed } from '@/lib/dog-breeds';
@@ -374,22 +375,27 @@ export default function PetDetailScreen() {
           />
         </Field>
 
-        {/* Round 12 / Step 5.7: species selector. New mode only —
-            edit mode locks species so the breed picker doesn't
-            mismatch already-saved vaccination data. */}
-        <View style={styles.field}>
-          <Text style={styles.label}>{t('pets.species_label')}</Text>
-          <SpeciesPicker
-            value={species}
-            onChange={(next) => {
-              setSpecies(next);
-              // Reset breed when switching species — the saved key
-              // wouldn't exist in the other list.
-              setBreedSelection({ breed: null, breedOther: null });
-            }}
-            disabled={!isNew}
-          />
-        </View>
+        {/* Round 12 / Step 5.7: species selector. Hidden while
+            SPECIES_ENABLED is false — every pet defaults to 'cat'
+            via the existing state initializer + DB column default
+            from 0001. Edit mode also locks species when shown, so
+            the breed picker doesn't mismatch already-saved
+            vaccination data. */}
+        {SPECIES_ENABLED ? (
+          <View style={styles.field}>
+            <Text style={styles.label}>{t('pets.species_label')}</Text>
+            <SpeciesPicker
+              value={species}
+              onChange={(next) => {
+                setSpecies(next);
+                // Reset breed when switching species — the saved key
+                // wouldn't exist in the other list.
+                setBreedSelection({ breed: null, breedOther: null });
+              }}
+              disabled={!isNew}
+            />
+          </View>
+        ) : null}
 
         {/* Breed picker replaces the Step 5.5 free-text input */}
         <View style={styles.field}>

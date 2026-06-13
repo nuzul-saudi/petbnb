@@ -31,6 +31,7 @@ import {
 } from '@/lib/feed-filters-storage';
 import { useAuth } from '@/lib/auth';
 import { CITIES, findCity, type CityKey } from '@/lib/cities';
+import { SPECIES_ENABLED } from '@/lib/features';
 import { pickLocalized, toArabicDigits } from '@/lib/format';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
@@ -539,7 +540,10 @@ function OwnerFeedHome() {
             femaleHostsOnly: femaleOnly,
             groomingOnly,
             noResidentPetsOnly,
-            species: speciesFilter ?? undefined,
+            // Gated: while species support is off the DB column
+            // `listings.accepts_species` doesn't exist; sending the
+            // filter would 4xx the whole feed query.
+            species: SPECIES_ENABLED ? speciesFilter ?? undefined : undefined,
             minPriceSAR,
             maxPriceSAR,
             // Distance is also a sort, but the DB query has the haversine
@@ -636,6 +640,10 @@ function OwnerFeedHome() {
         onPressWhere={() => setWhereOpen(true)}
         onPressWhen={() => setWhenOpen(true)}
         onPressPet={() => setWhichPetOpen(true)}
+        // Gate: while species is off AND viewer is a guest, hide
+        // the Which-pet field. Signed-in users still see it
+        // (picking pets feeds the booking-forward URL params).
+        hideWhichPet={!SPECIES_ENABLED && !user}
         onPressSearch={() => {
           // State-driven feed: changing search.* already retriggers
           // load() via dependency. The search button is ceremonial —
@@ -833,30 +841,34 @@ function OwnerFeedHome() {
             </Text>
           </Pressable>
 
-          {/* Species chips — Round 12 / Step 5.7. */}
-          {(['cat', 'dog'] as const).map((s) => {
-            const active = speciesFilter === s;
-            return (
-              <Pressable
-                key={s}
-                onPress={() => setSpeciesFilter(active ? null : s)}
-                style={[
-                  styles.filterChip,
-                  active && styles.filterChipActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    active && styles.filterChipTextActive,
-                  ]}
-                >
-                  {active ? '✓ ' : ''}
-                  {speciesEmoji(s)} {t(`species.${s}`)}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {/* Species chips — Round 12 / Step 5.7. Hidden while
+              SPECIES_ENABLED is false (the launch is cat-only; a
+              "Dog" chip that filters to nothing is dead weight). */}
+          {SPECIES_ENABLED
+            ? (['cat', 'dog'] as const).map((s) => {
+                const active = speciesFilter === s;
+                return (
+                  <Pressable
+                    key={s}
+                    onPress={() => setSpeciesFilter(active ? null : s)}
+                    style={[
+                      styles.filterChip,
+                      active && styles.filterChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        active && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {active ? '✓ ' : ''}
+                      {speciesEmoji(s)} {t(`species.${s}`)}
+                    </Text>
+                  </Pressable>
+                );
+              })
+            : null}
 
           {/* Price band chips — Round 10. */}
           {(['budget', 'midrange', 'premium'] as const).map((band) => {
@@ -988,11 +1000,12 @@ function OwnerFeedHome() {
         onApply={({ petIds, guestSpecies }) => {
           setSearchPetIds(petIds);
           setSearchGuestSpecies(guestSpecies);
-          // Sync species filter so the feed reflects the user's pet
-          // choice. If the picked pets are mixed species (cat + dog),
-          // clear the species filter so the feed shows everything
-          // (the user is then expected to use the More-filters chip
-          // to narrow). Single-species → set the chip to that species.
+          // Species derivation gated. While SPECIES_ENABLED is
+          // false, picking a pet shouldn't touch speciesFilter
+          // (which would otherwise feed into the missing-column
+          // query). Pet IDs still forward to /request — they're
+          // useful for the booking flow regardless.
+          if (!SPECIES_ENABLED) return;
           if (petIds.length > 0) {
             const speciesSet = new Set(
               petIds

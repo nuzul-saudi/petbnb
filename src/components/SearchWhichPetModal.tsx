@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { SPECIES_ENABLED } from '@/lib/features';
 import { useTranslation } from '@/lib/i18n';
 import {
   SPECIES_LIST,
@@ -85,7 +86,12 @@ export function SearchWhichPetModal({
         <Pressable style={styles.sheet} onPress={() => {}}>
           <Text style={styles.title}>{t('search.which_pet')}</Text>
 
-          {isGuest ? (
+          {isGuest && !SPECIES_ENABLED ? (
+            // Guests with species off: nothing meaningful to pick.
+            // Parent already hides the field, this is a defensive
+            // render in case a stale visible flag slips through.
+            <Text style={styles.hint}>{t('search.no_pets_hint')}</Text>
+          ) : isGuest ? (
             <View style={styles.speciesRow}>
               {SPECIES_LIST.map((s) => {
                 const active = draftGuestSpecies === s;
