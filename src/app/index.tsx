@@ -5,6 +5,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -710,118 +711,120 @@ function OwnerFeedHome() {
           just hidden behind the toggle. The three rows are identical
           to the pre-collapse versions — they're rendered only when
           the user has expanded the panel. */}
+      {/* Part D (2026-06-13) — all expanded chips on one horizontal
+          scrollable row instead of wrapping to three lines. Chip
+          behavior, active styling, and the More-filters count
+          badge are unchanged — only the layout changed. */}
       {moreFiltersOpen ? (
-        <>
-          <View style={styles.filterRow}>
-            <Pressable
-              onPress={() => setFemaleOnly((v) => !v)}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRowScrollable}
+        >
+          <Pressable
+            onPress={() => setFemaleOnly((v) => !v)}
+            style={[
+              styles.filterChip,
+              femaleOnly && styles.filterChipActive,
+            ]}
+          >
+            <Text
               style={[
-                styles.filterChip,
-                femaleOnly && styles.filterChipActive,
+                styles.filterChipText,
+                femaleOnly && styles.filterChipTextActive,
               ]}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  femaleOnly && styles.filterChipTextActive,
-                ]}
-              >
-                {femaleOnly ? '✓ ' : ''}
-                {t('feed.female_filter')}
-              </Text>
-            </Pressable>
+              {femaleOnly ? '✓ ' : ''}
+              {t('feed.female_filter')}
+            </Text>
+          </Pressable>
 
-            <Pressable
-              onPress={() => setGroomingOnly((v) => !v)}
+          <Pressable
+            onPress={() => setGroomingOnly((v) => !v)}
+            style={[
+              styles.filterChip,
+              groomingOnly && styles.filterChipActive,
+            ]}
+          >
+            <Text
               style={[
-                styles.filterChip,
-                groomingOnly && styles.filterChipActive,
+                styles.filterChipText,
+                groomingOnly && styles.filterChipTextActive,
               ]}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  groomingOnly && styles.filterChipTextActive,
-                ]}
-              >
-                {groomingOnly ? '✓ ' : ''}
-                {t('feed.grooming_filter')}
-              </Text>
-            </Pressable>
+              {groomingOnly ? '✓ ' : ''}
+              {t('feed.grooming_filter')}
+            </Text>
+          </Pressable>
 
-            <Pressable
-              onPress={() => setNoResidentPetsOnly((v) => !v)}
+          <Pressable
+            onPress={() => setNoResidentPetsOnly((v) => !v)}
+            style={[
+              styles.filterChip,
+              noResidentPetsOnly && styles.filterChipActive,
+            ]}
+          >
+            <Text
               style={[
-                styles.filterChip,
-                noResidentPetsOnly && styles.filterChipActive,
+                styles.filterChipText,
+                noResidentPetsOnly && styles.filterChipTextActive,
               ]}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  noResidentPetsOnly && styles.filterChipTextActive,
-                ]}
-              >
-                {noResidentPetsOnly ? '✓ ' : ''}
-                {t('feed.no_resident_pets_filter')}
-              </Text>
-            </Pressable>
-          </View>
+              {noResidentPetsOnly ? '✓ ' : ''}
+              {t('feed.no_resident_pets_filter')}
+            </Text>
+          </Pressable>
 
           {/* Species chips — Round 12 / Step 5.7. */}
-          <View style={styles.filterRow}>
-            {(['cat', 'dog'] as const).map((s) => {
-              const active = speciesFilter === s;
-              return (
-                <Pressable
-                  key={s}
-                  onPress={() => setSpeciesFilter(active ? null : s)}
+          {(['cat', 'dog'] as const).map((s) => {
+            const active = speciesFilter === s;
+            return (
+              <Pressable
+                key={s}
+                onPress={() => setSpeciesFilter(active ? null : s)}
+                style={[
+                  styles.filterChip,
+                  active && styles.filterChipActive,
+                ]}
+              >
+                <Text
                   style={[
-                    styles.filterChip,
-                    active && styles.filterChipActive,
+                    styles.filterChipText,
+                    active && styles.filterChipTextActive,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      active && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {active ? '✓ ' : ''}
-                {speciesEmoji(s)} {t(`species.${s}`)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                  {active ? '✓ ' : ''}
+                  {speciesEmoji(s)} {t(`species.${s}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
 
           {/* Price band chips — Round 10. */}
-          <View style={styles.filterRow}>
-            {(['budget', 'midrange', 'premium'] as const).map((band) => {
-              const active = priceBand === band;
-              return (
-                <Pressable
-                  key={band}
-                  onPress={() => setPriceBand(active ? null : band)}
+          {(['budget', 'midrange', 'premium'] as const).map((band) => {
+            const active = priceBand === band;
+            return (
+              <Pressable
+                key={band}
+                onPress={() => setPriceBand(active ? null : band)}
+                style={[
+                  styles.filterChip,
+                  active && styles.filterChipActive,
+                ]}
+              >
+                <Text
                   style={[
-                    styles.filterChip,
-                    active && styles.filterChipActive,
+                    styles.filterChipText,
+                    active && styles.filterChipTextActive,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      active && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {active ? '✓ ' : ''}
-                    {t(`feed.price_band_${band}`)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
+                  {active ? '✓ ' : ''}
+                  {t(`feed.price_band_${band}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       ) : null}
 
       {/* Sort dropdown modal. RN Web has no clean cross-platform
@@ -1099,6 +1102,17 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
+  },
+  // Part D — horizontal-scroll variant. The ScrollView itself is
+  // full width; the contentContainerStyle adds the horizontal
+  // padding so the first/last chips align with the rest of the
+  // page (spacing.xl) and the chips have inter-chip gap.
+  filterRowScrollable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
   },
   // Compact bar (2026-06-12 progressive-disclosure). Sort dropdown
   // trigger + "More filters" toggle sit on the same row, separated by
