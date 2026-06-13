@@ -8,6 +8,7 @@ import {
   SectionList,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -323,6 +324,12 @@ function OwnerFeedHome() {
   const { t, locale, setLocale } = useTranslation();
   const { profile, user } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+
+  // Part C (2026-06-13) — responsive grid. FlatList's numColumns
+  // doesn't allow live changes, so we re-mount the list (via
+  // key={`cols-${numColumns}`}) when the breakpoint flips.
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 1200 ? 4 : width >= 900 ? 3 : width >= 600 ? 2 : 1;
   // Round 11 — favorites toggle. Anonymous viewers don't get the
   // heart (no userId to attach the row to); they tap into the listing
   // and are routed to /sign-in via the existing guest-gate.
@@ -891,40 +898,51 @@ function OwnerFeedHome() {
         </View>
       ) : (
         <FlatList
+          // Part C — re-mount on breakpoint change (numColumns is a
+          // RN constraint that can't be live-updated).
+          key={`cols-${numColumns}`}
+          numColumns={numColumns}
           data={sortedItems}
           keyExtractor={(it) => it.id}
           contentContainerStyle={styles.list}
+          columnWrapperStyle={
+            numColumns > 1 ? styles.gridColumnWrapper : undefined
+          }
           renderItem={({ item }) => (
-            <ListingCard
-              listing={item}
-              onPress={() => {
-                // Move 4 — forward search context as URL params so
-                // the request screen can prefill. Only append the
-                // params that are actually set; an empty string in a
-                // URL param is worse than no param at all (the
-                // request screen would have to filter empties).
-                const params: string[] = [];
-                if (searchStartDate) {
-                  params.push(`startDate=${searchStartDate}`);
+            // The wrapper takes flex:1 so each cell fills its column
+            // evenly. The vertical gap is handled by marginBottom so
+            // it's symmetric with the column-wrapper's gap.
+            <View style={styles.gridCell}>
+              <ListingCard
+                listing={item}
+                onPress={() => {
+                  // Move 4 — forward search context as URL params so
+                  // the request screen can prefill. Only append the
+                  // params that are actually set; an empty string in
+                  // a URL param is worse than no param at all.
+                  const params: string[] = [];
+                  if (searchStartDate) {
+                    params.push(`startDate=${searchStartDate}`);
+                  }
+                  if (searchEndDate) {
+                    params.push(`endDate=${searchEndDate}`);
+                  }
+                  if (searchPetId) {
+                    params.push(`petId=${searchPetId}`);
+                  }
+                  const qs = params.length ? `?${params.join('&')}` : '';
+                  router.push(`/listings/${item.id}${qs}`);
+                }}
+                favorite={
+                  user
+                    ? {
+                        isFavorited: favorites.ids.has(item.id),
+                        onToggle: () => void favorites.toggle(item.id),
+                      }
+                    : undefined
                 }
-                if (searchEndDate) {
-                  params.push(`endDate=${searchEndDate}`);
-                }
-                if (searchPetId) {
-                  params.push(`petId=${searchPetId}`);
-                }
-                const qs = params.length ? `?${params.join('&')}` : '';
-                router.push(`/listings/${item.id}${qs}`);
-              }}
-              favorite={
-                user
-                  ? {
-                      isFavorited: favorites.ids.has(item.id),
-                      onToggle: () => void favorites.toggle(item.id),
-                    }
-                  : undefined
-              }
-            />
+              />
+            </View>
           )}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -1207,6 +1225,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
+  },
+  // Part C — column wrapper for the responsive grid. `gap` is
+  // applied between cells horizontally only. Vertical spacing
+  // between rows comes from contentContainerStyle.gap (list.gap)
+  // which works for both single and multi-column layouts.
+  gridColumnWrapper: {
+    gap: spacing.md,
+  },
+  gridCell: {
+    flex: 1,
   },
   sectionHeader: {
     fontFamily: fonts.bodyBold,
