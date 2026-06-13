@@ -30,6 +30,11 @@ export default function FavoritesScreen() {
   const [items, setItems] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const favorites = useFavorites(user?.id ?? null);
+  // Destructure the stable useCallback ref so the focus effect's
+  // dependency array doesn't see a new identity every time
+  // `favorites.ids` changes mid-refetch (was causing a focus-effect
+  // loop → flicker).
+  const refetchFavoriteIds = favorites.refetch;
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -47,8 +52,8 @@ export default function FavoritesScreen() {
   useFocusEffect(
     useCallback(() => {
       void load();
-      void favorites.refetch();
-    }, [load, favorites]),
+      void refetchFavoriteIds();
+    }, [load, refetchFavoriteIds]),
   );
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
