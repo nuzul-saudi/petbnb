@@ -623,6 +623,10 @@
     "account": "My Account",
     "guest_sign_in": "Sign in",
     "lang_toggle_to_en": "EN",
-    "lang_toggle_to_ar": "ع"
+    "lang_toggle_to_ar": "ع",
+    "app_name": "Petbnb",
+    "menu_open": "Open menu",
+    "lang_toggle_to_en_full": "English",
+    "lang_toggle_to_ar_full": "العربية"
   }
 }

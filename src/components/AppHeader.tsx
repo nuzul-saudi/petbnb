@@ -1,27 +1,23 @@
-// Shared top navigation. Pure presentational — locale state is owned by
-// the LocaleProvider; AppHeader receives current locale + toggle callback
-// via props so screens don't have to import locale state themselves.
+// Top app bar (Move 1 — 2026-06-13). Airbnb-pattern: logo on the
+// leading edge, persona pill + hamburger on the trailing edge. The
+// hamburger opens a Modal containing the previously-inline nav
+// items (My Account, My Bookings, My Pets, My Favorites) plus the
+// language toggle and Sign out. Guest visitors see a Sign-in CTA
+// instead of the hamburger.
+//
+// The persona pill stays OUTSIDE the menu so the Owner↔Host toggle
+// remains a one-tap action and the pending-requests attention badge
+// is always visible (it's a live signal).
 
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
+import { useState } from 'react';
 
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { usePersona } from '@/lib/persona';
 import { useTheme } from '@/theme/theme';
-import { colors, fonts, radii, spacing } from '@/theme/tokens';
-
-// Test round 3 (2026-06-10): in host persona, "My Bookings" became
-// confusing because the owner-side bookings list always showed empty
-// (the host wasn't the owner of any booking). Renamed and re-routed —
-// host persona shows "My Listings" pointing at /, which is the host
-// home. Incoming bookings remain accessible via the persona-aware
-// /bookings list (reachable from the standalone pending-requests
-// badge below, or by typing the URL directly).
-const HOST_NAV_BOOKINGS_LABEL_KEY = 'nav.my_listings';
-const HOST_NAV_BOOKINGS_ROUTE = '/';
-const OWNER_NAV_BOOKINGS_LABEL_KEY = 'nav.bookings';
-const OWNER_NAV_BOOKINGS_ROUTE = '/bookings';
+import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export type AppHeaderProps = {
   locale: 'ar' | 'en';
@@ -44,77 +40,46 @@ export function AppHeader({
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
-  const { session, profile } = useAuth();
+  const { session, profile, signOut } = useAuth();
   const { persona, setPersona, pendingHostCount } = usePersona();
   const theme = useTheme();
 
-  // R2C3 guest mode (2026-06-11): when no session, the header shows
-  // only Home + language toggle + a sign-in CTA. Persona toggle,
-  // account, and the gated middle item (My Bookings / My Listings)
-  // hide entirely. Tapping anywhere stateful from the body of the
-  // page routes to /sign-in?returnTo=<current>.
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const isGuest = !session;
 
-  // Host = pure 'host' role OR 'both' currently in host persona.
-  const isHostMode =
-    profile?.role === 'host' ||
-    (profile?.role === 'both' && persona === 'host');
-
-  // Active-route detection: '/' is exact-match; the others are prefix
-  // matches so /bookings/[id] still highlights "My Bookings".
-  const isActive = (route: string): boolean => {
-    if (route === '/') return pathname === '/';
-    return pathname === route || pathname.startsWith(route + '/');
-  };
-
   // Wrap a nav action with the confirmLeave gate (if set). Synchronous so
-  // it composes cleanly with Pressable.onPress; web's window.confirm is
-  // synchronous, which is what we want for nav cancellation.
+  // it composes cleanly with Pressable.onPress.
   const safeNav = (fn: () => void) => () => {
     if (confirmLeave && !confirmLeave()) return;
     fn();
   };
 
+  const goAndClose = (path: string) => () => {
+    if (confirmLeave && !confirmLeave()) return;
+    setMenuOpen(false);
+    // Cast: pathname union doesn't widen to string; this header is
+    // generic and routes are validated at the call site.
+    router.push(path as never);
+  };
+
   return (
     <View style={[styles.bar, { backgroundColor: theme.background }]}>
-      <NavItem
-        label={t('nav.home')}
-        active={isActive('/')}
-        activeColor={theme.accent}
-        onPress={safeNav(() => router.push('/'))}
-      />
-      {isGuest ? null : (
-        <NavItem
-          label={t(
-            isHostMode
-              ? HOST_NAV_BOOKINGS_LABEL_KEY
-              : OWNER_NAV_BOOKINGS_LABEL_KEY,
-          )}
-          active={isActive(
-            isHostMode ? HOST_NAV_BOOKINGS_ROUTE : OWNER_NAV_BOOKINGS_ROUTE,
-          )}
-          activeColor={theme.accent}
-          onPress={safeNav(() =>
-            router.push(
-              isHostMode ? HOST_NAV_BOOKINGS_ROUTE : OWNER_NAV_BOOKINGS_ROUTE,
-            ),
-          )}
-        />
-      )}
-      {isGuest ? null : (
-        <NavItem
-          label={t('nav.account')}
-          active={isActive('/profile')}
-          activeColor={theme.accent}
-          onPress={safeNav(() => router.push('/profile'))}
-        />
-      )}
-      {/* R2C3 guest sign-in CTA — replaces the persona toggle slot. */}
+      {/* Wordmark — leading edge, taps home */}
+      <Pressable onPress={safeNav(() => router.push('/'))} style={styles.logo}>
+        <Text style={styles.logoText}>{t('nav.app_name')}</Text>
+      </Pressable>
+
+      <View style={styles.spacer} />
+
+      {/* Guest path: just a Sign-in CTA. No menu, no persona, no
+          language toggle in the header — guests can switch language
+          from the sign-in screen. */}
       {isGuest ? (
         <Pressable
           onPress={safeNav(() =>
             router.push(
-              `/sign-in?returnTo=${encodeURIComponent(pathname ?? '/')}`,
+              `/sign-in?returnTo=${encodeURIComponent(pathname ?? '/')}` as never,
             ),
           )}
           style={[styles.personaToggle, { borderColor: theme.accent }]}
@@ -124,26 +89,11 @@ export function AppHeader({
           </Text>
         </Pressable>
       ) : null}
-      {/* Persona toggle — visible only for role='both'. Single
-          destination-labeled button: its label names the OTHER persona
-          (the one you'd switch TO). Tapping calls setPersona(the other
-          persona) AND routes to '/', so the user lands on the new
-          persona's home immediately instead of staying on a screen
-          whose CTAs (e.g. listing-detail's "Edit listing" only renders
-          for hosts) read oddly in the new lens. Gated by confirmLeave
-          because the toggle is now real navigation — a dirty form on
-          the current screen should get the same leave-prompt it would
-          get from any other nav item.
 
-          Pending-host attention badge placement is mode-dependent:
-            • Owner mode → badge sits ON the toggle (the toggle IS the
-              host-mode entry point, so the alert belongs there).
-            • Host mode → badge is a standalone Pressable next to the
-              toggle (the toggle says "Owner" and host-work alert on it
-              would read confusingly). Tapping the standalone badge
-              routes to the host home for now; 7.6 will repoint at the
-              pending-requests list. */}
-      {profile?.role === 'both' ? (
+      {/* Persona pill — visible only for role='both'. Stays outside
+          the hamburger so the toggle + attention badge are always
+          one tap away. */}
+      {!isGuest && profile?.role === 'both' ? (
         <View style={styles.personaSwitch}>
           <Pressable
             onPress={safeNav(() => {
@@ -165,20 +115,9 @@ export function AppHeader({
           </Pressable>
           {persona === 'host' && pendingHostCount > 0 ? (
             <Pressable
-              // Test round 3 (2026-06-10): the badge now routes to
-              // /bookings, which became persona-aware and lists the
-              // host's incoming bookings (requested + accepted +
-              // active + completed). Previously routed to '/' which
-              // dropped the host onto their own listings page with no
-              // path to the requests the badge was pointing at.
               onPress={() => router.push('/bookings')}
               style={styles.requestsBadge}
             >
-              {/* Inbox-tray glyph names the badge: this is pending
-                  requests, not a generic alert. Emoji avoids new i18n
-                  keys; reads in both LTR and RTL since flex-row
-                  reverses naturally and the glyph itself isn't
-                  directional. */}
               <Text style={styles.requestsBadgeIcon}>📥</Text>
               <Text style={styles.attentionDotText}>
                 {pendingHostCount > 9 ? '9+' : String(pendingHostCount)}
@@ -187,39 +126,97 @@ export function AppHeader({
           ) : null}
         </View>
       ) : null}
-      <Pressable onPress={onLanguageToggle} style={styles.langToggle}>
-        <Text style={[styles.langToggleText, { color: theme.accent }]}>
-          {locale === 'ar'
-            ? t('nav.lang_toggle_to_en')
-            : t('nav.lang_toggle_to_ar')}
-        </Text>
-      </Pressable>
+
+      {/* Hamburger — signed-in only. Opens the Modal menu below. */}
+      {!isGuest ? (
+        <Pressable
+          onPress={() => setMenuOpen(true)}
+          style={styles.hamburger}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.menu_open')}
+        >
+          <View style={styles.hamburgerLine} />
+          <View style={styles.hamburgerLine} />
+          <View style={styles.hamburgerLine} />
+        </Pressable>
+      ) : null}
+
+      {/* Menu modal. Trailing-edge dropdown over a tap-to-dismiss
+          backdrop. Backdrop tap closes; sheet tap doesn't bubble. */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable
+          style={styles.menuBackdrop}
+          onPress={() => setMenuOpen(false)}
+        >
+          <Pressable style={styles.menuSheet} onPress={() => {}}>
+            <MenuItem
+              label={t('nav.account')}
+              onPress={goAndClose('/profile')}
+            />
+            <MenuItem
+              label={t('nav.bookings')}
+              onPress={goAndClose('/bookings')}
+            />
+            <MenuItem
+              label={t('profile.my_pets_link')}
+              onPress={goAndClose('/pets')}
+            />
+            <MenuItem
+              label={t('favorites.title')}
+              onPress={goAndClose('/favorites')}
+            />
+
+            <View style={styles.menuDivider} />
+
+            <MenuItem
+              label={
+                locale === 'ar'
+                  ? t('nav.lang_toggle_to_en_full')
+                  : t('nav.lang_toggle_to_ar_full')
+              }
+              onPress={() => {
+                onLanguageToggle();
+                setMenuOpen(false);
+              }}
+            />
+
+            <View style={styles.menuDivider} />
+
+            <MenuItem
+              label={t('profile.sign_out')}
+              destructive
+              onPress={async () => {
+                setMenuOpen(false);
+                await signOut();
+              }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
-function NavItem({
+function MenuItem({
   label,
-  active,
-  activeColor,
   onPress,
+  destructive,
 }: {
   label: string;
-  active: boolean;
-  // Persona-aware accent for the active state. Owner mode resolves to
-  // colors.moss (matches the static navTextActive style), host mode to
-  // colors.goldDeep. Passed in by AppHeader so NavItem stays a plain
-  // sub-component without its own hook calls.
-  activeColor: string;
   onPress: () => void;
+  destructive?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.navItem}>
+    <Pressable onPress={onPress} style={styles.menuItem}>
       <Text
         style={[
-          styles.navText,
-          active && styles.navTextActive,
-          active && { color: activeColor },
+          styles.menuItemText,
+          destructive && styles.menuItemTextDestructive,
         ]}
       >
         {label}
@@ -234,46 +231,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 56,
     paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
-    // backgroundColor applied inline at the JSX site so the header
-    // tints with the active persona (cream in owner, honey in host).
-    // Owner mode resolves theme.background to colors.cream — same
-    // pixel as the previous static value.
+    gap: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.whisper,
   },
-  navItem: {
-    paddingVertical: spacing.sm,
-  },
-  navText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-  },
-  navTextActive: {
-    fontFamily: fonts.bodyBold,
-    color: colors.moss,
-  },
-  langToggle: {
-    paddingHorizontal: spacing.sm,
+  logo: {
     paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
-  langToggleText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 13,
-    color: colors.moss,
+  logoText: {
+    fontFamily: fonts.headingBold,
+    fontSize: 20,
+    color: colors.mossDeep,
   },
-  // Persona switch container — holds the single destination toggle
-  // and (in host mode) the standalone attention badge as siblings.
+  spacer: {
+    flex: 1,
+  },
+  // Hamburger button — 3 stacked lines. Hand-built so we don't pull
+  // in an icon font for one glyph.
+  hamburger: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hamburgerLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: colors.ink,
+    borderRadius: 1,
+  },
+  // ── Persona toggle (kept from prior AppHeader) ────────────
   personaSwitch: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
-  // Single destination-labeled toggle (replaces the old two-pill
-  // control). Outlined treatment — transparent bg + theme.accent border
-  // + theme.accent label applied inline at the JSX site. Matches the
-  // header's existing density (small pill, similar size to langToggle).
   personaToggle: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
@@ -284,10 +278,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 11,
   },
-  // Attention badge that sits ON the destination toggle when in owner
-  // mode. `end` (not `right`) keeps it on the trailing edge in both
-  // LTR and RTL. minWidth + paddingHorizontal lets it stretch for
-  // "9+" without losing pill shape on single digits.
   attentionDot: {
     position: 'absolute',
     top: -4,
@@ -300,12 +290,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Standalone host-mode badge — icon + count pill (replaces the bare
-  // attentionDotInline from the prior revision). The inbox glyph self-
-  // labels it as "pending requests" so the meaning is obvious on first
-  // encounter; the count behavior matches the owner-mode badge (1–9,
-  // "9+" cap, hidden at 0). Slightly taller than attentionDot to seat
-  // the icon comfortably alongside the count.
   requestsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -318,7 +302,6 @@ const styles = StyleSheet.create({
   },
   requestsBadgeIcon: {
     fontSize: 12,
-    // tight lineHeight keeps the emoji centered with the count text
     lineHeight: 14,
   },
   attentionDotText: {
@@ -326,5 +309,40 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: colors.cream,
     lineHeight: 12,
+  },
+  // ── Menu modal ────────────────────────────────────────────
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingTop: 56 + spacing.sm, // sits just under the header bar
+    paddingHorizontal: spacing.md,
+  },
+  menuSheet: {
+    width: '100%',
+    maxWidth: 260,
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    ...shadows.card,
+  },
+  menuItem: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  menuItemText: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.ink,
+  },
+  menuItemTextDestructive: {
+    color: colors.terracotta,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: colors.whisper,
+    marginVertical: spacing.xs,
+    marginHorizontal: spacing.sm,
   },
 });
