@@ -8,6 +8,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { PhotoGallery } from '@/components/PhotoGallery';
+import { SearchWhenModal } from '@/components/SearchWhenModal';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
@@ -36,16 +37,33 @@ export default function ListingDetailScreen() {
     petIds?: string;
   }>();
   const id = typeof params.id === 'string' ? params.id : '';
+
+  // Feature 2 — smart listing page. Dates carried in from search
+  // prefill the local state below; without dates the widget shows
+  // "Add stay dates" and lets the user pick on this page instead.
+  // The Request-booking button forwards whatever's currently set
+  // (carried-in OR chosen-on-detail), NOT the original URL params.
+  const carriedStart =
+    typeof params.startDate === 'string' && params.startDate
+      ? params.startDate
+      : null;
+  const carriedEnd =
+    typeof params.endDate === 'string' && params.endDate
+      ? params.endDate
+      : null;
+
+  const [stayStart, setStayStart] = useState<string | null>(carriedStart);
+  const [stayEnd, setStayEnd] = useState<string | null>(carriedEnd);
+  const [whenOpen, setWhenOpen] = useState(false);
+
+  // searchForward now reads from LOCAL state (Feature 2) so any
+  // post-arrival edit on the detail page travels to /request.
+  // Pets stay URL-driven — owners pick on request screen if they
+  // haven't already.
   const searchForward = (() => {
     const parts: string[] = [];
-    if (typeof params.startDate === 'string' && params.startDate) {
-      parts.push(`startDate=${params.startDate}`);
-    }
-    if (typeof params.endDate === 'string' && params.endDate) {
-      parts.push(`endDate=${params.endDate}`);
-    }
-    // Forward multi-pet petIds when set; fall back to the legacy
-    // singular petId for back-compat with old URLs.
+    if (stayStart) parts.push(`startDate=${stayStart}`);
+    if (stayEnd) parts.push(`endDate=${stayEnd}`);
     if (typeof params.petIds === 'string' && params.petIds) {
       parts.push(`petIds=${params.petIds}`);
     } else if (typeof params.petId === 'string' && params.petId) {
@@ -268,6 +286,34 @@ export default function ListingDetailScreen() {
             ) : null}
           </View>
 
+          {/* Feature 2 — stay-dates widget. Read-only summary
+              when dates are set; tap to edit (opens RangeCalendar
+              via SearchWhenModal). When unset shows a "Add stay
+              dates" prompt. Hidden when the viewer can't book
+              (own listing, no session — those branches show
+              alternate CTAs below). */}
+          {!isOwnListing && session ? (
+            <Pressable
+              onPress={() => setWhenOpen(true)}
+              style={styles.stayDatesWidget}
+              accessibilityRole="button"
+            >
+              <Text style={styles.stayDatesLabel}>
+                {t('listing.stay_dates_label')}
+              </Text>
+              <Text
+                style={[
+                  styles.stayDatesValue,
+                  !(stayStart && stayEnd) && styles.stayDatesValuePlaceholder,
+                ]}
+              >
+                {stayStart && stayEnd
+                  ? `${formatLongDate(stayStart, locale)} – ${formatLongDate(stayEnd, locale)}`
+                  : t('listing.stay_dates_hint')}
+              </Text>
+            </Pressable>
+          ) : null}
+
           {/* CTA gates on BOTH ownership AND current persona.
               A 'both' user viewing their own listing in OWNER persona
               should see the same "Request booking" CTA a real customer
@@ -330,8 +376,35 @@ export default function ListingDetailScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Feature 2 — date-picker modal shared with the search hero. */}
+      <SearchWhenModal
+        visible={whenOpen}
+        startDate={stayStart}
+        endDate={stayEnd}
+        onApply={({ startDate, endDate }) => {
+          setStayStart(startDate);
+          setStayEnd(endDate);
+        }}
+        onClose={() => setWhenOpen(false)}
+      />
     </SafeAreaView>
   );
+}
+
+/** Long date format for the detail-page stay-dates widget. "Jul 1" /
+ *  "1 يول" — the carried-in dates need to read at-a-glance and the
+ *  detail page has more horizontal room than the search hero. */
+function formatLongDate(iso: string, locale: 'ar' | 'en'): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const monthNames =
+    locale === 'ar'
+      ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
+      : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${monthNames[month - 1]} ${day}`;
 }
 
 function Amenity({ label, note }: { label: string; note?: string }) {
@@ -562,7 +635,35 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   ctaWrap: {
+    marginTop: spacing.lg,
+  },
+  // Feature 2 — stay-dates widget. Pressable card above the CTA
+  // showing the carried-in dates (or "Add stay dates" prompt).
+  stayDatesWidget: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     marginTop: spacing.xl,
+    gap: 2,
+  },
+  stayDatesLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    color: colors.inkSoft,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  stayDatesValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    color: colors.ink,
+  },
+  stayDatesValuePlaceholder: {
+    fontFamily: fonts.body,
+    color: colors.inkSoft,
   },
   selfBookingNotice: {
     backgroundColor: colors.whisper,
