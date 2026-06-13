@@ -28,6 +28,7 @@
     "female_filter": "Female sitters only",
     "grooming_filter": "Grooming offered",
     "no_resident_pets_filter": "No resident pets",
+    "more_filters": "More filters",
     "favorite_add": "Add to favorites",
     "favorite_remove": "Remove from favorites",
     "price_band_budget": "Budget · ≤ 200",

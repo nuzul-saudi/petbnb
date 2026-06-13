@@ -2,6 +2,7 @@ import { logWarn } from '@/lib/log';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   SectionList,
@@ -16,9 +17,13 @@ import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { ListingCard } from '@/components/ListingCard';
 import { useFavorites } from '@/hooks/useFavorites';
+import {
+  getFeedFilterPrefs,
+  saveFeedFilterPrefs,
+} from '@/lib/feed-filters-storage';
 import { useAuth } from '@/lib/auth';
 import { CITIES, findCity, type CityKey } from '@/lib/cities';
-import { pickLocalized } from '@/lib/format';
+import { pickLocalized, toArabicDigits } from '@/lib/format';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
 import { usePersona } from '@/lib/persona';
@@ -352,6 +357,24 @@ function OwnerFeedHome() {
     'newest' | 'price_asc' | 'price_desc' | 'rating' | 'distance'
   >('newest');
 
+  // Progressive disclosure (2026-06-12): the feed used to render six
+  // rows of chips above the cards. Default-collapse the secondary
+  // filters under a "More filters" toggle so the default surface is
+  // 2 rows. Filter STATE is untouched — only the layout/visibility.
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+
+  // Count of active filters that live inside the collapsed panel. The
+  // toggle label surfaces this so the user can see "results are
+  // filtered" without expanding (female-only especially must be
+  // discoverable here). City + sort are always visible and don't count.
+  const moreFiltersActiveCount =
+    (femaleOnly ? 1 : 0) +
+    (groomingOnly ? 1 : 0) +
+    (noResidentPetsOnly ? 1 : 0) +
+    (speciesFilter ? 1 : 0) +
+    (priceBand ? 1 : 0);
+
   // Fetch the user's location once on mount. On success, the load
   // callback below picks up the new coords via its dependency and
   // re-queries with sortByDistance. On denial we set geoDenied so
@@ -367,6 +390,57 @@ function OwnerFeedHome() {
       cancelled = true;
     };
   }, []);
+
+  // Hydrate filter + sort state from AsyncStorage once on mount. The
+  // `hydrated` gate prevents the persistence write-effect below from
+  // firing during this initial setState burst (which would write the
+  // unloaded defaults over the just-loaded values). After this effect
+  // resolves, every state change writes through.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void getFeedFilterPrefs().then((prefs) => {
+      if (cancelled) return;
+      if (prefs) {
+        setCity(prefs.city);
+        setFemaleOnly(prefs.femaleOnly);
+        setGroomingOnly(prefs.groomingOnly);
+        setNoResidentPetsOnly(prefs.noResidentPetsOnly);
+        setSpeciesFilter(prefs.speciesFilter);
+        setPriceBand(prefs.priceBand);
+        setSortBy(prefs.sortBy);
+      }
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Write-through: whenever any persisted filter changes, save the
+  // whole payload. Gated on `hydrated` so the initial setState fan-out
+  // from the hydration effect doesn't immediately overwrite storage.
+  useEffect(() => {
+    if (!hydrated) return;
+    void saveFeedFilterPrefs({
+      city,
+      femaleOnly,
+      groomingOnly,
+      noResidentPetsOnly,
+      speciesFilter,
+      priceBand,
+      sortBy,
+    });
+  }, [
+    hydrated,
+    city,
+    femaleOnly,
+    groomingOnly,
+    noResidentPetsOnly,
+    speciesFilter,
+    priceBand,
+    sortBy,
+  ]);
 
   const load = useCallback(
     async (opts: { silent?: boolean } = {}) => {
@@ -510,143 +584,225 @@ function OwnerFeedHome() {
         ))}
       </View>
 
-      <View style={styles.filterRow}>
+      {/* Compact bar (2026-06-12). Sort dropdown on the leading edge,
+          "More filters" toggle on the trailing edge. This is the
+          always-visible row 2 — replaces the chip-strip sort row +
+          the inline secondary filters that used to push the feed
+          down to row 6. */}
+      <View style={styles.compactBar}>
         <Pressable
-          onPress={() => setFemaleOnly((v) => !v)}
-          style={[styles.filterChip, femaleOnly && styles.filterChipActive]}
+          onPress={() => setSortMenuOpen(true)}
+          style={styles.compactBarButton}
+          accessibilityRole="button"
+          accessibilityLabel={
+            t('feed.sort_label') + ' ' + t(`feed.sort_${sortBy}`)
+          }
         >
-          <Text
-            style={[
-              styles.filterChipText,
-              femaleOnly && styles.filterChipTextActive,
-            ]}
-          >
-            {femaleOnly ? '✓ ' : ''}
-            {t('feed.female_filter')}
+          <Text style={styles.compactBarButtonText}>
+            {t('feed.sort_label')} {t(`feed.sort_${sortBy}`)}
+            <Text style={styles.compactBarChevron}> ▾</Text>
           </Text>
         </Pressable>
 
         <Pressable
-          onPress={() => setGroomingOnly((v) => !v)}
-          style={[styles.filterChip, groomingOnly && styles.filterChipActive]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              groomingOnly && styles.filterChipTextActive,
-            ]}
-          >
-            {groomingOnly ? '✓ ' : ''}
-            {t('feed.grooming_filter')}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setNoResidentPetsOnly((v) => !v)}
+          onPress={() => setMoreFiltersOpen((o) => !o)}
           style={[
-            styles.filterChip,
-            noResidentPetsOnly && styles.filterChipActive,
+            styles.compactBarButton,
+            moreFiltersActiveCount > 0 && styles.compactBarButtonActive,
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: moreFiltersOpen }}
         >
           <Text
             style={[
-              styles.filterChipText,
-              noResidentPetsOnly && styles.filterChipTextActive,
+              styles.compactBarButtonText,
+              moreFiltersActiveCount > 0 && styles.compactBarButtonTextActive,
             ]}
           >
-            {noResidentPetsOnly ? '✓ ' : ''}
-            {t('feed.no_resident_pets_filter')}
+            {t('feed.more_filters')}
+            {moreFiltersActiveCount > 0
+              ? ` · ${toArabicDigits(moreFiltersActiveCount)}`
+              : ''}
+            <Text style={styles.compactBarChevron}>
+              {moreFiltersOpen ? ' ▴' : ' ▾'}
+            </Text>
           </Text>
         </Pressable>
       </View>
 
-      {/* Round 12 / Step 5.7 — species filter chips. Mutually
-          exclusive (cat | dog | all). Tapping the active chip clears
-          back to "all". Backed by the GIN index on accepts_species. */}
-      <View style={styles.filterRow}>
-        {(['cat', 'dog'] as const).map((s) => {
-          const active = speciesFilter === s;
-          return (
+      {/* Collapsed-by-default secondary filters. State is unchanged;
+          just hidden behind the toggle. The three rows are identical
+          to the pre-collapse versions — they're rendered only when
+          the user has expanded the panel. */}
+      {moreFiltersOpen ? (
+        <>
+          <View style={styles.filterRow}>
             <Pressable
-              key={s}
-              onPress={() => setSpeciesFilter(active ? null : s)}
-              style={[styles.filterChip, active && styles.filterChipActive]}
+              onPress={() => setFemaleOnly((v) => !v)}
+              style={[
+                styles.filterChip,
+                femaleOnly && styles.filterChipActive,
+              ]}
             >
               <Text
                 style={[
                   styles.filterChipText,
-                  active && styles.filterChipTextActive,
+                  femaleOnly && styles.filterChipTextActive,
                 ]}
               >
-                {speciesEmoji(s)} {t(`species.${s}`)}
+                {femaleOnly ? '✓ ' : ''}
+                {t('feed.female_filter')}
               </Text>
             </Pressable>
-          );
-        })}
-      </View>
 
-      {/* Round 10 — price band chips. Three preset bands; tapping
-          the active band clears it. Mutually exclusive — picking a
-          different band replaces the previous selection. */}
-      <View style={styles.filterRow}>
-        {(['budget', 'midrange', 'premium'] as const).map((band) => {
-          const active = priceBand === band;
-          return (
             <Pressable
-              key={band}
-              onPress={() => setPriceBand(active ? null : band)}
-              style={[styles.filterChip, active && styles.filterChipActive]}
+              onPress={() => setGroomingOnly((v) => !v)}
+              style={[
+                styles.filterChip,
+                groomingOnly && styles.filterChipActive,
+              ]}
             >
               <Text
                 style={[
                   styles.filterChipText,
-                  active && styles.filterChipTextActive,
+                  groomingOnly && styles.filterChipTextActive,
                 ]}
               >
-                {active ? '✓ ' : ''}
-                {t(`feed.price_band_${band}`)}
+                {groomingOnly ? '✓ ' : ''}
+                {t('feed.grooming_filter')}
               </Text>
             </Pressable>
-          );
-        })}
-      </View>
 
-      {/* R2C5 sort selector. Chip strip — same pill shape as the
-          filter row. Distance only appears when device geolocation
-          succeeded (coords != null). */}
-      <View style={styles.sortRow}>
-        <Text style={styles.sortLabel}>{t('feed.sort_label')}</Text>
-        {(
-          [
-            'newest',
-            'price_asc',
-            'price_desc',
-            'rating',
-            'distance',
-          ] as const
-        )
-          .filter((key) => key !== 'distance' || coords)
-          .map((key) => {
-            const active = sortBy === key;
-            return (
-              <Pressable
-                key={key}
-                onPress={() => setSortBy(key)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
+            <Pressable
+              onPress={() => setNoResidentPetsOnly((v) => !v)}
+              style={[
+                styles.filterChip,
+                noResidentPetsOnly && styles.filterChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  noResidentPetsOnly && styles.filterChipTextActive,
+                ]}
               >
-                <Text
+                {noResidentPetsOnly ? '✓ ' : ''}
+                {t('feed.no_resident_pets_filter')}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Species chips — Round 12 / Step 5.7. */}
+          <View style={styles.filterRow}>
+            {(['cat', 'dog'] as const).map((s) => {
+              const active = speciesFilter === s;
+              return (
+                <Pressable
+                  key={s}
+                  onPress={() => setSpeciesFilter(active ? null : s)}
                   style={[
-                    styles.filterChipText,
-                    active && styles.filterChipTextActive,
+                    styles.filterChip,
+                    active && styles.filterChipActive,
                   ]}
                 >
-                  {active ? '✓ ' : ''}
-                  {t(`feed.sort_${key}`)}
-                </Text>
-              </Pressable>
-            );
-          })}
-      </View>
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      active && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {active ? '✓ ' : ''}
+                {speciesEmoji(s)} {t(`species.${s}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Price band chips — Round 10. */}
+          <View style={styles.filterRow}>
+            {(['budget', 'midrange', 'premium'] as const).map((band) => {
+              const active = priceBand === band;
+              return (
+                <Pressable
+                  key={band}
+                  onPress={() => setPriceBand(active ? null : band)}
+                  style={[
+                    styles.filterChip,
+                    active && styles.filterChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      active && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {active ? '✓ ' : ''}
+                    {t(`feed.price_band_${band}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+
+      {/* Sort dropdown modal. RN Web has no clean cross-platform
+          <select>; the codebase pattern for picker UIs is a Modal
+          with a vertical option list (mirrors ListingForm's district
+          picker). Tap an option → setSortBy + dismiss. Backdrop tap
+          cancels. */}
+      <Modal
+        visible={sortMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSortMenuOpen(false)}
+      >
+        <Pressable
+          style={styles.sortModalBackdrop}
+          onPress={() => setSortMenuOpen(false)}
+        >
+          <Pressable style={styles.sortModalSheet} onPress={() => {}}>
+            {(
+              [
+                'newest',
+                'price_asc',
+                'price_desc',
+                'rating',
+                'distance',
+              ] as const
+            )
+              .filter((key) => key !== 'distance' || coords)
+              .map((key) => {
+                const active = sortBy === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => {
+                      setSortBy(key);
+                      setSortMenuOpen(false);
+                    }}
+                    style={[
+                      styles.sortModalOption,
+                      active && styles.sortModalOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.sortModalOptionText,
+                        active && styles.sortModalOptionTextActive,
+                      ]}
+                    >
+                      {active ? '✓ ' : '  '}
+                      {t(`feed.sort_${key}`)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {geoDenied ? (
         <Text style={styles.geoHint}>{t('feed.geo_denied_hint')}</Text>
@@ -790,6 +946,75 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
+  },
+  // Compact bar (2026-06-12 progressive-disclosure). Sort dropdown
+  // trigger + "More filters" toggle sit on the same row, separated by
+  // a flex spacer. Replaces the chip-strip sort row and provides the
+  // entry point to the collapsed secondary filters.
+  compactBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  compactBarButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    backgroundColor: colors.paper,
+  },
+  compactBarButtonActive: {
+    borderColor: colors.moss,
+    backgroundColor: colors.whisper,
+  },
+  compactBarButtonText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+  },
+  compactBarButtonTextActive: {
+    fontFamily: fonts.bodyBold,
+    color: colors.mossDeep,
+  },
+  compactBarChevron: {
+    color: colors.inkSoft,
+  },
+  // Sort picker modal — centered sheet over a tap-to-dismiss
+  // backdrop. The inner Pressable absorbs taps so they don't bubble
+  // to the backdrop and close the modal mid-selection.
+  sortModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  sortModalSheet: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    overflow: 'hidden',
+  },
+  sortModalOption: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  sortModalOptionActive: {
+    backgroundColor: colors.whisper,
+  },
+  sortModalOptionText: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.ink,
+  },
+  sortModalOptionTextActive: {
+    fontFamily: fonts.bodyBold,
+    color: colors.mossDeep,
   },
   sortRow: {
     flexDirection: 'row',
