@@ -650,10 +650,10 @@ function OwnerFeedHome() {
         onPressWhere={() => setWhereOpen(true)}
         onPressWhen={() => setWhenOpen(true)}
         onPressPet={() => setWhichPetOpen(true)}
-        // Gate: while species is off AND viewer is a guest, hide
-        // the Which-pet field. Signed-in users still see it
-        // (picking pets feeds the booking-forward URL params).
-        hideWhichPet={!SPECIES_ENABLED && !user}
+        // Always show the Which-pet field. For guests, the modal
+        // explains they need to sign in to pick pets; the field
+        // itself stays as a visible part of the search hero so
+        // the layout is consistent across signed-in / guest views.
         onPressSearch={() => {
           // State-driven feed: changing search.* already retriggers
           // load() via dependency. The search button is ceremonial —

@@ -115,22 +115,34 @@ export function AppHeader({
         </Pressable>
       ) : null}
 
-      {/* Guest path: just a Sign-in CTA. No menu, no persona, no
-          language toggle in the header — guests can switch language
-          from the sign-in screen. */}
+      {/* Guest path: language toggle + Sign-in CTA. The hamburger
+          menu (which holds the language toggle for signed-in users)
+          isn't shown to guests — surface the toggle here instead so
+          a non-Arabic visitor isn't stuck in AR. */}
       {isGuest ? (
-        <Pressable
-          onPress={safeNav(() =>
-            router.push(
-              `/sign-in?returnTo=${encodeURIComponent(pathname ?? '/')}` as never,
-            ),
-          )}
-          style={[styles.personaToggle, { borderColor: theme.accent }]}
-        >
-          <Text style={[styles.personaToggleText, { color: theme.accent }]}>
-            {t('nav.guest_sign_in')}
-          </Text>
-        </Pressable>
+        <>
+          <Pressable
+            onPress={onLanguageToggle}
+            style={styles.guestLangButton}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.guestLangButtonText, { color: theme.accent }]}>
+              {locale === 'ar' ? 'EN' : 'ع'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={safeNav(() =>
+              router.push(
+                `/sign-in?returnTo=${encodeURIComponent(pathname ?? '/')}` as never,
+              ),
+            )}
+            style={[styles.personaToggle, { borderColor: theme.accent }]}
+          >
+            <Text style={[styles.personaToggleText, { color: theme.accent }]}>
+              {t('nav.guest_sign_in')}
+            </Text>
+          </Pressable>
+        </>
       ) : null}
 
       {/* Persona pill — visible only for role='both'. Stays outside
@@ -329,6 +341,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radii.pill,
     borderWidth: 1,
+  },
+  // Guest language toggle — compact, sits left of the Sign-in pill.
+  guestLangButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  guestLangButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
   },
   personaToggleText: {
     fontFamily: fonts.bodyBold,
