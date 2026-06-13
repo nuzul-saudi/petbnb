@@ -590,6 +590,8 @@
     "when_hint": "Add dates",
     "which_pet": "Which pet",
     "which_hint": "Choose your pet",
+    "n_pets": "{count} pets",
+    "n_pets_one": "1 pet",
     "button": "Search",
     "district_search_hint": "District name…",
     "any_district": "All districts",

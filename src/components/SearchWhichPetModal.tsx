@@ -1,14 +1,16 @@
 // Move 4 — Which-pet modal.
 //
-// Signed-in users: pick from their own pets. Selecting a pet sets
-// search.petId AND the species (so the feed filters to hosts who
-// accept that species).
+// Fix 4 (2026-06-13): now MULTI-SELECT for signed-in users. Boarding
+// services routinely cover several pets at once; the prior radio
+// behavior didn't match the booking flow's multi-pet capability.
 //
-// Guests: there are no pet rows to pick from, so we offer the
-// coarser "🐈 Cat / 🐕 Dog" choice as a stand-in. The same path
-// drives the species filter.
+// Signed-in users: tap pet rows to toggle selection. Selecting at
+// least one pet sets search.petIds AND derives species (if all
+// picked pets share a species, the species filter narrows; mixed
+// → species filter clears).
 //
-// Both cases support clearing back to "no pet" / "any species".
+// Guests: still a single coarse "🐈 Cat / 🐕 Dog" choice as a
+// stand-in (no pet rows exist for guests).
 
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -26,37 +28,51 @@ export type SearchWhichPetModalProps = {
   visible: boolean;
   /** Signed-in user's pets. Empty for guests. */
   pets: Tables<'pets'>[];
-  /** Currently selected pet id (signed-in) or null. */
-  petId: string | null;
+  /** Currently selected pet ids (signed-in). Empty array = none. */
+  petIds: string[];
   /** Currently selected guest species or null. */
   guestSpecies: Species | null;
   /** Distinguishes signed-in (use pet picker) vs guest (use species picker). */
   isGuest: boolean;
-  onApply: (next: { petId: string | null; guestSpecies: Species | null }) => void;
+  onApply: (next: {
+    petIds: string[];
+    guestSpecies: Species | null;
+  }) => void;
   onClose: () => void;
 };
 
 export function SearchWhichPetModal({
   visible,
   pets,
-  petId,
+  petIds,
   guestSpecies,
   isGuest,
   onApply,
   onClose,
 }: SearchWhichPetModalProps) {
   const { t } = useTranslation();
-  const [draftPetId, setDraftPetId] = useState<string | null>(petId);
+  const [draftPetIds, setDraftPetIds] = useState<Set<string>>(
+    new Set(petIds),
+  );
   const [draftGuestSpecies, setDraftGuestSpecies] = useState<Species | null>(
     guestSpecies,
   );
 
   useEffect(() => {
     if (visible) {
-      setDraftPetId(petId);
+      setDraftPetIds(new Set(petIds));
       setDraftGuestSpecies(guestSpecies);
     }
-  }, [visible, petId, guestSpecies]);
+  }, [visible, petIds, guestSpecies]);
+
+  const togglePet = (id: string) => {
+    setDraftPetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <Modal
@@ -98,32 +114,45 @@ export function SearchWhichPetModal({
             <Text style={styles.hint}>{t('search.no_pets_hint')}</Text>
           ) : (
             <ScrollView style={styles.list}>
+              {/* Clear-all row: collapses the selection to none. */}
               <Pressable
-                onPress={() => setDraftPetId(null)}
-                style={[styles.row, draftPetId === null && styles.rowActive]}
+                onPress={() => setDraftPetIds(new Set())}
+                style={[
+                  styles.row,
+                  draftPetIds.size === 0 && styles.rowActive,
+                ]}
               >
                 <Text
                   style={[
                     styles.rowText,
-                    draftPetId === null && styles.rowTextActive,
+                    draftPetIds.size === 0 && styles.rowTextActive,
                   ]}
                 >
                   {t('search.any_pet')}
                 </Text>
               </Pressable>
               {pets.map((p) => {
-                const active = draftPetId === p.id;
+                const active = draftPetIds.has(p.id);
                 return (
                   <Pressable
                     key={p.id}
-                    onPress={() => setDraftPetId(p.id)}
+                    onPress={() => togglePet(p.id)}
                     style={[styles.row, active && styles.rowActive]}
                   >
+                    {/* Checkbox glyph reflects multi-select intent.
+                        Square (☐) when off, filled (☑) when on —
+                        clearer affordance than a radio dot. */}
+                    <Text style={styles.checkbox}>
+                      {active ? '☑' : '☐'}
+                    </Text>
                     <Text style={styles.rowEmoji}>
                       {speciesEmoji(p.species === 'dog' ? 'dog' : 'cat')}
                     </Text>
                     <Text
-                      style={[styles.rowText, active && styles.rowTextActive]}
+                      style={[
+                        styles.rowText,
+                        active && styles.rowTextActive,
+                      ]}
                     >
                       {p.name}
                     </Text>
@@ -140,7 +169,7 @@ export function SearchWhichPetModal({
             <Pressable
               onPress={() => {
                 onApply({
-                  petId: isGuest ? null : draftPetId,
+                  petIds: isGuest ? [] : [...draftPetIds],
                   guestSpecies: isGuest ? draftGuestSpecies : null,
                 });
                 onClose();
@@ -224,6 +253,14 @@ const styles = StyleSheet.create({
   },
   rowEmoji: {
     fontSize: 20,
+  },
+  // Fix 4 — checkbox glyph for multi-select rows.
+  checkbox: {
+    fontSize: 18,
+    lineHeight: 20,
+    color: colors.mossDeep,
+    width: 22,
+    textAlign: 'center',
   },
   rowText: {
     fontFamily: fonts.body,

@@ -31,8 +31,16 @@ export type RangeCalendarProps = {
   /**
    * Fires when both dates are set in the same selection burst.
    * Parent uses this to auto-close the modal (rule 4 of the spec).
+   *
+   * IMPORTANT: receives the fresh (start, end) explicitly so the
+   * parent doesn't have to read its own (possibly-stale) state in
+   * a setTimeout closure. Without this, the parent reading
+   * `draftEnd` in a deferred callback can capture the pre-tap
+   * snapshot and call onApply with endDate=null (closing the
+   * modal with only the start set — the bug behind the reported
+   * "tap end and nothing happens").
    */
-  onRangeComplete?: () => void;
+  onRangeComplete?: (start: string, end: string) => void;
   /** Earliest selectable day, 'yyyy-mm-dd'. Defaults to today. */
   minDate?: string;
 };
@@ -76,10 +84,11 @@ export function RangeCalendar({
     if (!endDate) {
       if (date === startDate) return; // tapping the start day again is a no-op
       onChange({ startDate, endDate: date });
-      // Tell parent to close. Defer to next tick so the change
-      // commits to state before the modal animates away.
+      // Pass the fresh values into the callback explicitly. The
+      // setTimeout(0) defer lets React commit the onChange state
+      // update before the parent's close handler runs.
       if (onRangeComplete) {
-        setTimeout(onRangeComplete, 0);
+        setTimeout(() => onRangeComplete(startDate, date), 0);
       }
       return;
     }

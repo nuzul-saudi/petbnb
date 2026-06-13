@@ -33,6 +33,7 @@ export default function ListingDetailScreen() {
     startDate?: string;
     endDate?: string;
     petId?: string;
+    petIds?: string;
   }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const searchForward = (() => {
@@ -43,7 +44,11 @@ export default function ListingDetailScreen() {
     if (typeof params.endDate === 'string' && params.endDate) {
       parts.push(`endDate=${params.endDate}`);
     }
-    if (typeof params.petId === 'string' && params.petId) {
+    // Forward multi-pet petIds when set; fall back to the legacy
+    // singular petId for back-compat with old URLs.
+    if (typeof params.petIds === 'string' && params.petIds) {
+      parts.push(`petIds=${params.petIds}`);
+    } else if (typeof params.petId === 'string' && params.petId) {
       parts.push(`petId=${params.petId}`);
     }
     return parts.length ? `?${parts.join('&')}` : '';

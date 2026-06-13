@@ -2,7 +2,6 @@ import { logWarn } from '@/lib/log';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -386,7 +385,10 @@ function OwnerFeedHome() {
   const [searchDistrict, setSearchDistrict] = useState<string | null>(null);
   const [searchStartDate, setSearchStartDate] = useState<string | null>(null);
   const [searchEndDate, setSearchEndDate] = useState<string | null>(null);
-  const [searchPetId, setSearchPetId] = useState<string | null>(null);
+  // Fix 4 (2026-06-13) — multi-pet selection. Boarding services
+  // routinely cover multiple pets at once; restricting search to one
+  // pet didn't match the booking flow's multi-pet capability.
+  const [searchPetIds, setSearchPetIds] = useState<string[]>([]);
   const [searchGuestSpecies, setSearchGuestSpecies] = useState<
     'cat' | 'dog' | null
   >(null);
@@ -466,7 +468,7 @@ function OwnerFeedHome() {
         setPriceBand(prefs.priceBand);
         setSortBy(prefs.sortBy);
         setSearchDistrict(prefs.searchDistrict);
-        setSearchPetId(prefs.searchPetId);
+        setSearchPetIds(prefs.searchPetIds);
         setSearchGuestSpecies(prefs.searchGuestSpecies);
       }
       setHydrated(true);
@@ -490,7 +492,7 @@ function OwnerFeedHome() {
       priceBand,
       sortBy,
       searchDistrict,
-      searchPetId,
+      searchPetIds,
       searchGuestSpecies,
     });
   }, [
@@ -503,7 +505,7 @@ function OwnerFeedHome() {
     priceBand,
     sortBy,
     searchDistrict,
-    searchPetId,
+    searchPetIds,
     searchGuestSpecies,
   ]);
 
@@ -615,11 +617,21 @@ function OwnerFeedHome() {
         district={searchDistrict}
         startDate={searchStartDate}
         endDate={searchEndDate}
-        petName={
-          searchPetId
-            ? ownerPets.find((p) => p.id === searchPetId)?.name ?? null
-            : null
-        }
+        petName={(() => {
+          // Multi-pet (Fix 4). Summary text in the hero:
+          //   0 → null (placeholder shown)
+          //   1 → that pet's name
+          //   2+ → "N pets"
+          if (searchPetIds.length === 0) return null;
+          if (searchPetIds.length === 1) {
+            return (
+              ownerPets.find((p) => p.id === searchPetIds[0])?.name ?? null
+            );
+          }
+          return t('search.n_pets', {
+            count: toArabicDigits(searchPetIds.length),
+          });
+        })()}
         guestSpecies={searchGuestSpecies}
         onPressWhere={() => setWhereOpen(true)}
         onPressWhen={() => setWhenOpen(true)}
@@ -668,16 +680,19 @@ function OwnerFeedHome() {
           down to row 6. */}
       <View style={styles.compactBar}>
         <Pressable
-          onPress={() => setSortMenuOpen(true)}
+          onPress={() => setSortMenuOpen((o) => !o)}
           style={styles.compactBarButton}
           accessibilityRole="button"
+          accessibilityState={{ expanded: sortMenuOpen }}
           accessibilityLabel={
             t('feed.sort_label') + ' ' + t(`feed.sort_${sortBy}`)
           }
         >
           <Text style={styles.compactBarButtonText}>
             {t('feed.sort_label')} {t(`feed.sort_${sortBy}`)}
-            <Text style={styles.compactBarChevron}> ▾</Text>
+            <Text style={styles.compactBarChevron}>
+              {sortMenuOpen ? ' ▴' : ' ▾'}
+            </Text>
           </Text>
         </Pressable>
 
@@ -707,14 +722,57 @@ function OwnerFeedHome() {
         </Pressable>
       </View>
 
+      {/* Fix 1 (2026-06-13) — Sort opens INLINE as a horizontal chip
+          strip, mirroring the More-filters expansion pattern. Both
+          controls now behave the same way (toggle → expand
+          horizontally). Replaces the prior popup Modal. */}
+      {sortMenuOpen ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRowScrollable}
+        >
+          {(
+            [
+              'newest',
+              'price_asc',
+              'price_desc',
+              'rating',
+              'distance',
+            ] as const
+          )
+            .filter((key) => key !== 'distance' || coords)
+            .map((key) => {
+              const active = sortBy === key;
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => {
+                    setSortBy(key);
+                    setSortMenuOpen(false);
+                  }}
+                  style={[
+                    styles.filterChip,
+                    active && styles.filterChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      active && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {active ? '✓ ' : ''}
+                    {t(`feed.sort_${key}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+        </ScrollView>
+      ) : null}
+
       {/* Collapsed-by-default secondary filters. State is unchanged;
-          just hidden behind the toggle. The three rows are identical
-          to the pre-collapse versions — they're rendered only when
-          the user has expanded the panel. */}
-      {/* Part D (2026-06-13) — all expanded chips on one horizontal
-          scrollable row instead of wrapping to three lines. Chip
-          behavior, active styling, and the More-filters count
-          badge are unchanged — only the layout changed. */}
+          just hidden behind the toggle. */}
       {moreFiltersOpen ? (
         <ScrollView
           horizontal
@@ -827,62 +885,6 @@ function OwnerFeedHome() {
         </ScrollView>
       ) : null}
 
-      {/* Sort dropdown modal. RN Web has no clean cross-platform
-          <select>; the codebase pattern for picker UIs is a Modal
-          with a vertical option list (mirrors ListingForm's district
-          picker). Tap an option → setSortBy + dismiss. Backdrop tap
-          cancels. */}
-      <Modal
-        visible={sortMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSortMenuOpen(false)}
-      >
-        <Pressable
-          style={styles.sortModalBackdrop}
-          onPress={() => setSortMenuOpen(false)}
-        >
-          <Pressable style={styles.sortModalSheet} onPress={() => {}}>
-            {(
-              [
-                'newest',
-                'price_asc',
-                'price_desc',
-                'rating',
-                'distance',
-              ] as const
-            )
-              .filter((key) => key !== 'distance' || coords)
-              .map((key) => {
-                const active = sortBy === key;
-                return (
-                  <Pressable
-                    key={key}
-                    onPress={() => {
-                      setSortBy(key);
-                      setSortMenuOpen(false);
-                    }}
-                    style={[
-                      styles.sortModalOption,
-                      active && styles.sortModalOptionActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.sortModalOptionText,
-                        active && styles.sortModalOptionTextActive,
-                      ]}
-                    >
-                      {active ? '✓ ' : '  '}
-                      {t(`feed.sort_${key}`)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       {geoDenied ? (
         <Text style={styles.geoHint}>{t('feed.geo_denied_hint')}</Text>
       ) : null}
@@ -930,8 +932,10 @@ function OwnerFeedHome() {
                   if (searchEndDate) {
                     params.push(`endDate=${searchEndDate}`);
                   }
-                  if (searchPetId) {
-                    params.push(`petId=${searchPetId}`);
+                  if (searchPetIds.length > 0) {
+                    // Multi-pet (Fix 4). Comma-joined; the request
+                    // screen splits it back into a Set.
+                    params.push(`petIds=${searchPetIds.join(',')}`);
                   }
                   const qs = params.length ? `?${params.join('&')}` : '';
                   router.push(`/listings/${item.id}${qs}`);
@@ -978,19 +982,30 @@ function OwnerFeedHome() {
       <SearchWhichPetModal
         visible={whichPetOpen}
         pets={ownerPets}
-        petId={searchPetId}
+        petIds={searchPetIds}
         guestSpecies={searchGuestSpecies}
         isGuest={!user}
-        onApply={({ petId, guestSpecies }) => {
-          setSearchPetId(petId);
+        onApply={({ petIds, guestSpecies }) => {
+          setSearchPetIds(petIds);
           setSearchGuestSpecies(guestSpecies);
           // Sync species filter so the feed reflects the user's pet
-          // choice. The species chip in "More filters" can still be
-          // toggled to override.
-          if (petId) {
-            const pet = ownerPets.find((p) => p.id === petId);
-            if (pet?.species === 'dog' || pet?.species === 'cat') {
-              setSpeciesFilter(pet.species);
+          // choice. If the picked pets are mixed species (cat + dog),
+          // clear the species filter so the feed shows everything
+          // (the user is then expected to use the More-filters chip
+          // to narrow). Single-species → set the chip to that species.
+          if (petIds.length > 0) {
+            const speciesSet = new Set(
+              petIds
+                .map((id) => ownerPets.find((p) => p.id === id)?.species)
+                .filter((s): s is string => !!s),
+            );
+            if (speciesSet.size === 1) {
+              const only = [...speciesSet][0];
+              if (only === 'cat' || only === 'dog') {
+                setSpeciesFilter(only);
+              }
+            } else {
+              setSpeciesFilter(null);
             }
           } else if (guestSpecies) {
             setSpeciesFilter(guestSpecies);

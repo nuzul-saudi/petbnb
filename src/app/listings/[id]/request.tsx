@@ -86,6 +86,8 @@ export default function BookingRequestScreen() {
     startDate?: string;
     endDate?: string;
     petId?: string;
+    /** Fix 4 (2026-06-13). Comma-joined pet ids for multi-pet search. */
+    petIds?: string;
   }>();
   const listingId = typeof params.id === 'string' ? params.id : '';
   const editBookingId =
@@ -238,7 +240,10 @@ export default function BookingRequestScreen() {
   // Move 4 — prefill from the search context the feed forwarded.
   // Skipped in edit / rebook modes because those have their own
   // prefill paths and the user's intent there is different.
-  // Pets-aware on petId: only auto-select if the pet still exists.
+  // Pets-aware on petIds (Fix 4 multi-pet): only auto-select the
+  // ones that still exist among the owner's current pets. Legacy
+  // singular `petId` is also accepted for back-compat with any
+  // bookmarked URLs.
   useEffect(() => {
     if (isEditMode || isRebookMode) return;
     if (typeof params.startDate === 'string' && params.startDate) {
@@ -247,15 +252,22 @@ export default function BookingRequestScreen() {
     if (typeof params.endDate === 'string' && params.endDate) {
       setEndDate(params.endDate);
     }
-    if (typeof params.petId === 'string' && params.petId) {
-      if (pets.some((p) => p.id === params.petId)) {
-        setSelectedPetIds(new Set([params.petId]));
+    // Multi-pet (Fix 4): petIds is comma-joined; split, filter to
+    // still-owned, hydrate the Set.
+    let prefillIds: string[] = [];
+    if (typeof params.petIds === 'string' && params.petIds) {
+      prefillIds = params.petIds.split(',').filter(Boolean);
+    } else if (typeof params.petId === 'string' && params.petId) {
+      prefillIds = [params.petId];
+    }
+    if (prefillIds.length > 0) {
+      const validIds = prefillIds.filter((id) =>
+        pets.some((p) => p.id === id),
+      );
+      if (validIds.length > 0) {
+        setSelectedPetIds(new Set(validIds));
       }
     }
-    // Empty deps after first hydration is the right shape — we don't
-    // want the prefill to fight the user's subsequent edits. params.*
-    // are stable URL params; pets becomes available asynchronously,
-    // hence its inclusion.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pets, isEditMode, isRebookMode]);
 

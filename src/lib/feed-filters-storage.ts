@@ -38,7 +38,8 @@ export type FeedFilterPrefs = {
   // search context. Dates do NOT persist (per spec — date intent
   // is per-visit).
   searchDistrict: string | null;
-  searchPetId: string | null;
+  /** Multi-pet (Fix 4, 2026-06-13). Empty array means no pet picked. */
+  searchPetIds: string[];
   searchGuestSpecies: 'cat' | 'dog' | null;
 };
 
@@ -80,8 +81,15 @@ export async function getFeedFilterPrefs(): Promise<FeedFilterPrefs | null> {
         typeof parsed.searchDistrict === 'string'
           ? parsed.searchDistrict
           : null,
-      searchPetId:
-        typeof parsed.searchPetId === 'string' ? parsed.searchPetId : null,
+      // Fix 4 — multi-pet. Tolerate the old shape (searchPetId
+      // singleton from pre-fix builds in the wild) by folding it
+      // into a one-element array. After hydration, future writes
+      // use the array shape.
+      searchPetIds: Array.isArray(parsed.searchPetIds)
+        ? parsed.searchPetIds.filter((x): x is string => typeof x === 'string')
+        : typeof (parsed as { searchPetId?: unknown }).searchPetId === 'string'
+          ? [(parsed as { searchPetId: string }).searchPetId]
+          : [],
       searchGuestSpecies:
         parsed.searchGuestSpecies === 'cat' ||
         parsed.searchGuestSpecies === 'dog'

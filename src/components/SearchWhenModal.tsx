@@ -44,21 +44,18 @@ export function SearchWhenModal({
   };
 
   // Auto-apply + close when the user completes a range. The
-  // RangeCalendar signals via onRangeComplete after the end tap.
-  const onRangeComplete = () => {
-    // Use the latest draft via a microtask — the setStart/setEnd
-    // setter ran synchronously just before, so reading draft state
-    // directly here might still see the old snapshot in React's
-    // batched update. Push the apply behind a 0ms timer.
-    setTimeout(() => {
-      onApply({ startDate: draftStart, endDate: draftEnd });
-      onClose();
-    }, 0);
+  // RangeCalendar passes the fresh values explicitly — DON'T read
+  // draftStart/draftEnd in this callback, those are the pre-tap
+  // closure snapshot and will be one tap behind, dropping endDate
+  // on the floor.
+  const onRangeComplete = (start: string, end: string) => {
+    onApply({ startDate: start, endDate: end });
+    onClose();
   };
 
-  // The onApply path on the explicit "Apply" button reads the
-  // current draft directly (no race with batched state). Used when
-  // user clears or wants to confirm without two-tap completion.
+  // The explicit "Apply" button reads draft state — fine here
+  // because the user can only press it AFTER any pending state
+  // update has committed (one render later).
   const onApplyPress = () => {
     onApply({ startDate: draftStart, endDate: draftEnd });
     onClose();
