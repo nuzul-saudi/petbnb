@@ -72,22 +72,13 @@ export function AppHeader({
 
       <View style={styles.spacer} />
 
-      {/* Move 3 — Become-a-Host CTA, expanded (2026-06-13 bug fix).
-          The original gate was strictly role === 'owner', which left
-          'both' users (the common test-account state) without ANY
-          ctx-switch affordance besides the persona pill. The Move 3
-          spec actually anticipated this with a "Switch to hosting"
-          variant; wiring it now.
-
-          Two CTAs in one slot, mutually exclusive:
-            - role === 'owner'                          → "Become a Host"
-                                                          → /profile (RoleEditor)
-            - role === 'both' AND persona === 'owner'   → "Switch to hosting"
-                                                          → setPersona('host') + /
-            - anything else                             → nothing
-                                                          (hosts/admins/guests
-                                                          have their own
-                                                          header treatments) */}
+      {/* Move 3 — Become-a-Host CTA. Owner-only users see the
+          recruitment pill; 'both' users already have the persona
+          pill below (with the live pending-requests attention
+          badge) so a separate "Switch to hosting" CTA would just
+          duplicate it. Founder feedback 2026-06-14: drop the
+          duplicate, let the persona pill be the single
+          context-switch control for 'both' users. */}
       {!isGuest && profile?.role === 'owner' ? (
         <Pressable
           onPress={safeNav(() => router.push('/profile' as never))}
@@ -97,20 +88,6 @@ export function AppHeader({
         >
           <Text style={styles.becomeHostCtaText}>
             {t('nav.become_host')}
-          </Text>
-        </Pressable>
-      ) : !isGuest && profile?.role === 'both' && persona === 'owner' ? (
-        <Pressable
-          onPress={safeNav(() => {
-            setPersona('host');
-            router.replace('/');
-          })}
-          style={styles.becomeHostCta}
-          accessibilityRole="button"
-          accessibilityLabel={t('nav.switch_hosting')}
-        >
-          <Text style={styles.becomeHostCtaText}>
-            {t('nav.switch_hosting')}
           </Text>
         </Pressable>
       ) : null}
