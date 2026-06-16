@@ -40,10 +40,7 @@ export default function AdminHome() {
         countDisputedBookings(),
       ]);
       const pendingHosts = users.filter(
-        (u) =>
-          (u.role === 'host' || u.role === 'both') &&
-          !u.is_verified &&
-          !u.is_suspended,
+        (u) => u.role === 'host' && !u.is_verified && !u.is_suspended,
       ).length;
       // 8g: the listings counter now reflects the unified review
       // queue (new pendings + pending edits to approved/paused/

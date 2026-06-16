@@ -1,28 +1,44 @@
+// Owner signup — final step. After OTP + password the user lands here
+// to enter their full name. Role is implicit: anyone signing up via
+// the regular /sign-in funnel is an owner. (The host signup funnel
+// at /become-host has its own multi-field application form and
+// doesn't pass through this screen.)
+//
+// Replaces the old /role screen which combined name capture with a
+// 3-way role chooser (owner / host / both) — the persona-separation
+// work removed self-service role choice; hosts apply via a separate
+// flow that requires admin approval.
+
 import { logWarn } from '@/lib/log';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
-import { RoleEditor, type SelectableRole } from '@/components/RoleEditor';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
-export default function RoleScreen() {
+export default function NameScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session, user, refreshProfile } = useAuth();
+
   const [name, setName] = useState('');
-  const [selected, setSelected] = useState<SelectableRole | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
 
-  const canSave = name.trim().length > 0 && selected !== null && !saving;
+  const canSave = name.trim().length > 0 && !saving;
 
   const onSave = async () => {
     if (!canSave || !supabase) return;
@@ -31,13 +47,13 @@ export default function RoleScreen() {
     try {
       const { error: e } = await supabase
         .from('profiles')
-        .update({ full_name: name.trim(), role: selected! })
+        .update({ full_name: name.trim(), role: 'owner' })
         .eq('id', user.id);
       if (e) throw e;
       await refreshProfile();
       router.replace('/');
     } catch (err) {
-      logWarn('[auth.save_failed]', err);
+      logWarn('[auth.name_save_failed]', err);
       setError(t('auth.save_failed'));
     } finally {
       setSaving(false);
@@ -47,24 +63,21 @@ export default function RoleScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.heading}>{t('auth.role_title')}</Text>
-        <Text style={styles.subtitle}>{t('auth.role_subtitle')}</Text>
+        <Text style={styles.heading}>{t('auth.name_title')}</Text>
+        <Text style={styles.subtitle}>{t('auth.name_subtitle')}</Text>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>{t('auth.name_label')}</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder={t('auth.name_placeholder')}
-            placeholderTextColor={colors.inkSoft}
-            autoCapitalize="words"
-            style={styles.input}
-          />
-        </View>
-
-        <Text style={styles.question}>{t('auth.role_question')}</Text>
-
-        <RoleEditor value={selected} onChange={setSelected} />
+        <Text style={styles.label}>{t('auth.name_label')}</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder={t('auth.name_placeholder')}
+          placeholderTextColor={colors.inkSoft}
+          autoCapitalize="words"
+          autoFocus
+          style={styles.input}
+          onSubmitEditing={onSave}
+          returnKeyType="done"
+        />
 
         <Pressable
           onPress={onSave}
@@ -83,10 +96,7 @@ export default function RoleScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.cream,
-  },
+  safe: { flex: 1, backgroundColor: colors.cream },
   container: {
     padding: spacing.xl,
     gap: spacing.md,
@@ -106,14 +116,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.md,
   },
-  field: {
-    gap: spacing.xs,
-  },
   label: {
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.ink,
-    textAlign: 'right',
   },
   input: {
     backgroundColor: colors.paper,
@@ -125,15 +131,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 16,
     color: colors.ink,
-    textAlign: 'right',
-  },
-  question: {
-    fontFamily: fonts.headingBold,
-    fontSize: 18,
-    color: colors.ink,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
   },
   button: {
     backgroundColor: colors.moss,
@@ -142,9 +139,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.lg,
   },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
+  buttonDisabled: { opacity: 0.4 },
   buttonText: {
     fontFamily: fonts.bodyBold,
     fontSize: 16,
@@ -152,7 +147,7 @@ const styles = StyleSheet.create({
   },
   error: {
     fontFamily: fonts.body,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.terracotta,
     textAlign: 'center',
     marginTop: spacing.md,

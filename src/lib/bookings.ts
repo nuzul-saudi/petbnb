@@ -74,11 +74,12 @@ export async function createBookingRequest(
     );
   }
   // R2C1 — self-booking guard. A host cannot book their own listing.
-  // Reason: self-bookings would let a 'both' user complete the flow,
-  // switch personas, accept their own request, and (once two-way
-  // reviews ship) rate themselves five stars. RLS in 0029 makes this
-  // hard at the DB layer; this throw makes it a friendlier error
-  // surface in the UI.
+  // Reason: pre-0039 a 'both' user could complete the flow, switch
+  // personas, accept their own request, and (once two-way reviews
+  // ship) rate themselves five stars. 0039 removed the 'both' role
+  // so this is now defense-in-depth — the booking RLS in 0029 plus
+  // the email-uniqueness gate on the owner/host account split would
+  // also catch it.
   if (listingForCheck.host_id === input.ownerId) {
     throw new Error('Cannot book your own listing');
   }

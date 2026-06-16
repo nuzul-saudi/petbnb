@@ -43,11 +43,6 @@ export type Database = {
           is_verified: boolean;
           is_suspended: boolean;
           locale: string;
-          // 'persona' column is dropped by migration 0039; this
-          // field stays in the type for the bridge window so
-          // AppHeader / persona.tsx keep compiling. Removed when
-          // the persona toggle is deleted.
-          persona: string | null;
           // ── 0039: host application fields ─────────────────────
           host_application_status:
             | Database['public']['Enums']['host_application_status']
@@ -79,7 +74,6 @@ export type Database = {
           is_verified?: boolean;
           is_suspended?: boolean;
           locale?: string;
-          persona?: string | null;
           host_application_status?:
             | Database['public']['Enums']['host_application_status']
             | null;
@@ -110,7 +104,6 @@ export type Database = {
           is_verified?: boolean;
           is_suspended?: boolean;
           locale?: string;
-          persona?: string | null;
           host_application_status?:
             | Database['public']['Enums']['host_application_status']
             | null;
@@ -1019,15 +1012,7 @@ export type Database = {
     // app the same type-safety as if they were. If we ever migrate to real
     // Postgres ENUMs, `supabase gen types` will produce identical names.
     Enums: {
-      // 'both' is being removed in the persona-separation work
-      // (migration 0039 drops it from the CHECK constraint). The
-      // type union keeps it for the bridge window so consumer code
-      // that still references 'both' (AppHeader persona toggle,
-      // RoleEditor, admin user list, persona context) keeps
-      // compiling. Once those code paths are removed (commit 2 of
-      // the persona-separation series), 'both' will be removed
-      // from this union too.
-      user_role: 'owner' | 'host' | 'both' | 'admin';
+      user_role: 'owner' | 'host' | 'admin';
       listing_tier: 'bronze' | 'silver' | 'gold';
       host_gender: 'female' | 'male';
       host_application_status: 'pending' | 'approved' | 'rejected';

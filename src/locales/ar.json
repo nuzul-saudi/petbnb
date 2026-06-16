@@ -16,10 +16,6 @@
     "host_home_section_live": "منشور · للعملاء",
     "host_home_section_drafts": "مسوّدات · قيد المراجعة"
   },
-  "persona": {
-    "owner": "مالك",
-    "host": "مضيف"
-  },
   "feed": {
     "title": "المضيفون في {city}",
     "loading": "جارٍ تحميل الإعلانات…",
@@ -49,7 +45,7 @@
     "load_failed": "تعذّر تحميل الإعلان",
     "self_view_banner": "لديك تعديل قيد المراجعة. هذا هو إعلانك المنشور كما يراه العملاء.",
     "self_view_banner_link": "تعديل ←",
-    "self_booking_notice": "هذا إعلانك — بدّل إلى وضع المضيفة لإدارته. لا يمكن للمضيفة حجز مكانها الخاص.",
+    "self_booking_notice": "هذا إعلانك — لا يمكنك حجز منزلك الخاص.",
     "guest_sign_in_to_book": "سجّل دخولاً أو أنشئ حساباً لحجز هذا المكان",
     "not_found": "الإعلان غير موجود",
     "nightly_suffix": "/ ليلة",
@@ -428,25 +424,23 @@
     "resend_hint": "لم يصلك الرمز؟",
     "back": "← رجوع",
 
-    "role_title": "أهلاً بك في Petbnb",
-    "role_subtitle": "نحتاج بعض المعلومات للبدء",
+    "name_title": "أهلاً بك في Petbnb",
+    "name_subtitle": "اخبرنا باسمك للبدء",
     "name_label": "اسمك الكامل",
     "name_placeholder": "محمد العتيبي",
-    "role_question": "كيف تريد استخدام Petbnb؟",
     "continue_button": "متابعة",
     "saving": "جارٍ الحفظ…",
     "save_failed": "تعذّر حفظ التغييرات"
   },
   "role": {
     "owner": "مالك",
-    "host": "مضيف",
-    "both": "كلاهما",
-    "owner_title": "أبحث عن مكان لقطتي",
-    "owner_desc": "ابحث عن مضيف موثوق في منطقتك",
-    "host_title": "أستضيف الحيوانات الأليفة في منزلي",
-    "host_desc": "استقبل الحيوانات واكسب دخلاً",
-    "both_title": "كلاهما",
-    "both_desc": "أحتاج كلا الدورين"
+    "host": "مضيف"
+  },
+  "become_host": {
+    "title": "كن مُضيفاً",
+    "subtitle": "هذا المسار قيد الإنشاء — سيوفر نموذج تقديم الطلب قريباً.",
+    "separate_account_notice": "حساب المُضيف منفصل عن حساب المالك. لتقديم طلب استضافة، سجّل الخروج وأنشئ حساباً جديداً ببريد إلكتروني مختلف.",
+    "back_home": "← العودة إلى الرئيسية"
   },
   "admin": {
     "title": "لوحة الإدارة",
@@ -478,7 +472,6 @@
     "users_filter_pending_hosts": "طلبات معلّقة",
     "users_filter_owner": "ملاك",
     "users_filter_host": "مضيفون",
-    "users_filter_both": "كلاهما",
     "users_filter_admin": "مديرون",
     "users_filter_suspended": "موقوفون",
     "users_empty": "لا يوجد مستخدمون مطابقون",
@@ -726,6 +719,6 @@
     "lang_toggle_to_en_full": "English",
     "lang_toggle_to_ar_full": "العربية",
     "become_host": "كن مُضيفاً",
-    "switch_hosting": "انتقل إلى الاستضافة"
+    "host_inbox_badge": "صندوق الطلبات"
   }
 }

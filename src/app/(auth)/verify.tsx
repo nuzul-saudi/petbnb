@@ -80,9 +80,9 @@ export default function VerifyScreen() {
       // AUTH-2 — new-user detection. After OTP verify, look up the
       // profile row. The on_auth_user_created trigger ensures a row
       // exists; for a brand-new account the full_name is still empty
-      // (no role chosen yet, no password set yet). Route those to
-      // /set-password first so they finish onboarding with: password
-      // → role → home. Returning users skip straight to the
+      // (no name set yet, no password set yet). Route those to
+      // /set-password first so they finish owner onboarding with:
+      // password → name → home. Returning users skip straight to the
       // requested destination.
       const userId = verifyData?.user?.id;
       let isNewUser = false;
@@ -106,7 +106,9 @@ export default function VerifyScreen() {
             : '/set-password?mode=reset') as Href,
         );
       } else if (isNewUser) {
-        // Signup path: password → role → home.
+        // Owner signup path: password → name → home. (Host signup
+        // doesn't pass through this screen; it has its own funnel
+        // at /become-host.)
         router.replace(
           (returnTo
             ? `/set-password?mode=signup&returnTo=${encodeURIComponent(returnTo)}`

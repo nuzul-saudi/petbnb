@@ -478,10 +478,8 @@ export async function countCompletedBookingsForHost(
 
 /**
  * Count of pending (status='requested') bookings across all of a
- * host's listings. Used by the AppHeader persona-switch attention dot
- * (Step 7.1e) to flag waiting host work to a 'both' user currently in
- * owner persona — the whole point of the dot is to be visible WHILE
- * the user is in owner mode.
+ * host's listings. Used by the AppHeader host-inbox badge so a host
+ * sees pending work without having to open /bookings.
  *
  * Same query shape as countCompletedBookingsForHost above (host owns
  * the listings, bookings RLS permits the host to read these rows).

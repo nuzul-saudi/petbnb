@@ -16,10 +16,6 @@
     "host_home_section_live": "Live · public",
     "host_home_section_drafts": "Drafts · pending review"
   },
-  "persona": {
-    "owner": "Owner",
-    "host": "Sitter"
-  },
   "feed": {
     "title": "Sitters in {city}",
     "loading": "Loading sitters…",
@@ -49,7 +45,7 @@
     "load_failed": "Couldn't load sitter",
     "self_view_banner": "You have a pending edit awaiting review. This is your live listing as customers see it.",
     "self_view_banner_link": "Edit →",
-    "self_booking_notice": "This is your listing — switch to host mode to manage it. A sitter can't book their own home.",
+    "self_booking_notice": "This is your listing — you can't book your own home.",
     "guest_sign_in_to_book": "Sign in or create an account to book this stay",
     "not_found": "Sitter not found",
     "nightly_suffix": "/ night",
@@ -424,25 +420,23 @@
     "resend_countdown": "Resend ({seconds})",
     "resend_hint": "Didn't get the code?",
     "back": "← Back",
-    "role_title": "Welcome to Petbnb",
-    "role_subtitle": "We need a few details to get started",
+    "name_title": "Welcome to Petbnb",
+    "name_subtitle": "Tell us your name to get started",
     "name_label": "Your full name",
     "name_placeholder": "Sarah Smith",
-    "role_question": "How do you want to use Petbnb?",
     "continue_button": "Continue",
     "saving": "Saving…",
     "save_failed": "Couldn't save changes"
   },
   "role": {
     "owner": "Owner",
-    "host": "Sitter",
-    "both": "Both",
-    "owner_title": "I'm looking for a place for my cat",
-    "owner_desc": "Find a trusted sitter in your area",
-    "host_title": "I sit pets at my home",
-    "host_desc": "Welcome cats and earn income",
-    "both_title": "Both",
-    "both_desc": "I need both roles"
+    "host": "Sitter"
+  },
+  "become_host": {
+    "title": "Become a Host",
+    "subtitle": "This flow is under construction — the application form arrives soon.",
+    "separate_account_notice": "Host accounts are separate from owner accounts. To apply as a host, please sign out and create a new account with a different email.",
+    "back_home": "← Back to home"
   },
   "admin": {
     "title": "Admin dashboard",
@@ -472,7 +466,6 @@
     "users_filter_pending_hosts": "Pending applications",
     "users_filter_owner": "Owners",
     "users_filter_host": "Sitters",
-    "users_filter_both": "Both",
     "users_filter_admin": "Admins",
     "users_filter_suspended": "Suspended",
     "users_empty": "No matching users",
@@ -714,6 +707,6 @@
     "lang_toggle_to_en_full": "English",
     "lang_toggle_to_ar_full": "العربية",
     "become_host": "Become a Host",
-    "switch_hosting": "Switch to hosting"
+    "host_inbox_badge": "Booking inbox"
   }
 }

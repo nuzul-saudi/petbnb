@@ -14,7 +14,6 @@ import { Redirect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
-import { RoleEditor, type SelectableRole } from '@/components/RoleEditor';
 import {
   pickAvatarPhoto,
   uploadAvatar,
@@ -32,7 +31,6 @@ export default function ProfileScreen() {
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [name, setName] = useState('');
-  const [role, setRole] = useState<SelectableRole | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,21 +45,14 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!profile) return;
     setName(profile.full_name);
-    if (profile.role !== 'admin') {
-      setRole(profile.role as SelectableRole);
-    } else {
-      setRole(null);
-    }
   }, [profile]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
   if (!profile) return <SafeAreaView style={styles.safe} />;
 
-  const isAdmin = profile.role === 'admin';
   const nameChanged = name.trim() !== profile.full_name;
-  const roleChanged = role !== null && role !== profile.role;
-  const canSave = nameChanged || roleChanged;
+  const canSave = nameChanged;
 
   // Move 5 — picker only stages the file; the actual upload runs on
   // "Save Photo" so the user sees a preview and can change their mind.
@@ -112,12 +103,9 @@ export default function ProfileScreen() {
     setSaving(true);
     setError(null);
     try {
-      const patch: { full_name?: string; role?: SelectableRole } = {};
-      if (nameChanged) patch.full_name = name.trim();
-      if (roleChanged && role) patch.role = role;
       const { error: e } = await supabase
         .from('profiles')
-        .update(patch)
+        .update({ full_name: name.trim() })
         .eq('id', user.id);
       if (e) throw e;
       await refreshProfile();
@@ -216,18 +204,6 @@ export default function ProfileScreen() {
             placeholderTextColor={colors.inkSoft}
             style={styles.input}
           />
-        </View>
-
-        {/* Role (RoleEditor or admin note) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t('profile.role_label')}</Text>
-          {isAdmin ? (
-            <View style={styles.adminNote}>
-              <Text style={styles.adminNoteText}>{t('profile.admin_note')}</Text>
-            </View>
-          ) : (
-            <RoleEditor value={role} onChange={setRole} />
-          )}
         </View>
 
         {/* Pets shortcut */}
@@ -398,18 +374,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     fontFamily: fonts.body,
     fontSize: 15,
-    color: colors.ink,
-  },
-  adminNote: {
-    backgroundColor: colors.whisper,
-    borderColor: colors.gold,
-    borderWidth: 1,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-  },
-  adminNoteText: {
-    fontFamily: fonts.body,
-    fontSize: 13,
     color: colors.ink,
   },
   navRow: {

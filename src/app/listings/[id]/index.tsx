@@ -16,14 +16,12 @@ import { useTranslation } from '@/lib/i18n';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { listReviewsForHost, type HostReview } from '@/lib/reviews';
 import { useAuth } from '@/lib/auth';
-import { usePersona } from '@/lib/persona';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function ListingDetailScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
-  const { persona } = usePersona();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   // Bilingual content fallback — _en field if present in current locale,
@@ -159,25 +157,12 @@ export default function ListingDetailScreen() {
     );
   }
 
-  // 8h.3 self-view banner. Shown only when:
-  //   - the viewer IS the listing's host (user.id === listing.host_id),
-  //   - the viewer is currently in host persona (browsing-as-host),
-  //   - a pending edit exists for this listing.
-  // Owner-persona viewing (or anyone who isn't the host) sees the
-  // public detail with no banner — they get the live, approved
-  // version exactly as customers do. The banner links to the host
-  // edit screen.
-  //
-  // Implementation note: we chose the "show live + banner with link"
-  // approach over "show draft + link to live" because the detail
-  // screen's query path (getListingWithPhotos) returns live data,
-  // and the edit screen already loads draft data via
-  // getListingForEdit. Keeping the detail screen on live keeps both
-  // the public path and the host-self-view path consistent — only
-  // the banner differs.
+  // 8h.3 self-view banner. Shown only when the viewer IS the listing's
+  // host AND a pending edit exists. The banner links to the host edit
+  // screen. We render live data here (PostgREST returns live), so the
+  // banner is the only host-vs-public differentiator.
   const isOwnListing = !!user && user.id === listing.host_id;
-  const showSelfViewBanner =
-    isOwnListing && persona === 'host' && listing.has_pending_edit;
+  const showSelfViewBanner = isOwnListing && listing.has_pending_edit;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -431,38 +416,18 @@ export default function ListingDetailScreen() {
             </Pressable>
           ) : null}
 
-          {/* CTA gates on BOTH ownership AND current persona.
-              A 'both' user viewing their own listing in OWNER persona
-              should see the same "Request booking" CTA a real customer
-              sees — they're shopping for sitters, not editing. Only
-              when they switch to HOST persona does the Edit CTA appear
-              (mirrors the self-view banner above, which already uses
-              the persona gate). Owners on listings they don't own
-              always see Request booking. */}
+          {/* CTA gates on listing ownership.
+              Own listing → Edit CTA (a host can't book their own
+              listing; DB RLS backs this up). Otherwise → Request
+              booking CTA, or a sign-in CTA for guests. */}
           <View style={styles.ctaWrap}>
-            {/* R2C1 self-booking guard (Round 2 — audit §1).
-                Three states:
-                  - own listing in host persona  → Edit listing CTA
-                  - own listing in owner persona → inert notice
-                    ("switch to host mode to manage this") instead of
-                    Request booking — a host can't book their own home
-                    (would let them generate fake five-star ratings
-                    once two-way reviews ship). DB + app guards back
-                    this up; the notice is the friendly surface.
-                  - any other viewer            → Request booking CTA */}
-            {isOwnListing && persona === 'host' ? (
+            {isOwnListing ? (
               <Button
                 label={t('listing.edit_button')}
                 onPress={() => router.push(`/listings/${listing.id}/edit`)}
                 variant="primary"
                 fullWidth
               />
-            ) : isOwnListing ? (
-              <View style={styles.selfBookingNotice}>
-                <Text style={styles.selfBookingNoticeText}>
-                  {t('listing.self_booking_notice')}
-                </Text>
-              </View>
             ) : !session ? (
               <Button
                 label={t('listing.guest_sign_in_to_book')}

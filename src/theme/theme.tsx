@@ -1,20 +1,17 @@
-// Persona-resolved theme accent.
+// Role-resolved theme accent.
 //
-// Owner mode (default + pure 'owner' + admin + signed-out + missing
-// profile) uses moss; host mode (pure 'host' role, OR 'both' role in
-// host persona) uses goldDeep. The role guard is LOAD-BEARING — without
-// it, every signed-in user would render in host theme because
-// PersonaProvider's default in-memory persona is 'host'. Don't
-// regress this check.
+// Owner mode (default + 'owner' + admin + signed-out + missing
+// profile) uses moss; host mode ('host' role) uses goldDeep. After
+// migration 0039 there's no persona toggle — a user IS either an
+// owner or a host account, so theme follows role directly.
 //
 // Components opt in by calling useTheme(); files that keep importing
-// colors.moss directly continue to render unchanged. Owner-mode resolution
-// returns the literal colors.moss / colors.mossLight values, so any
-// surface that switches to theme.accent renders byte-identically when
-// the viewer is an owner.
+// colors.moss directly continue to render unchanged. Owner-mode
+// resolution returns the literal colors.moss / colors.mossLight
+// values, so any surface that switches to theme.accent renders
+// byte-identically when the viewer is an owner.
 
 import { useAuth } from '@/lib/auth';
-import { usePersona } from '@/lib/persona';
 import { colors } from '@/theme/tokens';
 
 export type Theme = {
@@ -54,9 +51,7 @@ export const HOST_THEME: Theme = {
 
 export function useTheme(): Theme {
   const { profile } = useAuth();
-  const { persona } = usePersona();
 
   if (profile?.role === 'host') return HOST_THEME;
-  if (profile?.role === 'both' && persona === 'host') return HOST_THEME;
   return OWNER_THEME;
 }

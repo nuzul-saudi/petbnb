@@ -2,7 +2,10 @@
 //
 // Two modes via the `mode` URL param:
 //   - signup → after OTP verify on a new account. After save, the
-//             user goes to /role (existing role picker) → /.
+//             user goes to /name (just-the-name capture) → /.
+//             Role is implicit: anyone signing up through the main
+//             /sign-in funnel is an owner; hosts have their own
+//             funnel at /become-host.
 //   - reset  → after forgot-password OTP verify. After save, the
 //             user goes to / (or returnTo).
 //
@@ -67,11 +70,11 @@ export default function SetPasswordScreen() {
       const { error: e } = await supabase.auth.updateUser({ password });
       if (e) throw e;
       // Mode routing:
-      //   signup → /role (finish onboarding)
+      //   signup → /name (finish owner onboarding)
       //   reset  → returnTo || '/'
       const next: Href =
         mode === 'signup'
-          ? ('/role' as Href)
+          ? ('/name' as Href)
           : ((returnTo ?? '/') as Href);
       router.replace(next);
     } catch (err) {

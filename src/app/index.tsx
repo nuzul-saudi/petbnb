@@ -35,7 +35,7 @@ import { SPECIES_ENABLED } from '@/lib/features';
 import { pickLocalized, toArabicDigits } from '@/lib/format';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
-import { usePersona } from '@/lib/persona';
+import { useHostNotifications } from '@/lib/persona';
 import { speciesEmoji } from '@/lib/species';
 import {
   listActiveListings,
@@ -46,27 +46,21 @@ import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const { initializing, session, profile } = useAuth();
-  const { persona } = usePersona();
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   // R2C3 guest mode (2026-06-11): signed-out visitors can now browse
   // the owner feed. Previously this redirected to /sign-in
-  // unconditionally. Gated actions (Request booking, persona toggle,
-  // pets, bookings) route to /sign-in?returnTo=… when the visitor
-  // taps them — see OwnerFeedHome and AppHeader.
+  // unconditionally. Gated actions (Request booking, pets, bookings)
+  // route to /sign-in?returnTo=… when the visitor taps them — see
+  // OwnerFeedHome and AppHeader.
   if (!session) return <OwnerFeedHome />;
   if (!profile) return <SafeAreaView style={styles.safe} />;
   // Suspended check runs before role gating so admins can also be locked out.
   if (profile.is_suspended) return <Redirect href="/suspended" />;
-  if (profile.full_name.trim() === '') return <Redirect href="/role" />;
+  if (profile.full_name.trim() === '') return <Redirect href="/name" />;
   if (profile.role === 'admin') return <Redirect href="/admin" />;
 
   if (profile.role === 'host') return <HostHome />;
-  // 'both' users see whichever home their current persona names.
-  // Pure 'owner' falls through to OwnerFeedHome unchanged.
-  if (profile.role === 'both') {
-    return persona === 'host' ? <HostHome /> : <OwnerFeedHome />;
-  }
   return <OwnerFeedHome />;
 }
 
@@ -147,7 +141,7 @@ function HostHome() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { profile } = useAuth();
-  const { refreshPendingHostCount } = usePersona();
+  const { refreshPendingHostCount } = useHostNotifications();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
@@ -182,7 +176,7 @@ function HostHome() {
   // requests badge whenever HostHome gains focus. A host returning
   // from accepting/declining a booking elsewhere sees fresh counts
   // immediately. useFocusEffect fires once per focus event; the
-  // persona-context tick throttles redundant fetches if needed.
+  // notifications-context tick throttles redundant fetches if needed.
   useFocusEffect(
     useCallback(() => {
       refreshPendingHostCount();

@@ -24,7 +24,7 @@ import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
 
-const ROLES: Enums<'user_role'>[] = ['owner', 'host', 'both', 'admin'];
+const ROLES: Enums<'user_role'>[] = ['owner', 'host', 'admin'];
 
 export default function AdminUserDetailScreen() {
   const router = useRouter();

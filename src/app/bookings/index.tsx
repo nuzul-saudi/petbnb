@@ -14,7 +14,7 @@ import {
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { getLastSeenBatch } from '@/lib/last-seen-storage';
-import { usePersona } from '@/lib/persona';
+import { useHostNotifications } from '@/lib/persona';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
 
@@ -22,17 +22,12 @@ export default function MyBookingsScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user, profile } = useAuth();
-  const { persona, refreshPendingHostCount } = usePersona();
+  const { refreshPendingHostCount } = useHostNotifications();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
-  // Persona-aware mode (test round 3, 2026-06-10): host persona sees
-  // bookings against THEIR listings (incoming requests + accepted/
-  // active/completed); owner persona sees bookings they themselves
-  // created. role='both' picks by current persona; pure 'owner' and
-  // 'admin' always see owner mode; pure 'host' always sees host mode.
-  const isHostMode =
-    profile?.role === 'host' ||
-    (profile?.role === 'both' && persona === 'host');
+  // Mode is role-driven now: hosts see incoming bookings against their
+  // listings, owners + admin see bookings they themselves created.
+  const isHostMode = profile?.role === 'host';
 
   const [bookings, setBookings] = useState<MyBookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +75,7 @@ export default function MyBookingsScreen() {
       // screen focus. Without this, a host who accepted a request
       // somewhere else (e.g. another tab, the booking detail) and
       // then navigated to /bookings would still see the old count
-      // until they switched personas. Cheap one-shot — the persona
+      // on the header badge. Cheap one-shot — the notifications
       // context throttles redundant fetches via its internal tick.
       refreshPendingHostCount();
     }, [load, refreshPendingHostCount]),

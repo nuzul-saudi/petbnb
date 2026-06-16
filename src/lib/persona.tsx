@@ -1,15 +1,21 @@
-import { logWarn } from '@/lib/log';
-// Persona context for role='both' users. Persists across devices via
-// profiles.persona (DB source of truth, migration 0018) with an
-// AsyncStorage cache for instant first paint. Mirrors LocaleProvider's
-// dual-source pattern from lib/i18n.tsx.
+// Host-side notifications context.
 //
-// Persona is only meaningful for role='both'. Pure 'owner' and 'host'
-// users don't read this value; their home is determined by role alone.
-// First open (cache empty AND profile.persona NULL) defaults to 'host'
-// — matches the spec "first ever open → host; subsequent → wherever
-// they left off".
+// Was a persona-toggle context in the 'both'-role world: it owned the
+// owner/host persona state + the pending-host-bookings badge count.
+// Migration 0039 dropped 'both' and the persona toggle — there's no
+// switching context any more, a user IS either an owner or a host
+// account.
+//
+// What's left: the pending-host-bookings badge. Hosts still need a
+// visible signal when an owner sends them a booking request, even
+// before they open the bookings screen. This file now exposes only
+// that count + a refresh trigger.
+//
+// File name kept as `persona.tsx` to minimize churn across import
+// sites; the exported names changed (usePersona → useHostNotifications,
+// PersonaProvider → HostNotificationsProvider).
 
+import { logWarn } from '@/lib/log';
 import {
   createContext,
   useCallback,
@@ -22,102 +28,58 @@ import {
 
 import { useAuth } from '@/lib/auth';
 import { countPendingHostBookings } from '@/lib/listings';
-import { cachePersona, loadCachedPersona } from '@/lib/persona-storage';
-import { supabase } from '@/lib/supabase';
 
-export type Persona = 'owner' | 'host';
-
-type PersonaContextValue = {
-  persona: Persona;
-  setPersona: (next: Persona) => void;
+type HostNotificationsContextValue = {
   /**
    * Count of host-side bookings awaiting action (status='requested')
    * across all of the current user's own listings. Refreshed on user
-   * change, role change, persona switch, and explicit calls to
-   * refreshPendingHostCount() — NOT realtime. AppHeader uses this to
-   * render an attention dot on the host persona pill for 'both' users
-   * so host work doesn't get missed while in owner mode. Zero for
-   * users without host capability (role='owner', 'admin') and while
-   * the count is loading.
+   * change, role change, and explicit calls to
+   * refreshPendingHostCount() — NOT realtime. AppHeader renders a
+   * badge on the bookings shortcut so host work doesn't get missed.
+   * Zero for non-host users and while loading.
    */
   pendingHostCount: number;
   /**
    * Force a re-fetch of pendingHostCount. The booking detail screen
-   * calls this after a host accept/decline so the badge in the header
-   * decrements without waiting for the next persona switch. Best-
-   * effort: a failed fetch leaves the previous value in place.
+   * calls this after a host accept/decline so the badge decrements
+   * without waiting for the next focus event. Best-effort: a failed
+   * fetch leaves the previous value in place.
    */
   refreshPendingHostCount: () => void;
 };
 
-const PersonaContext = createContext<PersonaContextValue | null>(null);
+const HostNotificationsContext =
+  createContext<HostNotificationsContextValue | null>(null);
 
-export function PersonaProvider({ children }: { children: ReactNode }) {
+export function HostNotificationsProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const { user, profile } = useAuth();
-  const [persona, setPersonaState] = useState<Persona>('host');
   const [pendingHostCount, setPendingHostCount] = useState(0);
-
-  // Cache hydration: instant on user change. Reset to 'host' FIRST so a
-  // stale value from a previous user on the same device can't leak; then
-  // layer in the cached value if any exists.
-  useEffect(() => {
-    if (!user?.id) {
-      setPersonaState('host');
-      return;
-    }
-    let cancelled = false;
-    setPersonaState('host');
-    (async () => {
-      const cached = await loadCachedPersona(user.id);
-      if (!cancelled && cached) {
-        setPersonaState(cached);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
-
-  // DB reconciliation: profiles.persona is the cross-device source of
-  // truth. Once profile loads, if it carries a non-null value adopt it
-  // and sync the cache. Null DB value (never explicitly chosen) leaves
-  // the cached/default value untouched.
-  useEffect(() => {
-    if (!user?.id || !profile) return;
-    const dbValue = profile.persona;
-    if (dbValue === 'owner' || dbValue === 'host') {
-      setPersonaState((prev) => {
-        if (prev !== dbValue) {
-          void cachePersona(user.id, dbValue);
-          return dbValue;
-        }
-        return prev;
-      });
-    }
-  }, [user?.id, profile?.persona]);
 
   // Refresh trigger: bumping pendingRefreshTick re-runs the count
   // fetch. The booking detail screen calls refreshPendingHostCount()
-  // after a host accept/decline so the badge decrements without
-  // waiting for the next persona switch.
+  // after a host accept/decline so the badge decrements immediately.
   const [pendingRefreshTick, setPendingRefreshTick] = useState(0);
   const refreshPendingHostCount = useCallback(() => {
     setPendingRefreshTick((n) => n + 1);
   }, []);
 
-  // Pending-host-bookings count (7.1e). Fetched on:
+  // Pending-host-bookings count. Fetched on:
   //   • user.id change (sign-in, sign-out)
-  //   • profile.role change (owner → both, etc.)
-  //   • persona switch (deliberate context shift — fresh read)
+  //   • profile.role change (owner ↔ host — only meaningful if an
+  //     admin flips a role, since users can't self-change)
   //   • pendingRefreshTick bump (explicit refresh after host action)
   // No polling, no realtime. Stale until the next of these triggers.
-  // Pure 'owner' / 'admin' / signed-out users skip the fetch entirely.
+  // Owner / admin / signed-out users skip the fetch entirely.
   useEffect(() => {
     if (!user?.id) {
       setPendingHostCount(0);
       return;
     }
-    if (profile?.role !== 'host' && profile?.role !== 'both') {
+    if (profile?.role !== 'host') {
       setPendingHostCount(0);
       return;
     }
@@ -127,7 +89,7 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
         const count = await countPendingHostBookings(user.id);
         if (!cancelled) setPendingHostCount(count);
       } catch (e) {
-        logWarn('[persona.pending_count_failed]', e);
+        logWarn('[host_notifications.pending_count_failed]', e);
         // Leave the previous value in place — a transient failure
         // shouldn't clear an existing badge.
       }
@@ -135,59 +97,29 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, profile?.role, persona, pendingRefreshTick]);
+  }, [user?.id, profile?.role, pendingRefreshTick]);
 
-  const setPersona = useCallback(
-    (next: Persona) => {
-      setPersonaState(next);
-      if (!user?.id) return;
-      // Write-through to both layers. Fire-and-forget — a failed persist
-      // must NOT block the UI. Cache covers the immediate session; a
-      // failed DB write is retried implicitly on the next switch.
-      void cachePersona(user.id, next);
-      const sb = supabase;
-      if (sb) {
-        void sb
-          .from('profiles')
-          .update({ persona: next })
-          .eq('id', user.id)
-          .then((res) => {
-            if (res.error) {
-              logWarn('[persona.write_failed]', res.error.message);
-            }
-          });
-      }
-    },
-    [user?.id],
-  );
-
-  const value = useMemo<PersonaContextValue>(
-    () => ({
-      persona,
-      setPersona,
-      pendingHostCount,
-      refreshPendingHostCount,
-    }),
-    [persona, setPersona, pendingHostCount, refreshPendingHostCount],
+  const value = useMemo<HostNotificationsContextValue>(
+    () => ({ pendingHostCount, refreshPendingHostCount }),
+    [pendingHostCount, refreshPendingHostCount],
   );
 
   return (
-    <PersonaContext.Provider value={value}>{children}</PersonaContext.Provider>
+    <HostNotificationsContext.Provider value={value}>
+      {children}
+    </HostNotificationsContext.Provider>
   );
 }
 
-export function usePersona(): PersonaContextValue {
-  const ctx = useContext(PersonaContext);
+export function useHostNotifications(): HostNotificationsContextValue {
+  const ctx = useContext(HostNotificationsContext);
   if (ctx) return ctx;
   if (__DEV__) {
     logWarn(
-      '[persona.no_provider] usePersona used outside PersonaProvider',
+      '[host_notifications.no_provider] used outside HostNotificationsProvider',
     );
   }
-  // Defensive fallback — returns the default and a no-op setter.
   return {
-    persona: 'host',
-    setPersona: () => undefined,
     pendingHostCount: 0,
     refreshPendingHostCount: () => undefined,
   };

@@ -23,10 +23,7 @@ export default function PendingHostsScreen() {
     try {
       const all = await listAllUsers();
       const pending = all.filter(
-        (u) =>
-          (u.role === 'host' || u.role === 'both') &&
-          !u.is_verified &&
-          !u.is_suspended,
+        (u) => u.role === 'host' && !u.is_verified && !u.is_suspended,
       );
       setUsers(pending);
     } catch (e) {

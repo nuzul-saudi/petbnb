@@ -21,7 +21,6 @@ type FilterValue =
   | 'pending_hosts'
   | 'owner'
   | 'host'
-  | 'both'
   | 'admin'
   | 'suspended';
 
@@ -30,7 +29,6 @@ const FILTERS: { value: FilterValue; i18nKey: string }[] = [
   { value: 'pending_hosts', i18nKey: 'admin.users_filter_pending_hosts' },
   { value: 'owner', i18nKey: 'admin.users_filter_owner' },
   { value: 'host', i18nKey: 'admin.users_filter_host' },
-  { value: 'both', i18nKey: 'admin.users_filter_both' },
   { value: 'admin', i18nKey: 'admin.users_filter_admin' },
   { value: 'suspended', i18nKey: 'admin.users_filter_suspended' },
 ];
@@ -74,7 +72,7 @@ export default function AdminUsersScreen() {
       if (filter === 'pending_hosts') {
         if (
           !(
-            (u.role === 'host' || u.role === 'both') &&
+            u.role === 'host' &&
             !u.is_verified &&
             !u.is_suspended
           )

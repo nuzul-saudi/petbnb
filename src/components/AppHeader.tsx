@@ -1,13 +1,15 @@
 // Top app bar (Move 1 — 2026-06-13). Airbnb-pattern: logo on the
-// leading edge, persona pill + hamburger on the trailing edge. The
-// hamburger opens a Modal containing the previously-inline nav
-// items (My Account, My Bookings, My Pets, My Favorites) plus the
-// language toggle and Sign out. Guest visitors see a Sign-in CTA
-// instead of the hamburger.
+// leading edge, action chip + hamburger on the trailing edge. The
+// hamburger opens a Modal containing the previously-inline nav items
+// (My Account, My Bookings, My Pets, My Favorites) plus the language
+// toggle and Sign out. Guest visitors see a Sign-in CTA instead of
+// the hamburger.
 //
-// The persona pill stays OUTSIDE the menu so the Owner↔Host toggle
-// remains a one-tap action and the pending-requests attention badge
-// is always visible (it's a live signal).
+// After migration 0039 there is no persona toggle — a user is EITHER
+// an owner or a host account. Owners see a "Become a Host" CTA (it
+// kicks off the host application flow); hosts see a pending-requests
+// badge that links to their bookings inbox; guests see the language
+// toggle + sign-in CTA. None of these are toggles — they're nav.
 
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
@@ -15,7 +17,7 @@ import { useState } from 'react';
 
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
-import { usePersona } from '@/lib/persona';
+import { useHostNotifications } from '@/lib/persona';
 import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
@@ -41,7 +43,7 @@ export function AppHeader({
   const router = useRouter();
   const pathname = usePathname();
   const { session, profile, signOut } = useAuth();
-  const { persona, setPersona, pendingHostCount } = usePersona();
+  const { pendingHostCount } = useHostNotifications();
   const theme = useTheme();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -72,16 +74,13 @@ export function AppHeader({
 
       <View style={styles.spacer} />
 
-      {/* Move 3 — Become-a-Host CTA. Owner-only users see the
-          recruitment pill; 'both' users already have the persona
-          pill below (with the live pending-requests attention
-          badge) so a separate "Switch to hosting" CTA would just
-          duplicate it. Founder feedback 2026-06-14: drop the
-          duplicate, let the persona pill be the single
-          context-switch control for 'both' users. */}
+      {/* Move 3 — Become-a-Host CTA. Owners see this; tapping it
+          starts the host application flow at /become-host (separate
+          account required — same email cannot create both an owner
+          AND a host account). Hosts and admin don't see it. */}
       {!isGuest && profile?.role === 'owner' ? (
         <Pressable
-          onPress={safeNav(() => router.push('/profile' as never))}
+          onPress={safeNav(() => router.push('/become-host' as never))}
           style={styles.becomeHostCta}
           accessibilityRole="button"
           accessibilityLabel={t('nav.become_host')}
@@ -122,41 +121,21 @@ export function AppHeader({
         </>
       ) : null}
 
-      {/* Persona pill — visible only for role='both'. Stays outside
-          the hamburger so the toggle + attention badge are always
-          one tap away. */}
-      {!isGuest && profile?.role === 'both' ? (
-        <View style={styles.personaSwitch}>
-          <Pressable
-            onPress={safeNav(() => {
-              setPersona(persona === 'host' ? 'owner' : 'host');
-              router.replace('/');
-            })}
-            style={[styles.personaToggle, { borderColor: theme.accent }]}
-          >
-            <Text style={[styles.personaToggleText, { color: theme.accent }]}>
-              {persona === 'host' ? t('persona.owner') : t('persona.host')}
-            </Text>
-            {persona === 'owner' && pendingHostCount > 0 ? (
-              <View style={styles.attentionDot}>
-                <Text style={styles.attentionDotText}>
-                  {pendingHostCount > 9 ? '9+' : String(pendingHostCount)}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-          {persona === 'host' && pendingHostCount > 0 ? (
-            <Pressable
-              onPress={() => router.push('/bookings')}
-              style={styles.requestsBadge}
-            >
-              <Text style={styles.requestsBadgeIcon}>📥</Text>
-              <Text style={styles.attentionDotText}>
-                {pendingHostCount > 9 ? '9+' : String(pendingHostCount)}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
+      {/* Host inbox badge — visible only for role='host' when there's
+          at least one pending booking request. Taps through to the
+          host's bookings inbox. */}
+      {!isGuest && profile?.role === 'host' && pendingHostCount > 0 ? (
+        <Pressable
+          onPress={safeNav(() => router.push('/bookings' as never))}
+          style={styles.requestsBadge}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.host_inbox_badge')}
+        >
+          <Text style={styles.requestsBadgeIcon}>📥</Text>
+          <Text style={styles.attentionDotText}>
+            {pendingHostCount > 9 ? '9+' : String(pendingHostCount)}
+          </Text>
+        </Pressable>
       ) : null}
 
       {/* Hamburger — signed-in only. Opens the Modal menu below. */}
@@ -307,17 +286,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.cream,
   },
-  // ── Persona toggle (kept from prior AppHeader) ────────────
-  personaSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
+  // Sign-in pill for guests — reused for the auth CTA below.
   personaToggle: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radii.pill,
     borderWidth: 1,
+  },
+  personaToggleText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
   },
   // Guest language toggle — compact, sits left of the Sign-in pill.
   guestLangButton: {
@@ -327,22 +305,6 @@ const styles = StyleSheet.create({
   guestLangButtonText: {
     fontFamily: fonts.bodyBold,
     fontSize: 13,
-  },
-  personaToggleText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 11,
-  },
-  attentionDot: {
-    position: 'absolute',
-    top: -4,
-    end: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    backgroundColor: colors.terracotta,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   requestsBadge: {
     flexDirection: 'row',
