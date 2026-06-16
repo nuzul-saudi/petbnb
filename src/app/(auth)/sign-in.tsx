@@ -20,7 +20,7 @@ export default function SignInScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session } = useAuth();
-  const params = useLocalSearchParams<{ returnTo?: string }>();
+  const params = useLocalSearchParams<{ returnTo?: string; flow?: string }>();
   // R2C3 (2026-06-11): guest-mode entry routes here with returnTo so
   // the user lands back on the page that triggered the sign-in (the
   // listing they wanted to book, the booking they wanted to open,
@@ -29,6 +29,12 @@ export default function SignInScreen() {
     typeof params.returnTo === 'string' && params.returnTo.startsWith('/')
       ? params.returnTo
       : null;
+  // 0039 host signup funnel — the Become-a-Host CTA opens the
+  // intro page at /become-host, which forwards here with
+  // ?flow=host. We thread this through verify → set-password so
+  // the post-password route goes to /become-host/application
+  // (the host form) instead of /name (the owner-only finish step).
+  const isHostFlow = params.flow === 'host';
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,9 +70,11 @@ export default function SignInScreen() {
       if (e) throw e;
       router.push({
         pathname: '/verify',
-        params: returnTo
-          ? { email: cleanEmail, returnTo }
-          : { email: cleanEmail },
+        params: {
+          email: cleanEmail,
+          ...(returnTo ? { returnTo } : {}),
+          ...(isHostFlow ? { flow: 'host' } : {}),
+        },
       });
     } catch (err) {
       logWarn('[auth.send_failed]', err);
@@ -152,11 +160,20 @@ export default function SignInScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <Text style={styles.heading}>{t('auth.sign_in_or_signup_title')}</Text>
-        <Text style={styles.subtitle}>{t('auth.sign_in_subtitle')}</Text>
-        <Text style={styles.newHereHint}>
-          {t('auth.new_here_hint')}
+        {isHostFlow ? (
+          <View style={styles.hostBanner}>
+            <Text style={styles.hostBannerText}>
+              {t('auth.host_signup_banner')}
+            </Text>
+          </View>
+        ) : null}
+        <Text style={styles.heading}>
+          {isHostFlow
+            ? t('auth.host_sign_in_title')
+            : t('auth.sign_in_or_signup_title')}
         </Text>
+        <Text style={styles.subtitle}>{t('auth.sign_in_subtitle')}</Text>
+        <Text style={styles.newHereHint}>{t('auth.new_here_hint')}</Text>
 
         <View style={styles.field}>
           <Text style={styles.label}>{t('auth.email_label')}</Text>
@@ -441,6 +458,21 @@ const styles = StyleSheet.create({
     marginTop: -spacing.sm,
     marginBottom: spacing.md,
     fontStyle: 'italic',
+  },
+  hostBanner: {
+    backgroundColor: colors.whisper,
+    borderColor: colors.gold,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  hostBannerText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   guestLink: {
     marginTop: spacing.xl,

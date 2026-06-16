@@ -30,6 +30,11 @@ export default function VerifyScreen() {
   // After OTP verification, route into /set-password?mode=reset
   // instead of the signup/normal flow.
   const isResetFlow = params.flow === 'reset';
+  // 0039 host signup funnel — flow=host means the user came in
+  // through the Become-a-Host CTA. We forward this through to
+  // set-password so the post-password route lands on the host
+  // application form instead of the owner /name screen.
+  const isHostFlow = params.flow === 'host';
   // R2C3 — preserve the returnTo from the sign-in step so a guest who
   // started on a listing detail page ends up back there after auth.
   const returnTo =
@@ -106,14 +111,13 @@ export default function VerifyScreen() {
             : '/set-password?mode=reset') as Href,
         );
       } else if (isNewUser) {
-        // Owner signup path: password → name → home. (Host signup
-        // doesn't pass through this screen; it has its own funnel
-        // at /become-host.)
-        router.replace(
-          (returnTo
-            ? `/set-password?mode=signup&returnTo=${encodeURIComponent(returnTo)}`
-            : '/set-password?mode=signup') as Href,
-        );
+        // Signup path: password → /name (owner) or
+        // /become-host/application (host). The flow=host param
+        // threads through set-password to decide.
+        const parts: string[] = ['mode=signup'];
+        if (returnTo) parts.push(`returnTo=${encodeURIComponent(returnTo)}`);
+        if (isHostFlow) parts.push('flow=host');
+        router.replace(`/set-password?${parts.join('&')}` as Href);
       } else {
         router.replace((returnTo ?? '/') as Href);
       }

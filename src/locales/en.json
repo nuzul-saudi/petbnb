@@ -379,6 +379,8 @@
   "auth": {
     "sign_in_title": "Welcome to Petbnb",
     "sign_in_or_signup_title": "Sign in or Sign up",
+    "host_sign_in_title": "Sitter signup",
+    "host_signup_banner": "You're creating a host account. After signing in you'll complete an application and go through review before you can list.",
     "new_here_hint": "New here? Just enter your email — we'll create your account.",
     "continue_as_guest": "Continue as guest",
     "set_password_title": "Choose a password",
@@ -432,10 +434,23 @@
     "owner": "Owner",
     "host": "Sitter"
   },
+  "host_application": {
+    "title": "Host application",
+    "coming_soon": "The application form is under construction — it'll appear here soon."
+  },
   "become_host": {
     "title": "Become a Host",
-    "subtitle": "This flow is under construction — the application form arrives soon.",
-    "separate_account_notice": "Host accounts are separate from owner accounts. To apply as a host, please sign out and create a new account with a different email.",
+    "subtitle": "Welcome pets into your home and earn extra income. Here's how it works.",
+    "step_1_title": "Submit an application",
+    "step_1_body": "Fill in: name, gender, city, neighborhood, pet type, your experience. Takes under two minutes.",
+    "step_2_title": "We review your application",
+    "step_2_body": "We reach out to verify your identity and suitability as a host. Usually a day or two.",
+    "step_3_title": "Complete your profile, then list",
+    "step_3_body": "Once approved, complete your profile (photos, bio) then create your first listing. You can also book stays for your own pets with the same account.",
+    "start_application_button": "Start application",
+    "separate_account_title": "Host accounts are separate",
+    "separate_account_notice": "You're signed in as an owner. Host signup requires a new account with a different email. Please sign out, then re-open this page.",
+    "sign_out_button": "Sign out",
     "back_home": "← Back to home"
   },
   "admin": {

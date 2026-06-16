@@ -74,11 +74,15 @@ export function AppHeader({
 
       <View style={styles.spacer} />
 
-      {/* Move 3 — Become-a-Host CTA. Owners see this; tapping it
-          starts the host application flow at /become-host (separate
-          account required — same email cannot create both an owner
-          AND a host account). Hosts and admin don't see it. */}
-      {!isGuest && profile?.role === 'owner' ? (
+      {/* Move 3 — Become-a-Host CTA. Two audiences:
+          • Guests — they tap to start the host application funnel.
+            The intro screen sells the program; from there they sign
+            up with a fresh email (host accounts and owner accounts
+            are separate).
+          • Owners — same target, but the intro screen tells them
+            host signup needs a different email.
+          Hosts and admin don't see this CTA. */}
+      {isGuest || profile?.role === 'owner' ? (
         <Pressable
           onPress={safeNav(() => router.push('/become-host' as never))}
           style={styles.becomeHostCta}

@@ -29,13 +29,20 @@ export default function SetPasswordScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { initializing, session } = useAuth();
-  const params = useLocalSearchParams<{ mode?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{
+    mode?: string;
+    returnTo?: string;
+    flow?: string;
+  }>();
   const mode: 'signup' | 'reset' =
     params.mode === 'reset' ? 'reset' : 'signup';
   const returnTo =
     typeof params.returnTo === 'string' && params.returnTo.startsWith('/')
       ? params.returnTo
       : null;
+  // 0039 host signup funnel: flow=host means signup mode lands on
+  // /become-host/application instead of /name after password.
+  const isHostFlow = params.flow === 'host';
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -70,12 +77,14 @@ export default function SetPasswordScreen() {
       const { error: e } = await supabase.auth.updateUser({ password });
       if (e) throw e;
       // Mode routing:
-      //   signup → /name (finish owner onboarding)
-      //   reset  → returnTo || '/'
+      //   signup + flow=host → /become-host/application (host funnel)
+      //   signup             → /name (finish owner onboarding)
+      //   reset              → returnTo || '/'
+      const signupTarget: Href = (
+        isHostFlow ? '/become-host/application' : '/name'
+      ) as Href;
       const next: Href =
-        mode === 'signup'
-          ? ('/name' as Href)
-          : ((returnTo ?? '/') as Href);
+        mode === 'signup' ? signupTarget : ((returnTo ?? '/') as Href);
       router.replace(next);
     } catch (err) {
       logWarn('[auth.set_password_failed]', err);
