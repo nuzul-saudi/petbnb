@@ -206,6 +206,16 @@ export default function ProfileScreen() {
           />
         </View>
 
+        {/* 0039 — host application status panel for role='host'. */}
+        {profile.role === 'host' ? (
+          <HostStatusPanel
+            status={profile.host_application_status}
+            profileComplete={profile.host_profile_complete}
+            adminNotes={profile.host_application_admin_notes}
+            onComplete={() => router.push('/become-host/complete-profile' as never)}
+          />
+        ) : null}
+
         {/* Pets shortcut */}
         <Pressable
           onPress={() => router.push('/pets')}
@@ -248,6 +258,86 @@ export default function ProfileScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+// Host application status panel (0039). Renders only when role='host'.
+// Four visual states based on the application + profile-complete
+// flags:
+//   pending  → tan card: "We're reviewing your application"
+//   approved + !complete → moss card: "Approved — complete your profile" + CTA
+//   approved + complete  → quiet pill: "Verified host" (no CTA)
+//   rejected → terracotta card: "Application not approved" + notes
+function HostStatusPanel({
+  status,
+  profileComplete,
+  adminNotes,
+  onComplete,
+}: {
+  status: 'pending' | 'approved' | 'rejected' | null;
+  profileComplete: boolean;
+  adminNotes: string | null;
+  onComplete: () => void;
+}) {
+  const { t } = useTranslation();
+
+  if (status === 'pending') {
+    return (
+      <View style={[styles.statusCard, styles.statusCardPending]}>
+        <Text style={styles.statusTitle}>
+          {t('profile.host_status_pending_title')}
+        </Text>
+        <Text style={styles.statusBody}>
+          {t('profile.host_status_pending_body')}
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'approved' && !profileComplete) {
+    return (
+      <View style={[styles.statusCard, styles.statusCardApproved]}>
+        <Text style={styles.statusTitle}>
+          {t('profile.host_status_complete_title')}
+        </Text>
+        <Text style={styles.statusBody}>
+          {t('profile.host_status_complete_body')}
+        </Text>
+        <Pressable onPress={onComplete} style={styles.statusCta}>
+          <Text style={styles.statusCtaText}>
+            {t('profile.host_status_complete_cta')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (status === 'approved' && profileComplete) {
+    return (
+      <View style={styles.verifiedPill}>
+        <Text style={styles.verifiedPillText}>
+          ✓ {t('profile.host_status_verified')}
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'rejected') {
+    return (
+      <View style={[styles.statusCard, styles.statusCardRejected]}>
+        <Text style={styles.statusTitle}>
+          {t('profile.host_status_rejected_title')}
+        </Text>
+        <Text style={styles.statusBody}>
+          {t('profile.host_status_rejected_body')}
+        </Text>
+        {adminNotes ? (
+          <Text style={styles.statusNotes}>{adminNotes}</Text>
+        ) : null}
+      </View>
+    );
+  }
+
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -405,5 +495,68 @@ const styles = StyleSheet.create({
   },
   actionGap: {
     marginTop: spacing.lg,
+  },
+  // 0039 — host application status panel styles.
+  statusCard: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  statusCardPending: {
+    backgroundColor: colors.whisper,
+    borderColor: colors.gold,
+  },
+  statusCardApproved: {
+    backgroundColor: colors.whisper,
+    borderColor: colors.moss,
+  },
+  statusCardRejected: {
+    backgroundColor: colors.whisper,
+    borderColor: colors.terracotta,
+  },
+  statusTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    color: colors.ink,
+  },
+  statusBody: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    lineHeight: 20,
+  },
+  statusNotes: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+    backgroundColor: colors.paper,
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  statusCta: {
+    backgroundColor: colors.mossDeep,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  statusCtaText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.cream,
+  },
+  verifiedPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.mossDeep,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+  },
+  verifiedPillText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.cream,
   },
 });

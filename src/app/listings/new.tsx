@@ -34,7 +34,7 @@ import { colors, fonts, spacing } from '@/theme/tokens';
 export default function NewListingScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { initializing, session, user } = useAuth();
+  const { initializing, session, user, profile } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [saving, setSaving] = useState(false);
@@ -42,6 +42,24 @@ export default function NewListingScreen() {
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
+  // 0039 — listing INSERT RLS requires role='host' AND
+  // host_application_status='approved' AND host_profile_complete.
+  // Send pre-approval users to the application form, approved-but-
+  // incomplete users to the completion screen, owners back home.
+  if (profile && profile.role !== 'host') return <Redirect href="/" />;
+  if (profile && !profile.host_application_status) {
+    return <Redirect href="/become-host/application" />;
+  }
+  if (profile && profile.host_application_status === 'pending') {
+    return <Redirect href="/profile" />;
+  }
+  if (
+    profile &&
+    profile.host_application_status === 'approved' &&
+    !profile.host_profile_complete
+  ) {
+    return <Redirect href="/become-host/complete-profile" />;
+  }
 
   const onSave = async (values: ListingFormValues) => {
     setSaveError(null);

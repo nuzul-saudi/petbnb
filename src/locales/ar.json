@@ -438,9 +438,45 @@
     "owner": "مالك",
     "host": "مضيف"
   },
+  "host_complete": {
+    "title": "أكمل ملفك الشخصي",
+    "subtitle": "خطوة أخيرة قبل أن تتمكن من إنشاء إعلانات. أخبر العملاء عن نفسك.",
+    "bio_label": "نبذة عنك",
+    "bio_hint": "اكتب على الأقل {min} حرفاً عن نفسك وخبرتك مع الحيوانات الأليفة.",
+    "bio_placeholder": "أحب القطط منذ صغري…",
+    "avatar_hint": "أضف صورة شخصية ليتعرف عليك العملاء.",
+    "avatar_link": "إضافة صورة شخصية →",
+    "nafath_title": "التحقق عبر نفاذ — قريباً",
+    "nafath_body": "سنطلب منك التحقق من هويتك عبر نفاذ قبل نشر إعلانك. هذه الخطوة قيد الإعداد.",
+    "submit_button": "إكمال الملف",
+    "submitting": "جارٍ الحفظ…",
+    "submit_failed": "تعذّر حفظ الملف. حاول مرة أخرى."
+  },
   "host_application": {
     "title": "طلب الاستضافة",
-    "coming_soon": "نموذج تقديم الطلب قيد الإنشاء — سيظهر هنا قريباً."
+    "subtitle": "أخبرنا قليلاً عنك. لن يستغرق ذلك أكثر من دقيقتين.",
+    "name_label": "الاسم الكامل",
+    "name_placeholder": "محمد العتيبي",
+    "gender_label": "الجنس",
+    "gender_female": "أنثى",
+    "gender_male": "ذكر",
+    "city_label": "المدينة",
+    "neighborhood_label": "الحي",
+    "pet_type_label": "ما الذي تستطيع استضافته؟",
+    "pet_type_cats": "قطط",
+    "pet_type_dogs": "كلاب",
+    "pet_type_both": "قطط وكلاب",
+    "coming_soon_tag": "قريباً",
+    "experience_label": "هل لديك خبرة في استضافة الحيوانات الأليفة؟",
+    "experience_yes": "نعم",
+    "experience_no": "لا",
+    "experience_years_label": "كم عدد السنوات؟",
+    "submit_button": "أرسل الطلب",
+    "submitting": "جارٍ الإرسال…",
+    "submit_failed": "تعذّر إرسال الطلب. حاول مرة أخرى.",
+    "submitted_title": "تم استلام طلبك",
+    "submitted_body": "شكراً! سنراجع طلبك ونتواصل معك قريباً. يمكنك في هذه الأثناء تصفح الموقع وحجز إقامات لحيواناتك.",
+    "submitted_continue_button": "تصفّح الموقع"
   },
   "become_host": {
     "title": "كن مُضيفاً",
@@ -687,7 +723,15 @@
     "avatar_change": "تغيير الصورة",
     "avatar_save": "حفظ الصورة",
     "avatar_uploading": "جارٍ الرفع…",
-    "avatar_save_failed": "تعذّر رفع الصورة"
+    "avatar_save_failed": "تعذّر رفع الصورة",
+    "host_status_pending_title": "طلبك قيد المراجعة",
+    "host_status_pending_body": "نراجع طلبك حالياً. سنتواصل معك قريباً. يمكنك حجز إقامات لحيواناتك في هذه الأثناء، لكن إنشاء الإعلانات يحتاج إلى الموافقة أولاً.",
+    "host_status_complete_title": "تمت الموافقة — أكمل ملفك",
+    "host_status_complete_body": "مرحباً بك في مجتمع المُضيفين. لإنشاء إعلانك الأول، أكمل ملفك الشخصي بإضافة نبذة وصور.",
+    "host_status_complete_cta": "أكمل ملفي الآن",
+    "host_status_verified": "مُضيف موثّق",
+    "host_status_rejected_title": "لم تتم الموافقة على طلبك",
+    "host_status_rejected_body": "للأسف لا يمكننا قبول طلبك في الوقت الحالي. يمكنك مراسلتنا للاستفسار أو إعادة المحاولة لاحقاً."
   },
   "mybookings": {
     "title": "حجوزاتي",

@@ -434,9 +434,45 @@
     "owner": "Owner",
     "host": "Sitter"
   },
+  "host_complete": {
+    "title": "Complete your profile",
+    "subtitle": "One last step before you can create listings. Tell customers a bit about yourself.",
+    "bio_label": "About you",
+    "bio_hint": "Write at least {min} characters about yourself and your experience with pets.",
+    "bio_placeholder": "I've loved cats since I was a kid…",
+    "avatar_hint": "Add a profile photo so customers can recognize you.",
+    "avatar_link": "Add a profile photo →",
+    "nafath_title": "Nafath verification — coming soon",
+    "nafath_body": "We'll ask you to verify your identity via Nafath before your first listing goes live. This step is under preparation.",
+    "submit_button": "Complete profile",
+    "submitting": "Saving…",
+    "submit_failed": "Couldn't save your profile. Please try again."
+  },
   "host_application": {
     "title": "Host application",
-    "coming_soon": "The application form is under construction — it'll appear here soon."
+    "subtitle": "Tell us a bit about yourself. Takes under two minutes.",
+    "name_label": "Full name",
+    "name_placeholder": "Sarah Smith",
+    "gender_label": "Gender",
+    "gender_female": "Female",
+    "gender_male": "Male",
+    "city_label": "City",
+    "neighborhood_label": "Neighborhood",
+    "pet_type_label": "What can you host?",
+    "pet_type_cats": "Cats",
+    "pet_type_dogs": "Dogs",
+    "pet_type_both": "Cats & Dogs",
+    "coming_soon_tag": "soon",
+    "experience_label": "Do you have experience pet-sitting?",
+    "experience_yes": "Yes",
+    "experience_no": "No",
+    "experience_years_label": "How many years?",
+    "submit_button": "Submit application",
+    "submitting": "Submitting…",
+    "submit_failed": "Couldn't submit your application. Please try again.",
+    "submitted_title": "Application received",
+    "submitted_body": "Thank you! We'll review your application and reach out soon. In the meantime feel free to browse the site and book stays for your own pets.",
+    "submitted_continue_button": "Browse the site"
   },
   "become_host": {
     "title": "Become a Host",
@@ -675,7 +711,15 @@
     "avatar_change": "Change photo",
     "avatar_save": "Save photo",
     "avatar_uploading": "Uploading…",
-    "avatar_save_failed": "Couldn't upload the photo"
+    "avatar_save_failed": "Couldn't upload the photo",
+    "host_status_pending_title": "Application under review",
+    "host_status_pending_body": "We're reviewing your application and will reach out soon. You can still book stays for your own pets in the meantime; listing creation needs approval first.",
+    "host_status_complete_title": "Approved — complete your profile",
+    "host_status_complete_body": "Welcome to the host community. To create your first listing, complete your profile with a bio and photos.",
+    "host_status_complete_cta": "Complete my profile",
+    "host_status_verified": "Verified host",
+    "host_status_rejected_title": "Application not approved",
+    "host_status_rejected_body": "We can't approve your application at this time. You can reach out for more information or apply again later."
   },
   "mybookings": {
     "title": "My bookings",
