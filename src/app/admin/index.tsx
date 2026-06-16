@@ -13,10 +13,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import {
   countDisputedBookings,
-  listAllUsers,
   listPendingReviews,
 } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
+import { listPendingHostApplications } from '@/lib/host-application';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
@@ -34,14 +34,15 @@ export default function AdminHome() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [users, reviews, disputed] = await Promise.all([
-        listAllUsers(),
+      const [applications, reviews, disputed] = await Promise.all([
+        // 0039 — direct query for pending host applications. The
+        // admin_list_users RPC doesn't return host_application_status,
+        // so we count via the helper which selects it explicitly.
+        listPendingHostApplications(),
         listPendingReviews(),
         countDisputedBookings(),
       ]);
-      const pendingHosts = users.filter(
-        (u) => u.role === 'host' && !u.is_verified && !u.is_suspended,
-      ).length;
+      const pendingHosts = applications.filter((u) => !u.is_suspended).length;
       // 8g: the listings counter now reflects the unified review
       // queue (new pendings + pending edits to approved/paused/
       // admin_disabled listings). Approved-no-drafts listings are
@@ -90,7 +91,7 @@ export default function AdminHome() {
           ]}
         >
           <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>{t('admin.pending_hosts_card')}</Text>
+            <Text style={styles.cardTitle}>{t('admin.applications_card')}</Text>
             <CountBadge value={pendingHostsCount} />
           </View>
         </Pressable>

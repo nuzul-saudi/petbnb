@@ -1,33 +1,65 @@
+// Host applications review queue (0039).
+//
+// Replaced the prior "pending hosts" view, which gated on
+// is_verified=false alone. Under 0039 every host signup goes through
+// an explicit application step with structured fields (gender, city,
+// neighborhood, pet type, experience years). The queue now shows
+// those fields so the admin (founder, manually vetting each one) can
+// make a real decision before approving.
+//
+// Approve flips host_application_status='approved' AND is_verified=
+// true so listings RLS unblocks the user once their post-approval
+// profile completion is done.
+//
+// Reject takes a required notes string so the applicant sees a
+// reason on their profile status panel.
+
 import { logWarn } from '@/lib/log';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { listAllUsers, setUserVerified, type AdminUser } from '@/lib/admin';
+import { useAuth } from '@/lib/auth';
+import { findCity, findDistrict, type CityKey } from '@/lib/cities';
+import {
+  approveHostApplication,
+  listPendingHostApplications,
+  rejectHostApplication,
+  type HostApplicationRow,
+} from '@/lib/host-application';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
-export default function PendingHostsScreen() {
+export default function HostApplicationsQueueScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { user: adminUser } = useAuth();
 
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [items, setItems] = useState<HostApplicationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<HostApplicationRow | null>(
+    null,
+  );
+  const [rejectNotes, setRejectNotes] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const all = await listAllUsers();
-      const pending = all.filter(
-        (u) => u.role === 'host' && !u.is_verified && !u.is_suspended,
-      );
-      setUsers(pending);
+      setItems(await listPendingHostApplications());
     } catch (e) {
-      logWarn('[admin.hosts.load_failed]', e);
+      logWarn('[admin.applications.load_failed]', e);
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
@@ -40,29 +72,48 @@ export default function PendingHostsScreen() {
     }, [load]),
   );
 
-  const onApprove = async (id: string) => {
-    setApprovingId(id);
+  const onApprove = async (applicant: HostApplicationRow) => {
+    if (!adminUser) return;
+    setBusyId(applicant.id);
     setError(null);
     try {
-      await setUserVerified(id, true);
-      // Optimistic: drop the row from the local list immediately so the
-      // queue feels responsive.
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      await approveHostApplication(applicant.id, adminUser.id);
+      setItems((prev) => prev.filter((u) => u.id !== applicant.id));
     } catch (e) {
-      logWarn('[admin.hosts.approve_failed]', e);
+      logWarn('[admin.applications.approve_failed]', e);
       setError(t('admin.save_failed'));
     } finally {
-      setApprovingId(null);
+      setBusyId(null);
+    }
+  };
+
+  const onSubmitReject = async () => {
+    if (!adminUser || !rejectTarget || rejectNotes.trim().length === 0) return;
+    setBusyId(rejectTarget.id);
+    setError(null);
+    try {
+      await rejectHostApplication(rejectTarget.id, adminUser.id, rejectNotes);
+      setItems((prev) => prev.filter((u) => u.id !== rejectTarget.id));
+      setRejectTarget(null);
+      setRejectNotes('');
+    } catch (e) {
+      logWarn('[admin.applications.reject_failed]', e);
+      setError(t('admin.save_failed'));
+    } finally {
+      setBusyId(null);
     }
   };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.replace('/admin')} style={styles.backLink}>
+        <Pressable
+          onPress={() => router.replace('/admin')}
+          style={styles.backLink}
+        >
           <Text style={styles.backText}>{t('admin.back')}</Text>
         </Pressable>
-        <Text style={styles.title}>{t('admin.hosts_title')}</Text>
+        <Text style={styles.title}>{t('admin.applications_title')}</Text>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -71,54 +122,206 @@ export default function PendingHostsScreen() {
         <View style={styles.centered}>
           <Text style={styles.muted}>{t('admin.loading')}</Text>
         </View>
-      ) : users.length === 0 ? (
+      ) : items.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.muted}>{t('admin.hosts_empty')}</Text>
+          <Text style={styles.muted}>{t('admin.applications_empty')}</Text>
         </View>
       ) : (
         <FlatList
-          data={users}
+          data={items}
           keyExtractor={(u) => u.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <View style={styles.row}>
-              <View style={styles.rowLeft}>
-                <Text style={styles.rowName}>{item.full_name || '—'}</Text>
-                <Text style={styles.rowEmail}>{item.email}</Text>
-                <Text style={styles.rowMeta}>
-                  {t('admin.host_signup_at')}: {item.auth_created_at.slice(0, 10)}
-                </Text>
-                <Text style={styles.rowMeta}>
-                  {t('admin.user_role_label')}: {t(`role.${item.role}`)}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => onApprove(item.id)}
-                disabled={approvingId === item.id}
-                style={[
-                  styles.approveButton,
-                  approvingId === item.id && styles.approveButtonDisabled,
-                ]}
-              >
-                <Text style={styles.approveButtonText}>
-                  {approvingId === item.id
-                    ? t('admin.saving')
-                    : t('admin.user_approve_verification')}
-                </Text>
-              </Pressable>
-            </View>
+            <ApplicationCard
+              item={item}
+              locale={locale}
+              t={t}
+              busy={busyId === item.id}
+              onApprove={() => onApprove(item)}
+              onReject={() => {
+                setRejectTarget(item);
+                setRejectNotes('');
+              }}
+            />
           )}
         />
       )}
+
+      <Modal
+        visible={!!rejectTarget}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setRejectTarget(null)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setRejectTarget(null)}
+        >
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>
+              {t('admin.applications_reject_modal_title')}
+            </Text>
+            <Text style={styles.modalBody}>
+              {t('admin.applications_reject_modal_body')}
+            </Text>
+            <TextInput
+              value={rejectNotes}
+              onChangeText={setRejectNotes}
+              placeholder={t('admin.applications_reject_notes_placeholder')}
+              placeholderTextColor={colors.inkSoft}
+              multiline
+              numberOfLines={4}
+              style={styles.modalInput}
+            />
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setRejectTarget(null)}
+                style={[styles.modalButton, styles.modalCancel]}
+              >
+                <Text style={styles.modalCancelText}>
+                  {t('admin.cancel')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={onSubmitReject}
+                disabled={rejectNotes.trim().length === 0 || !!busyId}
+                style={[
+                  styles.modalButton,
+                  styles.modalReject,
+                  (rejectNotes.trim().length === 0 || !!busyId) &&
+                    styles.modalRejectDisabled,
+                ]}
+              >
+                <Text style={styles.modalRejectText}>
+                  {busyId
+                    ? t('admin.saving')
+                    : t('admin.applications_reject_confirm')}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
+function ApplicationCard({
+  item,
+  locale,
+  t,
+  busy,
+  onApprove,
+  onReject,
+}: {
+  item: HostApplicationRow;
+  locale: 'ar' | 'en';
+  t: (key: string, params?: Record<string, string | number>) => string;
+  busy: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const cityObj = item.host_city ? findCity(item.host_city) : null;
+  const districtObj =
+    cityObj && item.host_neighborhood
+      ? findDistrict(cityObj.key as CityKey, item.host_neighborhood)
+      : null;
+  const cityLabel = cityObj
+    ? locale === 'ar'
+      ? cityObj.name_ar
+      : cityObj.name_en
+    : item.host_city ?? '—';
+  const districtLabel = districtObj
+    ? locale === 'ar'
+      ? districtObj.name_ar
+      : districtObj.name_en
+    : item.host_neighborhood ?? '—';
+
+  const genderLabel = item.host_gender
+    ? t(`host_application.gender_${item.host_gender}`)
+    : '—';
+  const petLabel = item.host_pet_type_accepted
+    ? t(`host_application.pet_type_${item.host_pet_type_accepted}`)
+    : '—';
+  const experienceLabel =
+    item.host_experience_years === null
+      ? t('admin.applications_experience_none')
+      : t('admin.applications_experience_years', {
+          years: item.host_experience_years,
+        });
+
+  const submittedDate = item.host_application_submitted_at
+    ? item.host_application_submitted_at.slice(0, 10)
+    : '—';
+
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowHeader}>
+        <Text style={styles.rowName}>{item.full_name || '—'}</Text>
+        <Text style={styles.rowMeta}>{submittedDate}</Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <DetailItem
+          label={t('admin.applications_gender_label')}
+          value={genderLabel}
+        />
+        <DetailItem
+          label={t('admin.applications_city_label')}
+          value={`${cityLabel} · ${districtLabel}`}
+        />
+      </View>
+
+      <View style={styles.detailRow}>
+        <DetailItem
+          label={t('admin.applications_pet_type_label')}
+          value={petLabel}
+        />
+        <DetailItem
+          label={t('admin.applications_experience_label')}
+          value={experienceLabel}
+        />
+      </View>
+
+      <View style={styles.actionsRow}>
+        <Pressable
+          onPress={onReject}
+          disabled={busy}
+          style={[styles.actionButton, styles.rejectButton, busy && styles.busy]}
+        >
+          <Text style={[styles.actionButtonText, styles.rejectButtonText]}>
+            {t('admin.applications_reject_button')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onApprove}
+          disabled={busy}
+          style={[
+            styles.actionButton,
+            styles.approveButton,
+            busy && styles.busy,
+          ]}
+        >
+          <Text style={[styles.actionButtonText, styles.approveButtonText]}>
+            {busy ? t('admin.saving') : t('admin.applications_approve_button')}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailItem}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.cream,
-  },
+  safe: { flex: 1, backgroundColor: colors.cream },
   header: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
@@ -127,9 +330,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  backLink: {
-    paddingVertical: spacing.xs,
-  },
+  backLink: { paddingVertical: spacing.xs },
   backText: {
     fontFamily: fonts.body,
     fontSize: 14,
@@ -140,7 +341,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 22,
     color: colors.mossDeep,
-    textAlign: 'right',
   },
   error: {
     fontFamily: fonts.body,
@@ -167,49 +367,138 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     backgroundColor: colors.paper,
     borderRadius: radii.lg,
     padding: spacing.lg,
     gap: spacing.md,
     ...shadows.card,
   },
-  rowLeft: {
-    flex: 1,
-    gap: 2,
+  rowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: spacing.md,
   },
   rowName: {
     fontFamily: fonts.bodyBold,
-    fontSize: 15,
+    fontSize: 16,
     color: colors.ink,
-    textAlign: 'right',
-  },
-  rowEmail: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.inkSoft,
-    textAlign: 'right',
   },
   rowMeta: {
     fontFamily: fonts.body,
     fontSize: 11,
     color: colors.inkSoft,
-    textAlign: 'right',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+  },
+  detailItem: {
+    flex: 1,
+    gap: 2,
+  },
+  detailLabel: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.inkSoft,
+  },
+  detailValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
+    alignItems: 'center',
   },
   approveButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.moss,
-    borderRadius: radii.pill,
-  },
-  approveButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: colors.mossDeep,
   },
   approveButtonText: {
+    color: colors.cream,
+  },
+  rejectButton: {
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.terracotta,
+  },
+  rejectButtonText: {
+    color: colors.terracotta,
+  },
+  actionButtonText: {
     fontFamily: fonts.bodyBold,
-    fontSize: 12,
+    fontSize: 14,
+  },
+  busy: { opacity: 0.5 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(31,42,29,0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  modalTitle: {
+    fontFamily: fonts.headingBold,
+    fontSize: 20,
+    color: colors.mossDeep,
+  },
+  modalBody: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+    lineHeight: 22,
+  },
+  modalInput: {
+    backgroundColor: colors.cream,
+    borderColor: colors.whisper,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+  },
+  modalCancel: {
+    backgroundColor: colors.whisper,
+  },
+  modalCancelText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  modalReject: {
+    backgroundColor: colors.terracotta,
+  },
+  modalRejectDisabled: { opacity: 0.4 },
+  modalRejectText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
     color: colors.cream,
   },
 });
