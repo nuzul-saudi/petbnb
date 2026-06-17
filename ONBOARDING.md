@@ -7,7 +7,9 @@
 > "why didn't they just…" questions get answered. Round-by-round decision
 > trails live in [`docs/batch-decisions.md`](./docs/batch-decisions.md).
 
-Last refresh: **2026-06-11** (immediately after Round 2 + env-saga close).
+Last refresh: **2026-06-17** (immediately after the host-signup funnel
+landed — migration 0039 + the persona-separation refactor — see
+§7 "Step 4.6 — host signup funnel" and CLAUDE.md §12).
 
 ---
 
@@ -17,12 +19,12 @@ Last refresh: **2026-06-11** (immediately after Round 2 + env-saga close).
   marketplace MVP (Airbnb-for-cats, expanding to dogs in Step 5.7).
 
 - **Stage:** Steps 1 → 8 + Phase 0a-c + Milestones A + B + Stretches S1 + S2
-  + Round 1 audit response + Round 2 behavior batch all SHIPPED. 30
-  migrations applied through `0030_reconcile_review_policies.sql`. 35
-  vitest unit tests over the pure money / pricing / availability /
-  vaccination libraries gate every push via GitHub Actions
-  (`.github/workflows/ci.yml`). Step 9 (in-app messaging) is the next
-  build target.
+  + Round 1 audit response + Round 2 behavior batch + **Step 4.6 host
+  signup funnel (0039)** all SHIPPED. 39 migrations applied through
+  `0039_host_application_schema.sql`. 35 vitest unit tests over the
+  pure money / pricing / availability / vaccination libraries gate every
+  push via GitHub Actions (`.github/workflows/ci.yml`). Step 9 (in-app
+  messaging) is the next planned build target.
 
 - **Strategic context the doc-reading Claude should know:**
   - **Saudi pet market is growing fast** — Saudization, rising disposable
@@ -55,6 +57,22 @@ Last refresh: **2026-06-11** (immediately after Round 2 + env-saga close).
   - **Latin numerals everywhere** in display (test-round-3 founder
     decision). `toArabicDigits` is a deliberate pass-through kept for
     compile compatibility; don't reintroduce Arabic-Indic conversion.
+  - **Masculine Arabic register** (2026-06-14 founder decision,
+    superseding the earlier feminine register). New strings use
+    masculine forms: imperative `سجّل` not `سجّلي`, pronoun `لك`
+    not `لكِ`, etc. The `feed.female_filter` ("مضيفات فقط") and
+    listing `host_gender` are display labels for gender data and
+    stay as-is.
+  - **Two account types — owner and host are separate accounts**
+    (2026-06-15 founder decision, migration 0039). Same email
+    cannot create both. Owner signup is instant (email → OTP →
+    password → name → home, no role picker). Host signup is the
+    ONLY path through the `/become-host` CTA, goes through a
+    multi-field application and admin approval, and a post-approval
+    profile-completion step before listing creation unlocks. Hosts
+    can book stays without approval — only listing creation is
+    gated. The `'both'` role and persona toggle are gone. See
+    CLAUDE.md §12 for the full lifecycle.
 
 - **Who built it:** Non-technical founder + Claude (one Strategy + one
   Code instance, see the next section) pairing — sometimes interactively
@@ -211,7 +229,7 @@ defaults to `'cat'` since migration 0001).
 | Auth (dev) | Email OTP (Supabase + Resend custom SMTP) |
 | Auth (pre-launch) | Saudi phone OTP via Unifonic/Taqnyat (Send SMS Hook + Edge Function). `src/lib/phone.ts` is pre-staged with the E.164 normalizer. |
 | Payments | Mocked. `PaymentProvider` interface in `src/lib/payment.ts` → `MockPaymentProvider` charges 0%. Fee policy + refund math live in pure `src/lib/payments-policy.ts` (whole-SAR, Riyadh-anchored — Round 1 R1C1). Pre-launch swap to Moyasar/HyperPay (CLAUDE.md §11). |
-| State | React Context (auth/session, locale, persona) + Supabase JS direct (server state — no TanStack yet) |
+| State | React Context (auth/session, locale, host-notifications) + Supabase JS direct (server state — no TanStack yet) |
 | i18n | `src/lib/i18n.tsx` (Context-aware) + `src/locales/(ar|en).json` (524 keys at parity, enforced by `scripts/check-i18n-parity.mjs` in CI). Plural-aware `t()` via `Intl.PluralRules`. |
 | Styling | Single theme file `src/theme/tokens.ts`. RTL default. |
 | Location | `src/lib/geo.ts` wraps `navigator.geolocation` (web) and `expo-location` (native). |
@@ -261,31 +279,37 @@ Petbnb/
 │
 ├── src/
 │   ├── app/                    ← Expo Router file-based routes
-│   │   ├── _layout.tsx         ← Root: AuthProvider + LocaleProvider + PersonaProvider + Stack
-│   │   ├── index.tsx           ← Signed-in home, role + persona branched. Owner feed + HostHome live here.
+│   │   ├── _layout.tsx         ← Root: AuthProvider + LocaleProvider + HostNotificationsProvider + Stack
+│   │   ├── index.tsx           ← Signed-in home, role-branched (owner / host / admin). Owner feed + HostHome live here.
 │   │   ├── suspended.tsx       ← Account-suspended dedicated screen
-│   │   ├── profile.tsx         ← Customer profile (edit name + role + pets link)
+│   │   ├── profile.tsx         ← Customer profile (edit name + pets link + avatar). For role='host': HostStatusPanel (pending/approved/rejected/verified states).
+│   │   ├── become-host.tsx     ← Host signup intro screen (3-step pitch + Start application CTA). 0039 entry point for hosts; guests + owners can both tap.
 │   │   ├── (auth)/             ← Auth route group (no URL prefix)
 │   │   │   ├── _layout.tsx
-│   │   │   ├── sign-in.tsx     ← Email entry. Honors ?returnTo= for guest-mode flow (R2C3).
-│   │   │   ├── verify.tsx      ← OTP entry (6 digits)
-│   │   │   └── role.tsx        ← First-time role pick (uses RoleEditor)
+│   │   │   ├── sign-in.tsx     ← Email entry. Honors ?returnTo= (guest-mode) and ?flow=host (host signup banner). Threads flow=host through verify → set-password.
+│   │   │   ├── verify.tsx      ← OTP entry. Routes new users to /set-password?mode=signup; threads flow=host.
+│   │   │   ├── set-password.tsx ← AUTH-2/4. After password: flow=host → /become-host/application; else → /name. Reset mode → returnTo.
+│   │   │   └── name.tsx        ← Owner-only final step. Just collects full_name; role defaults 'owner'. (Replaced /role + RoleEditor in 0039.)
+│   │   ├── become-host/        ← Host application funnel (post-OTP+password)
+│   │   │   ├── application.tsx   ← Six-field form (name + gender + city + neighborhood + pet type + experience yes/no + years). Submit flips role='host' + host_application_status='pending'.
+│   │   │   ├── submitted.tsx     ← Confirmation screen. "We'll review your application."
+│   │   │   └── complete-profile.tsx ← Post-approval step. Bio (min 30 chars) + avatar reminder + Nafath stub behind NAFATH_ENABLED=false flag. Submit → host_profile_complete=true → listings unlocked.
 │   │   ├── admin/              ← Admin dashboard (role='admin' only)
 │   │   │   ├── _layout.tsx     ← Admin gate (redirects non-admins)
-│   │   │   ├── index.tsx       ← Dashboard with queue cards; useFocusEffect refresh
-│   │   │   ├── hosts.tsx       ← Pending host applications queue
+│   │   │   ├── index.tsx       ← Dashboard with queue cards; useFocusEffect refresh. 'New host applications' card uses listPendingHostApplications().
+│   │   │   ├── hosts.tsx       ← Host applications review queue (0039 rewrite). Shows gender + city + neighborhood + pet type + experience. Approve flips status='approved' + is_verified=true. Reject takes required notes.
 │   │   │   ├── users.tsx       ← All users with search + filter chips
 │   │   │   ├── users/[id].tsx  ← User detail/edit + suspend
 │   │   │   ├── listings.tsx    ← All listings + pending filter
 │   │   │   ├── listings/[id].tsx ← UNIFIED review: new_listing AND pending_edit on same layout (8h.1)
 │   │   │   └── bookings.tsx    ← Read-only bookings overview
 │   │   ├── bookings/
-│   │   │   ├── index.tsx       ← "My Bookings" list. Persona-aware (owner vs host views). R2C7 unread dot.
-│   │   │   └── [id].tsx        ← Booking detail. Persona-gated controls (R2C1). ReviewCard mount (R2C6).
+│   │   │   ├── index.tsx       ← "My Bookings" list. Role-driven mode (owner vs host views). R2C7 unread dot.
+│   │   │   └── [id].tsx        ← Booking detail. Role-driven controls (was persona-gated; 0039 simplified). ReviewCard mount (R2C6).
 │   │   ├── listings/
-│   │   │   ├── new.tsx         ← Host: create a listing (Step 7.2)
+│   │   │   ├── new.tsx         ← Host: create a listing. Pre-condition redirects (0039): non-host → /, no application → /become-host/application, pending → /profile, approved+incomplete → /become-host/complete-profile.
 │   │   │   └── [id]/
-│   │   │       ├── index.tsx     ← Public listing detail. Guest mode + self-listing notice (R2C1+R2C3).
+│   │   │       ├── index.tsx     ← Public listing detail. Guest mode + self-listing edit-CTA (R2C1+R2C3).
 │   │   │       ├── request.tsx   ← Booking request flow
 │   │   │       ├── edit.tsx      ← Host: edit listing. 8d two-copy model — pending → in-place, approved/paused → draft.
 │   │   │       ├── photos.tsx    ← Host: manage photos. Draft-aware (8e).
@@ -299,9 +323,8 @@ Petbnb/
 │   │   ├── ListingForm.tsx     ← Shared create/edit form (Step 7.2)
 │   │   ├── PhotoGallery.tsx    ← Swipeable photos for listing detail
 │   │   ├── PetAvatar.tsx       ← Photo → breed-thumbnail → emoji fallback chain (5.6C.4)
-│   │   ├── RoleEditor.tsx      ← Owner/host/both role-card picker
 │   │   ├── BreedPicker.tsx     ← Horizontal breed tile picker (with "I don't know" + "Other")
-│   │   ├── AppHeader.tsx       ← Top-nav bar. Persona-aware labels. Guest-mode "Sign in" pill (R2C3). Pending-requests badge (R2C7).
+│   │   ├── AppHeader.tsx       ← Top-nav bar. Become-a-Host CTA for guests + owners. Inbox badge for hosts (0039 — replaced the persona pill).
 │   │   ├── Button.tsx          ← 3 variants × 2 sizes. The CTA component since the R1C5 audit migration.
 │   │   ├── DateField.tsx       ← Web calendar picker + native TextInput fallback. Used by booking request, pet vacc, availability (R1C3).
 │   │   └── bookings/           ← Booking-detail sub-components
@@ -320,8 +343,8 @@ Petbnb/
 │   │   ├── supabase.ts             ← Typed Supabase client + pingSupabase()
 │   │   ├── auth.tsx                ← AuthProvider + useAuth(). Note KNOWN/TODO blocks for SMS swap.
 │   │   ├── i18n.tsx                ← LocaleProvider + useTranslation() + module-scope t()
-│   │   ├── persona.tsx             ← PersonaProvider — owner/host current view for role=both. pendingHostCount + refreshPendingHostCount (R2C7).
-│   │   ├── persona-storage.ts      ← AsyncStorage cache for persona switch
+│   │   ├── persona.tsx             ← HostNotificationsProvider — exposes pendingHostCount + refreshPendingHostCount. Filename kept from the pre-0039 persona context (which managed owner/host toggling), now host-notifications only.
+│   │   ├── host-application.ts     ← 0039 helpers: submitHostApplication, listPendingHostApplications, approveHostApplication, rejectHostApplication, markHostProfileComplete.
 │   │   ├── format.ts               ← formatSAR (whole SAR), pickLocalized, todayIso, formatRiyadhStamp. toArabicDigits is now a deliberate pass-through.
 │   │   ├── locale-storage.ts       ← AsyncStorage cache for locale
 │   │   ├── log.ts                  ← logWarn/logInfo/logError. __DEV__-gated. Replaces raw console.*  (R1C5).
@@ -352,7 +375,7 @@ Petbnb/
 │   │
 │   ├── theme/
 │   │   ├── tokens.ts           ← Single source of truth for colors/fonts/spacing/radii/shadows
-│   │   ├── theme.tsx           ← useTheme() — persona-aware background/accent
+│   │   ├── theme.tsx           ← useTheme() — role-driven background/accent (owner=moss/cream; host=goldDeep/honey)
 │   │   └── rtl.ts              ← useReadingTextAlign() (mostly unused after the audit)
 │   │
 │   ├── locales/
@@ -399,7 +422,16 @@ Petbnb/
         ├── 0027_availability_and_capacity.sql ← listing_blocked_dates table + bookings_capacity_guard trigger. Half-open overlap predicate. Re-fires on date edits (Milestone B + 2346c1b follow-up).
         ├── 0028_payments_foundations.sql ← bookings.{owner_fee_sar, host_fee_sar, total_charged_sar, payout_sar, payout_status, paid_at, cancelled_at, refund_sar}. payout_status CHECK constraint. (Stretch S1)
         ├── 0029_round2_behavior.sql      ← THREE parts in one migration: (A) bookings_insert_owner RLS tighten with owner_id <> host_id; (B) listing_blocked_dates SELECT widened to anon; (C) reviews_insert_participant + reviews_select_authenticated. (Round 2)
-        └── 0030_reconcile_review_policies.sql ← Drops the redundant policies from 0002+0004 + 0029 part C SELECT. Net: reviews has reviews_insert_participant + reviews_select_public (anon+authenticated). (Round 2 founder-decision Option A)
+        ├── 0030_reconcile_review_policies.sql ← Drops the redundant policies from 0002+0004 + 0029 part C SELECT. Net: reviews has reviews_insert_participant + reviews_select_public (anon+authenticated). (Round 2 founder-decision Option A)
+        ├── 0031_feed_index.sql            ← Composite btree index on listings (city, status) for the owner feed's hot path.
+        ├── 0032_host_rating_rpc.sql       ← SECURITY DEFINER RPC returning host avg rating + review count, bypassing reviews RLS for the listing card aggregate.
+        ├── 0033_favorites.sql             ← Round 11 — user_favorites(user_id, listing_id) + RLS. Owner-only writes; SELECT scoped to self.
+        ├── 0034_listings_accepts_species.sql ← Step 5.7 prep (PARKED) — listings.accepts_species text[]. Schema-ready; SPECIES_ENABLED flag in src/lib/features.ts is false.
+        ├── 0035_available_listings_rpc.sql  ← Availability-aware RPC for the feed (Milestone B follow-up).
+        ├── 0036_available_listings_rls_parity.sql ← Adds the host-visibility EXISTS predicate inside the RPC to mirror the RLS reach.
+        ├── 0037_anon_profiles_visibility.sql ← Bug fix: guest feed was empty. Adds an anon SELECT policy on profiles + narrows anon column-level GRANT to 6 display fields (id, full_name, full_name_en, avatar_url, is_verified, is_suspended). Phone/email/nafath stay private.
+        ├── 0038_is_admin_security_definer.sql ← Turns is_admin() + is_active_user() into SECURITY DEFINER with pinned search_path = public, so they bypass the narrowed anon column grants from 0037.
+        └── 0039_host_application_schema.sql ← Step 4.6 host signup funnel. Drops 'both' from profiles.role CHECK + persona column. Adds 12 host_application_* columns (status, submitted_at, reviewed_at, reviewer_id, admin_notes, gender, city, neighborhood, pet_type_accepted, experience_years, bio_ar, profile_complete) + partial index on status='pending'. Tightens listings_insert_host RLS to require role='host' AND host_application_status='approved' AND host_profile_complete=true.
 ```
 
 **Booking screen architecture:**
@@ -427,10 +459,12 @@ The dirty-state predicates (`isUpdateFormDirty`, `isCrFormDirty`,
 leave-warning is preserved. Owner-side review state (`myReview`,
 `reviewFetchTick`) also lives in the parent.
 
-**Persona gates:** the parent computes `isOwnerMode` / `isHostMode` from
-`profile.role` + `usePersona().persona` and gates Edit/Cancel (owner)
-vs Accept/Decline/Start/Complete (host) buttons accordingly. R2C1's
-fix for the "both" user seeing both sets of buttons lives here.
+**Role-driven mode:** the parent computes `isOwnerMode` / `isHostMode`
+from `profile.role` alone (was persona-driven; 0039 simplified after
+the `'both'` role was dropped). Owners see Edit/Cancel on their own
+bookings; hosts see Accept/Decline/Start/Complete on bookings against
+their listings. Booking-on-own-listing isn't possible any more
+(separate account types) but the gates remain defense-in-depth.
 
 **Shared styles DUPLICATED** across the three section components (each
 flagged `// shared with parent`). Tidy-up deferred.
@@ -439,14 +473,13 @@ flagged `// shared with parent`). Tidy-up deferred.
 
 ## 5. The data model
 
-**14 tables** in `public` (was 11 in §3 of the original onboarding; added
-`listing_drafts`, `listing_photo_drafts`, `listing_blocked_dates`). All
+**15 tables** in `public` (was 14; added `user_favorites` in 0033). All
 with RLS enabled. Migration history in `supabase/migrations/`; type
 mirror in `src/types/database.ts`.
 
 | Table | Purpose | Notes |
 |---|---|---|
-| `profiles` | 1:1 with `auth.users`. Auto-created by trigger. | Roles: `owner`, `host`, `both`, `admin`. Plus `is_verified` (admin trust badge for hosts), `is_suspended` (admin block), `full_name_en` (optional English), `locale` (`'ar'`/`'en'`, default `'ar'`), `persona` (`'owner'`/`'host'`/null — cross-device persona memory for role=both, since 0018). |
+| `profiles` | 1:1 with `auth.users`. Auto-created by trigger. | Roles: `owner`, `host`, `admin` (`'both'` was dropped by 0039). Plus `is_verified` (host trust badge flipped true by application approval), `is_suspended` (admin block), `full_name_en` (optional English), `locale` (`'ar'`/`'en'`, default `'ar'`). **Host application fields (0039)**: `host_application_status` (`'pending'`/`'approved'`/`'rejected'`/null), `host_application_submitted_at`, `host_application_reviewed_at`, `host_application_reviewer_id`, `host_application_admin_notes`, `host_gender`, `host_city`, `host_neighborhood`, `host_pet_type_accepted` (`'cats'`/`'dogs'`/`'cats_and_dogs'`), `host_experience_years`, `host_bio_ar`, `host_profile_complete`. The `persona` column was dropped by 0039. |
 | `pets` | Owner's pets (cats today, dogs after 5.7). | Health fields from 5.5: `medical_needs`, `dietary_restrictions`, `medications`, `behavioral_notes`. Vaccination from 0026: `rabies_vaccinated_at`, `fvrcp_vaccinated_at`, `vaccination_doc_url`, `care_notes`. `photo_url` is a 7-day signed URL from the `pet-photos` private bucket. `species` defaults `'cat'`. |
 | `listings` | Host's home offering. | **`status` is now the canonical visibility column** (since 0021). 4 states: `pending`, `approved`, `paused`, `admin_disabled`. `is_active` was DROPPED in 0024. `requires_vaccination` (0026 Milestone A). `lat/lng` nullable. `title_en`, `description_en` optional bilingual. `additional_pet_discount` (5.6D). `max_concurrent_pets`. `city` is an enum (riyadh/dammam/jeddah/khobar/medina) since 0019. `tier` (bronze/silver/gold). `host_gender` ('female'/'male' for female-trust filter). |
 | `listing_drafts` | **8d two-copy edit model.** Host-pending field edits on approved/paused listings. | UNIQUE(`listing_id`) — at most one draft per listing. Same shape as `listings` for editable columns (10 fields). Promoted into `listings` by `promote_listing_draft` RPC. |
@@ -522,45 +555,101 @@ commit.
 
 ## 6. Auth + routing
 
-### Auth flow (Step 4)
+### Owner signup (Step 4 — the regular `/sign-in` funnel)
 
 1. User enters email → `supabase.auth.signInWithOtp({ email })`
-2. Resend (custom SMTP) sends a 6-digit code in Arabic (template configured
-   in Supabase dashboard, not in code)
+2. Resend (custom SMTP) sends a 6-digit code (template configured in
+   Supabase dashboard, not in code)
 3. User enters code → `supabase.auth.verifyOtp({ email, token, type: 'email' })`
-4. First time only: hits `/role` to pick name + role (RoleEditor)
-5. Lands on the role-appropriate home
-6. **Guest mode (R2C3):** anon visitors can browse the owner feed and
-   listing detail without signing in. Any gated action
-   (Request booking, persona toggle, /bookings, /profile) routes to
-   `/sign-in?returnTo=<current-path>`. The verify step honors returnTo
-   and lands the new session back on the original URL.
+4. First time only: `/set-password?mode=signup` (AUTH-2)
+5. After password: `/name` — just collects `full_name`; row commits with
+   `role='owner'` (was a 3-way role picker pre-0039)
+6. Lands on `OwnerFeedHome` at `/`
+
+**Forgot-password** branches at step 3 (`/sign-in` "Forgot password?" link)
+into `signInWithOtp({ shouldCreateUser:false })`, then verify forwards to
+`/set-password?mode=reset` instead of the signup chain.
+
+**Guest mode (R2C3):** anon visitors can browse the owner feed and
+listing detail without signing in. Any gated action (Request booking,
+/bookings, /profile) routes to `/sign-in?returnTo=<current-path>`. The
+verify step honors returnTo and lands the new session back on the
+original URL.
+
+### Host signup (Step 4.6 — the `/become-host` funnel, 0039)
+
+Hosts cannot sign up through the regular `/sign-in` funnel. Email
+uniqueness on `auth.users` enforces the founder's "same email cannot
+create both" decision — owner and host are different accounts.
+
+1. Guest (or signed-in owner) taps "Become a Host" in `AppHeader`
+2. Lands on `/become-host` — the intro screen with a 3-step pitch
+3. **Signed-in owner branch:** instead of the Start CTA, sees a notice
+   *"Host accounts are separate. Please sign out and create a new
+   account with a different email."* + a Sign-out button. After
+   signing out the screen flips to the guest variant.
+4. **Guest branch:** tap "Start application" → routes to
+   `/sign-in?flow=host` (host-mode banner above the email field)
+5. Email → OTP → `/set-password?mode=signup&flow=host`
+6. After password: routes to `/become-host/application` (NOT `/name`).
+   The `flow=host` URL param threads through verify and set-password
+   to make this routing decision.
+7. Fill the 6-field form (name + gender + city + neighborhood + pet
+   type + experience yes/no + years). Submit → `submitHostApplication()`
+   flips `role='host'`, `host_application_status='pending'`,
+   timestamps the submission, and writes all six values.
+8. Lands on `/become-host/submitted` — confirmation. From here the
+   applicant browses the site like any logged-in user; can book stays,
+   can read messages, cannot create listings.
+9. **Admin** opens `/admin/hosts`, reviews the application card
+   (renders gender/location/pet-type/experience), and either approves
+   or rejects. Approve = `approveHostApplication()` which flips
+   `host_application_status='approved'` AND `is_verified=true`.
+   Reject = `rejectHostApplication()` with a required notes string
+   that the applicant sees on their profile screen.
+10. After approval, profile screen renders the "Complete your profile"
+    card with a CTA to `/become-host/complete-profile`.
+11. Complete-profile collects `host_bio_ar` (min 30 chars), reminds
+    the user to add an avatar (links to `/profile`), and renders a
+    Nafath stub block behind `NAFATH_ENABLED = false`. Submit →
+    `markHostProfileComplete()` flips `host_profile_complete=true`.
+12. Listing INSERT RLS now unblocks; `/listings/new` becomes
+    accessible. Pre-completion taps to `/listings/new` redirect to the
+    appropriate step.
 
 **Auth context** lives in `src/lib/auth.tsx` (`.tsx` because JSX). `useAuth()`
 returns `{ initializing, session, user, profile, signOut, refreshProfile }`.
 
-**Persona context** lives in `src/lib/persona.tsx`. `usePersona()` returns
-`{ persona, setPersona, pendingHostCount, refreshPendingHostCount }`. Persona
-is only meaningful for `role='both'`; pure owner/host ignore it. Cross-device
-via `profiles.persona` (since 0018), with AsyncStorage fallback for instant
-first paint.
+**Host notifications context** lives in `src/lib/persona.tsx` (filename kept
+from the pre-0039 persona context). `useHostNotifications()` returns
+`{ pendingHostCount, refreshPendingHostCount }`. The host-side AppHeader
+inbox badge reads this; pre-0039 it also owned the owner/host toggle, but
+that's gone.
 
-### Routing gates (current state, post-Step 8 + R2C3)
+### Routing gates (current state, post-0039)
 
 ```
 NOT signed in
-  visiting / or /listings/[id]           → render guest view (R2C3)
-  visiting any other route               → /sign-in?returnTo=<path>
-  guest hits Request booking / persona   → /sign-in?returnTo=<path>
+  visiting /, /listings/[id], or /become-host   → render guest view
+  visiting any other route                       → /sign-in?returnTo=<path>
+  guest hits Request booking / /bookings/...    → /sign-in?returnTo=<path>
+  guest taps "Become a Host"                    → /become-host (intro screen)
+  guest taps "Start application" on /become-host → /sign-in?flow=host
 
 session present
-  profile.is_suspended                   → /suspended   (priority over role)
-  profile.full_name empty                → /role         (fresh-profile signal)
-  profile.role = 'admin'                 → /admin
-  profile.role = 'host'                  → HostHome on /
-  profile.role = 'both' + persona='host' → HostHome on /
-  profile.role = 'both' + persona='owner'→ OwnerFeedHome on /
-  profile.role = 'owner'                 → OwnerFeedHome on /
+  profile.is_suspended                          → /suspended  (priority over role)
+  profile.full_name empty + owner signup        → /name
+  profile.full_name empty + host signup         → /become-host/application
+  profile.role = 'admin'                        → /admin
+  profile.role = 'host'                         → HostHome on /
+  profile.role = 'owner'                        → OwnerFeedHome on /
+
+/listings/new pre-conditions (mirrors listings_insert_host RLS):
+  role != 'host'                                → /
+  no application yet                            → /become-host/application
+  host_application_status = 'pending'           → /profile (status panel)
+  host_application_status = 'approved' + !complete → /become-host/complete-profile
+  approved + complete                           → render form
 ```
 
 ### The Expo Router file-path-vs-URL quirk (still relevant)
@@ -588,22 +677,26 @@ fails when no history exists (deep link, refresh, post-replace). Use
 `router.replace(<explicit destination>)` instead. Zero `router.back()`
 calls in the codebase; keep it that way.
 
-### Roles + personas
+### Roles (post-0039 — three values, no persona toggle)
 
-The four `profiles.role` values:
+The three `profiles.role` values (0039 dropped `'both'`):
 
-- **`owner`** — browses, books, messages, files condition reports as a
-  participant, leaves reviews. Cannot create listings.
-- **`host`** — creates listings (pending admin approval), accepts/declines
-  bookings, posts daily updates, files CRs as a participant, leaves
-  reviews. Cannot request bookings.
-- **`both`** — superset; persona toggle in the AppHeader switches between
-  owner and host views. Persona persists cross-device via
-  `profiles.persona`. Default for a fresh `both` user is `host`.
-- **`admin`** — founder vetting account. Sees admin dashboard as home.
-  Can approve/reject hosts, approve/reject listings + drafts, edit any
-  profile/listing, suspend/unsuspend. Multi-admin permission tiers are
-  post-MVP.
+- **`owner`** — created instantly via `/sign-in`. Browses, books,
+  messages, files condition reports as a participant, leaves reviews.
+  **Cannot create listings, ever.** Tapping "Become a Host" routes to
+  `/become-host` which shows a separate-account notice and a
+  Sign-out button.
+- **`host`** — created only via the `/become-host` funnel + admin
+  approval + profile completion (see §6 "Host signup"). Can do
+  everything an owner can (book stays, leave reviews, etc.) plus
+  list, accept/decline bookings, post daily updates, file CRs as a
+  participant. The four `host_application_status` × `host_profile_complete`
+  combinations gate listing creation; see CLAUDE.md §12 for the
+  full table.
+- **`admin`** — founder vetting account. Sees admin dashboard as
+  home. Can approve/reject host applications, approve/reject listings
+  + drafts, edit any profile/listing, suspend/unsuspend. Multi-admin
+  permission tiers are post-MVP.
 
 Suspended users see `/suspended` instead of their normal home. They can
 sign in but cannot insert listings, bookings, messages, addons, CRs,
@@ -612,7 +705,9 @@ updates, or reviews — enforced at the RLS layer via
 
 Verified hosts (`profiles.is_verified = true`) display a verified badge
 in the feed. Verification is **not** the visibility gate — that's
-`listings.status = 'approved'`. Admin sets both independently.
+`listings.status = 'approved'`. Admin sets both independently; the
+`approveHostApplication()` helper flips both `is_verified=true` AND
+`host_application_status='approved'` in one update.
 
 ---
 
@@ -703,6 +798,71 @@ Seven commits + the 0029 migration responding to a separate behavior audit:
 - **R2C6 — Two-way reviews.** `src/lib/reviews.ts` + `ReviewCard.tsx`. Wired into `bookings/[id].tsx` with persona gates. 0029 Part C adds `reviews_insert_participant` with role-symmetric clause + `reviews_select_authenticated`.
 - **R2C7 — Notification signals.** AsyncStorage last-seen stamps drive an unread dot on owner bookings list. `useFocusEffect` triggers `refreshPendingHostCount()` so the host badge decrements without a persona switch.
 
+### Step 4.6 — host signup funnel + persona separation (2026-06-15 → 2026-06-17)
+
+Founder review of the deployed Step 5.5 sitter-first flow surfaced two
+linked problems:
+
+1. The in-flight 3-way role picker at signup (`/role`) let any new
+   user instantly pick `host` or `both` with no verification —
+   directly undercutting the female-trust wedge that the §0
+   admin-vetting model is built around.
+2. The deployed "Become a Host" CTA in the AppHeader was owner-only
+   AND routed to a stub, so no working host-signup path existed at
+   all.
+
+Founder decisions (CLAUDE.md §13 "Test round 4"; locked):
+
+- Owner signup stays instant — email → OTP → password → name → home.
+- Host signup is the ONLY path through `/become-host` → 6-field
+  application → admin review → post-approval profile completion.
+- Two account types separated at the email level — same email can't
+  create both. To act as both, sign out and use a different email.
+- Booking is universal (hosts can book). Only listing creation is
+  gated.
+
+Implementation (5 commits, 39 migrations total now):
+
+1. **Migration 0039.** Drops `'both'` from `profiles.role` CHECK +
+   the `persona` column. Adds 12 host_application_* columns + a
+   partial index on `host_application_status='pending'`. Tightens
+   `listings_insert_host` to require `role='host' AND
+   host_application_status='approved' AND host_profile_complete=true`.
+2. **Persona-toggle removal + owner-signup simplification.** Drop
+   the `/role` picker + RoleEditor + persona-storage cache. Replace
+   the persona context with a `HostNotificationsProvider` that only
+   exposes the pending-host-count badge. Drop every
+   `(role==='both' && persona===X)` branch across home, bookings,
+   listings detail, theme — those become role-driven.
+3. **Guest entry + auth funnel threading.** AppHeader's "Become a
+   Host" CTA visible to guests AND owners. Real `/become-host` intro
+   screen with separate-account-notice branch for signed-in owners.
+   `?flow=host` URL param threads through `/sign-in → /verify →
+   /set-password` so post-password routing goes to
+   `/become-host/application` instead of `/name`.
+4. **Application form + status panel + completion + listing gate.**
+   `/become-host/application` six-field form, `/become-host/submitted`
+   confirmation, `HostStatusPanel` on `/profile` (4 visual states),
+   `/become-host/complete-profile` with Nafath stub. `/listings/new`
+   redirects pre-conditions to the appropriate step. New
+   `src/lib/host-application.ts` with submit/list/approve/reject/
+   markComplete helpers.
+5. **Admin queue.** `/admin/hosts` rewritten — was an
+   `is_verified=false` filter, now a proper application detail view
+   with approve/reject buttons + a notes-required rejection modal.
+   Admin home card relabeled "New host applications" and the counter
+   uses `listPendingHostApplications()` directly (the
+   `admin_list_users` RPC doesn't return the new columns).
+
+Out of scope this batch (deferred, listed for future work):
+- Updating the `admin_list_users` RPC to return host_application_*
+  fields. Today the admin home does a separate query for the
+  pending-count.
+- Email-uniqueness UI on `/become-host/application` — currently
+  the same-email-can't-be-both rule is enforced solely by
+  Supabase Auth's email uniqueness on `auth.users`. A friendly
+  pre-OTP "this email is already an owner" check would help.
+
 ### Round 2 follow-up — reviews policy reconciliation (2026-06-11 evening)
 
 `ae1e857` — Migration 0030 fixes a collision discovered during smoke test:
@@ -764,7 +924,10 @@ a specific reason it's safe to defer during build but unsafe at launch:
    interface is ready; `MockPaymentProvider` charges 0%. Fee policy is
    locked at 5%/15%; refund math is locked at 48h cliff.
 4. **Nafath ID verification for hosts.** Schema-ready
-   (`profiles.nafath_verified` defaults false); no UI yet.
+   (`profiles.nafath_verified` defaults false). The stub UI lives at
+   `/become-host/complete-profile` behind `NAFATH_ENABLED = false`.
+   Flip the flag, wire the verifier, and require Nafath success
+   before flipping `host_profile_complete=true`.
 5. **Push notifications + prayer-time silence** — Phase 2. Needs Expo
    project credentials + a real device. Out of unattended-batch scope.
 6. **Real insurance partner** for the `تأمين` add-on.
@@ -777,6 +940,15 @@ a specific reason it's safe to defer during build but unsafe at launch:
 10. **Completed-bookings counter visible across users** — currently
     always 0 for non-host viewers due to RLS. SECURITY DEFINER RPC or
     counter-cache column.
+11. **Pre-OTP email-uniqueness hint on `/become-host/application`** —
+    today the same-email-can't-be-both rule is enforced only by
+    Supabase Auth's `auth.users` uniqueness. The signup blows up at
+    OTP send if the email is already an owner; a friendlier check at
+    the email step would help.
+12. **Update `admin_list_users` RPC to return host_application_***
+    fields — today admin/index does a separate `listPendingHost
+    Applications()` query for the count because the RPC's return
+    shape doesn't include the new columns.
 
 ### Future-milestone backlog (per `docs/batch-decisions.md`)
 
@@ -870,10 +1042,18 @@ locale)` from `lib/format.ts`. Falls back to Arabic primary when the
 English field is empty. Used for `listings.title_en`,
 `listings.description_en`, `profiles.full_name_en`.
 
-**Feminine register in Arabic strings.** New copy should use ـكِ
-(feminine singular you) not ـكَ (masculine). Verbs in feminine
-imperative — e.g. `قيّمي` (rate), `بدّلي` (switch), `سجّلي` (sign in).
-Smoke tests confirmed the founder cares about this.
+**Masculine register in Arabic strings.** (Founder decision
+2026-06-14, superseding the earlier feminine-register guidance.)
+New copy uses ـك (masculine singular you) not ـكِ. Verbs in
+masculine imperative — e.g. `قيّم` (rate), `بدّل` (switch),
+`سجّل` (sign in), `اختر` (choose). The earlier feminine register
+was swept in commit history; new code follows the masculine rule.
+
+**Exceptions** — these are display labels for gender data, not
+voice direction, and stay as-is:
+- `feed.female_filter` — "مضيفات فقط" (female sitters only)
+- `host_female` — "مضيفة" (the gender label "Female sitter")
+- `host_application.gender_female` — "أنثى" (the form chip "Female")
 
 ### Arabic / RTL
 
@@ -1052,6 +1232,13 @@ a blank screen.
   text. (Kept `reviews_select_public` from 0002.)
 - **Latin numerals everywhere** in display. `toArabicDigits()` is a
   no-op pass-through.
+- **Masculine Arabic register** (2026-06-14, supersedes the earlier
+  feminine register).
+- **Two account types — owner and host are separate accounts**
+  (2026-06-15 / migration 0039). Same email cannot create both.
+  Owner signup is instant; host signup requires application + admin
+  approval + profile completion. Booking is universal; only listing
+  creation is gated. Persona toggle is gone. `'both'` role is gone.
 
 **STILL OPEN (per CLAUDE.md §11):**
 
@@ -1062,6 +1249,8 @@ a blank screen.
 - **Custom domain for Resend** (e.g., `auth@petbnb.sa`).
 - **Saudi alpha sender ID for SMS OTP** (CITC registration, multi-day).
 - **Final brand name + trademark** — "Petbnb" is provisional.
+- **Nafath wiring.** Stub is at `/become-host/complete-profile`
+  behind `NAFATH_ENABLED=false`. Flip + wire before launch.
 
 ### Branding / data-vs-display
 
@@ -1321,11 +1510,15 @@ change:
 | Suspended user gets normal UI | Gating order in `src/app/index.tsx` — suspended must come before role. |
 | Console flooded with `"shadow*"` warning | Known. `theme/tokens.ts` uses old shadow API. Deferred. |
 | Build crashes mid-edit | Commit what you have (`wip:` prefix is fine), then resume with smaller turns. |
-| Booking detail shows both Edit AND Accept buttons | Pre-R2C1 fix. Make sure persona gates are in place (`isOwnerMode` / `isHostMode` based on `profile.role` + `usePersona().persona`). |
+| Booking detail shows both Edit AND Accept buttons | Pre-R2C1 fix that's now defense-in-depth (owner and host are separate accounts since 0039). Mode is role-driven: `isOwnerMode = profile?.role !== 'host'`; `isHostMode = profile?.role === 'host'`. |
 | Self-booking insert succeeds when it shouldn't | Check `bookings_insert_owner` policy body via `pg_get_expr(polwithcheck, polrelid)`. Should include `owner_id <> ( SELECT host_id FROM public.listings`. If missing, migration 0029 wasn't applied. |
 | Anon visitor can't see review text | Check `reviews_select_public` policy. Should have `polroles = {anon,authenticated}`. If `{authenticated}` only, migration 0030 wasn't applied. |
 | Whole-SAR fee fields show decimals | Booking accepted pre-R1C1 with the old `round2` math. NOT a current bug; force a fresh accept to verify R1C1. |
-| Fresh `requested` booking but pending-host badge doesn't increment | Persona context's `pendingRefreshTick` only fires on focus. Navigate away + back, or call `refreshPendingHostCount()`. |
+| Fresh `requested` booking but pending-host badge doesn't increment | The host-notifications context's `pendingRefreshTick` only fires on focus. Navigate away + back, or call `refreshPendingHostCount()`. |
+| Host can't create a listing after admin approval | `/listings/new` redirects when `host_profile_complete=false`. They need to finish `/become-host/complete-profile` (bio at minimum). DB RLS in 0039 enforces; UI just routes them. |
+| New host signup blows up at OTP send | Email already exists as an owner. Same email can't create both account types. Use a different email. (Pre-OTP hint is a pre-launch item.) |
+| "Become a Host" CTA missing from header | Only shown to guests + `role='owner'`. Hosts and admin don't see it. If a guest doesn't see it, check `AppHeader.tsx` — the gate is `isGuest \|\| profile?.role === 'owner'`. |
+| Listings missing from feed (anon) | Three layers: `status='approved'` + host `is_verified=true` + host `is_suspended=false`. Plus narrow anon SELECT on profiles (0037) and SECURITY DEFINER on `is_admin()` (0038). If broken: check column-level GRANTs on `public.profiles` for the `anon` role — should be exactly 6 fields. |
 
 ---
 

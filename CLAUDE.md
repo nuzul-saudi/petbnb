@@ -63,11 +63,12 @@ review with the founder, we agreed:
 1. Project scaffold + run it blank on web + Arabic/RTL + theme + i18n skeleton
 2. Supabase project connection + `.env` + client helper (founder creates the Supabase project — give instructions)
 3. Database schema + Row Level Security (Section 5)
-4. Auth: Saudi phone number → SMS OTP → verify → create profile → choose role (owner/host/both)
-4.5. **Admin role + admin dashboard** (added after prototype review — see Scope clarification above). Extends `profiles.role` with `'admin'`, adds `is_verified` (host trust badge) and `is_suspended` (account block) columns. Builds an admin dashboard for the founder to personally vet every early host. **Must land before Step 5 resumes** so the host-vetting workflow is in place when self-signups arrive.
-5. Owner flow: browse Riyadh hosts → host detail with home photo gallery → request booking + optional add-on → confirmation (mock payment). Feed filters to `is_active = true` AND host not suspended.
+4. Auth: email → OTP → set password → set name → owner home. (Saudi phone OTP is the pre-launch swap — Section 11. The current `(auth)/sign-in.tsx → verify.tsx → set-password.tsx → name.tsx` funnel always creates an OWNER account; host signup is a separate funnel — Step 4.6.)
+4.5. **Admin role + admin dashboard.** Extends `profiles.role` with `'admin'`, adds `is_verified` (host trust badge) and `is_suspended` (account block) columns. Builds an admin dashboard for the founder to personally vet every early host. Must land before Step 5.
+4.6. **Host signup funnel + application flow** (shipped 2026-06-16 / migration 0039). Replaces the in-flight "role picker at signup" model. Two account types separated at the email level — same email cannot create both an owner and a host account. Host signup is the only path through `/become-host` → `/sign-in?flow=host` → multi-field application → admin approval → post-approval profile completion (bio + pictures + Nafath stub) → listing creation unlocked. Hosts can book stays without approval — only listing creation is gated. See Section 12 for the lifecycle. The previous `'both'` role + persona-toggle UI was removed by 0039.
+5. Owner flow: browse Riyadh hosts → host detail with home photo gallery → request booking + optional add-on → confirmation (mock payment). Feed gates on `listings.status='approved'` + host `is_verified=true` + host `is_suspended=false`.
 6. Check-in / check-out condition report flow (CRITICAL — Section 6)
-7. Host flow: create listing + upload home gallery photos + accept/decline requests + post daily updates. **Self-registered listings default to `is_active = false`** and enter the admin approval queue (Step 4.5).
+7. Host flow: create listing + upload home gallery photos + accept/decline requests + post daily updates. Self-registered listings default to `status='pending'` and enter the admin approval queue (Step 4.5).
 8. Bookings list + status tracking + profile/settings expansion (pickup/dropoff coordination, emergency vet contact — see Section 13 items i, j)
 9. Basic in-app messaging (owner ↔ host)
 10. Marketplace screen (display only — products + "sold by X" label, NO cart/checkout)
@@ -86,9 +87,10 @@ Even if useful: real payments, real insurance, Nafath, push notifications, merch
 
 ## 5. Data model (core tables, RLS ON for every table)
 
-- **profiles**: id (uuid fk auth.users), full_name, phone, role (`owner`|`host`|`both`|`admin`), avatar_url, created_at, nafath_verified (bool default false), id_document_url (nullable, future), is_verified (bool default false — admin marks hosts trusted), is_suspended (bool default false — admin blocks abusers from writes)
+- **profiles**: id (uuid fk auth.users), full_name, full_name_en (nullable), phone, role (`owner`|`host`|`admin` — `'both'` was dropped by migration 0039), avatar_url, created_at, locale (`'ar'`|`'en'`, default `'ar'`), nafath_verified (bool default false — Nafath UI is stubbed behind a feature flag in `/become-host/complete-profile`), id_document_url (nullable, future), is_verified (bool default false — flipped true when admin approves host application), is_suspended (bool default false — admin blocks abusers from writes).
+  - **Host application fields (0039)**: host_application_status (`pending`|`approved`|`rejected`|null — null for owners), host_application_submitted_at, host_application_reviewed_at, host_application_reviewer_id (admin who acted), host_application_admin_notes (rejection reason shown to applicant), host_gender (`female`|`male` — collected at apply time), host_city, host_neighborhood, host_pet_type_accepted (`cats`|`dogs`|`cats_and_dogs` — `cats` only for MVP; dogs gated behind `SPECIES_ENABLED`), host_experience_years (int nullable), host_bio_ar (collected at post-approval profile-completion step), host_profile_complete (bool default false — listing creation RLS requires true).
 - **pets**: id, owner_id, name, species (default 'cat'), breed, age_months, vaccination_doc_url, behavioral_notes, photo_url
-- **listings**: id, host_id, title_ar, description_ar, neighborhood, nightly_price_sar, max_concurrent_pets, has_resident_pets (bool), resident_pets_note, is_active, tier (`bronze`|`silver`|`gold` default bronze), offers_grooming (bool default false), host_gender (`female`|`male`)
+- **listings**: id, host_id, title_ar, description_ar, neighborhood, nightly_price_sar, max_concurrent_pets, has_resident_pets (bool), resident_pets_note, status (`pending`|`approved`|`paused`|`admin_disabled` — replaced `is_active` in migration 0021/0024), tier (`bronze`|`silver`|`gold` default bronze), offers_grooming (bool default false), host_gender (`female`|`male`)
 - **listing_photos**: id, listing_id, photo_url, sort_order  (THE AIRBNB-STYLE HOME GALLERY)
 - **bookings**: id, listing_id, owner_id, pet_id, start_date, end_date, nights, base_price_sar, addons_total_sar, total_sar, status (`requested`|`accepted`|`declined`|`active`|`completed`|`cancelled`|`disputed`), created_at
 - **booking_addons**: id, booking_id, type (`grooming`|`vet`|`transport`|`insurance`), provider_label, price_sar
@@ -98,7 +100,7 @@ Even if useful: real payments, real insurance, Nafath, push notifications, merch
 - **reviews**: id, booking_id, rater_id, ratee_id, stars (1–5), text_ar, created_at
 - **products** (display only): id, name_ar, seller_name, brand, price_sar, category, image_url, is_halal_certified (bool)
 
-RLS: users read/write only their own rows; a booking is visible to both its owner and the listing's host; active listings publicly readable.
+RLS: users read/write only their own rows; a booking is visible to both its owner and the listing's host; approved listings publicly readable. **Listing INSERT (0039)** requires `role='host' AND host_application_status='approved' AND host_profile_complete=true` — pending applicants and approved-but-incomplete hosts cannot create listings even though they can read/update their own profile row.
 
 ---
 
@@ -172,6 +174,17 @@ launch.
 > Status is the 4-state column `pending/approved/paused/admin_disabled` with a
 > DB-level transition guard (migration 0025). is_active is gone (0024).
 
+> **SHIPPED 2026-06-16 / 0039 (Step 4.6 — host signup funnel):** owner signup
+> simplified (email → OTP → password → name → home, no role picker); host
+> signup is a separate funnel via the "Become a Host" CTA on the home page
+> that any visitor can tap. The funnel collects a 6-field application
+> (name + gender + city + neighborhood + pet type + experience), goes to an
+> admin review queue, and on approval prompts the host to complete their
+> profile (bio + pictures + Nafath stub) before listing creation unlocks.
+> Same email cannot create both an owner and a host account — to act as
+> both, the user signs out and signs in to the other account. The 'both'
+> role + persona toggle were removed.
+
 - **Swap email OTP → Saudi phone OTP.** Step 4 ships with email OTP for dev
   speed. Before launch: enable Supabase Phone Auth, wire a Send SMS Hook (Edge
   Function calling Unifonic or Taqnyat), swap `{email}` for `{phone}` in
@@ -192,8 +205,10 @@ launch.
   HyperPay (mada + STC Pay + Apple Pay) before any real money moves.
 
 - **Nafath ID verification for hosts.** `profiles.nafath_verified` ships as a
-  `false` default with no UI to set it. Before launch hosts must complete
-  Nafath to be listable.
+  `false` default. The post-approval profile-completion screen at
+  `/become-host/complete-profile` already renders a Nafath stub block behind
+  a local `NAFATH_ENABLED = false` flag — flip the flag, wire the verifier,
+  and gate `host_profile_complete = true` on Nafath success before launch.
 
 - **Push notifications + prayer-time awareness.** The `notificationsAllowed()`
   helper stub exists; wire to expo-notifications and add the prayer-time
@@ -237,23 +252,48 @@ launch.
 
 ## 12. Roles
 
-The `profiles.role` column has four values. Each describes both what UI the
-user sees on signed-in home and what they can do across the app.
+Migration 0039 split owner and host into separate account types — same email
+cannot create both. The `profiles.role` column has three values (was four;
+`'both'` was dropped):
 
-- **`owner`** — has at least one cat needing care. Browses hosts, requests
-  bookings, posts in messaging, files condition reports as a participant,
-  leaves reviews. Cannot create listings.
-- **`host`** — boards cats. Creates listings (pending admin approval),
-  accepts/declines bookings, posts daily updates, files condition reports
-  as a participant, leaves reviews. Cannot request bookings.
-- **`both`** — owner and host simultaneously. Can do everything owners and
-  hosts can do. Sees the owner browse feed as their home screen by default
-  (host dashboard reached separately).
-- **`admin`** — founder vetting account. Sees the admin dashboard as their
-  home screen. Can approve/reject host applications, approve/reject
-  listings, edit any profile, edit any listing, suspend/unsuspend users.
-  Multi-admin permission levels are post-MVP — for now it's binary
-  (you're admin or you're not).
+- **`owner`** — signs up via the regular `/sign-in` funnel (email → OTP →
+  password → name → home). No approval, no verification. Browses hosts,
+  requests bookings, posts in messaging, files condition reports as a
+  participant, leaves reviews. **Cannot create listings, ever.** Tapping
+  "Become a Host" routes to `/become-host` which shows a notice asking
+  them to sign out and create a separate account with a different email.
+- **`host`** — signs up only via the "Become a Host" CTA → `/become-host`
+  → `/sign-in?flow=host` → email → OTP → password → multi-field
+  application form (`/become-host/application`). Goes through the
+  `host_application_status` lifecycle below. Booking stays is always
+  available on a host account — only listing creation is gated. Hosts
+  can accept/decline bookings on their listings, post daily updates,
+  file condition reports as a participant, leave reviews.
+- **`admin`** — founder vetting account. Sees the admin dashboard as
+  their home screen. Can approve/reject host applications via the
+  Host Applications queue at `/admin/hosts`, approve/reject listings,
+  edit any profile, edit any listing, suspend/unsuspend users.
+  Multi-admin permission levels are post-MVP — for now it's binary.
+
+### Host application lifecycle
+
+After a user submits the application form, their profile carries one of
+four `host_application_status` values, all gated by RLS and surfaced by
+a status panel on `/profile`:
+
+| `host_application_status` | `host_profile_complete` | What the user can do |
+|---|---|---|
+| `null` (owner) | n/a | Book stays. Cannot list. |
+| `pending` | `false` | Book stays. Cannot list. Sees "Application under review" panel. |
+| `approved` | `false` | Book stays. Cannot list yet. Sees "Complete your profile" CTA → routes to `/become-host/complete-profile` for bio + pictures + Nafath stub. |
+| `approved` | `true` | Book stays AND create listings. Verified pill in feed. |
+| `rejected` | `false` | Book stays. Cannot list. Sees rejection notice with admin's reason. May re-apply later. |
+
+Listing INSERT RLS (migration 0039) enforces the gate at the DB layer:
+`role='host' AND host_application_status='approved' AND host_profile_complete=true`.
+The UI mirrors this — `/listings/new` redirects pre-conditions to the
+appropriate screen instead of letting the user fill the form and hit a
+500.
 
 Suspended users (`profiles.is_suspended = true`) can sign in but see a
 dedicated "account suspended" screen instead of their normal home. They
@@ -261,9 +301,11 @@ cannot insert listings, bookings, messages, addons, condition reports,
 daily updates, or reviews — enforced at the RLS layer via
 `public.is_active_user()`.
 
-Verified hosts (`profiles.is_verified = true`) display a verified badge in
-the feed. Verification is **not** gating visibility — that's controlled by
-`listings.is_active`. Admin sets both independently.
+Verified hosts (`profiles.is_verified = true`) display a verified badge
+in the feed. Verification is **not** the visibility gate — that's
+`listings.status='approved'`. Admin sets both independently; the
+`approveHostApplication()` helper flips both `is_verified=true` AND
+`host_application_status='approved'` in one update.
 
 ---
 
@@ -381,3 +423,47 @@ of its breadth.
     - Listing detail / card icons updated per species.
     - Section 11 cross-check: "تأمين" addon copy and insurance partner
       requirements may differ by species — flag during launch prep.
+
+### Test round 4 — 2026-06-15 / persona-separation (Step 4.6)
+
+Surfaced when the founder reviewed the deployed signup flow and asked
+"how does a new host sign up?" The answer was that they couldn't —
+the "Become a Host" CTA was owner-only and the destination was a
+stub. The same review also surfaced that the existing in-flight
+3-way role picker at signup let any new user instantly pick "host"
+or "both" with no verification — undercutting the female-trust wedge
+that the admin-vetting model in §0 is built around.
+
+Founder decisions (locked):
+
+- **Two account types separated at the email level.** Owner and host
+  are different accounts. Same email cannot create both. To act as
+  both, the user signs out and signs in to the other account. The
+  `'both'` role is gone (migration 0039 drops it from the CHECK
+  constraint; existing 'both' users migrated to 'owner').
+- **Owner signup is instant — no approval.** Email → OTP → password →
+  name → home feed. No role picker.
+- **Host signup is the only path through `/become-host`.** Two-stage:
+  application (name + gender + city + neighborhood + pet type +
+  experience yes/no + years), then post-approval profile completion
+  (bio + pictures + Nafath stub). Listing creation gated until both
+  stages are done.
+- **Booking is universal.** Hosts can book stays without verification —
+  only listing creation is gated. The booking RLS is unchanged.
+- **Gender is collected at apply time and stays required for hosts.**
+  Both male and female allowed (was previously female-trust-positioned
+  but never female-only at the schema level). The female-only filter
+  on the owner feed remains as a customer-facing choice.
+- **Persona toggle removed.** No more "Switch to Owner / Sitter" pill
+  in the header. A user IS what they signed up as.
+
+Implementation lives in:
+- Migration `0039_host_application_schema.sql`
+- `src/app/become-host.tsx` (intro)
+- `src/app/become-host/application.tsx` (the form)
+- `src/app/become-host/submitted.tsx` (confirmation)
+- `src/app/become-host/complete-profile.tsx` (post-approval bio + pics + Nafath stub)
+- `src/lib/host-application.ts` (submit/list/approve/reject/markComplete helpers)
+- `src/app/admin/hosts.tsx` (review queue, rewritten — was an
+  `is_verified=false` filter; now a proper application detail view)
+- Profile screen's `HostStatusPanel` (`src/app/profile.tsx`)
