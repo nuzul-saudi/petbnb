@@ -248,6 +248,36 @@ launch.
   matches how Rover/Airbnb track host stats. See JSDoc on the helper
   for context.
 
+- **Listing tier criteria (bronze / silver / gold).** The `listings.tier`
+  enum exists (default `bronze`) and ListingCard renders a Silver/Gold
+  overlay; Bronze stays unbadged so it reads as "default" rather than
+  "rank 3 of 3". Today the tier is set MANUALLY by admin on the listing
+  detail screen (`src/app/admin/listings/[id].tsx` — `setTier` state) —
+  no defined criteria, no scoring logic. Pre-launch decisions needed:
+  (a) what earns silver vs gold — e.g. completed-booking count, average
+  rating, repeat-customer share, host tenure — and (b) whether tiers
+  stay a manual admin lever (current behavior) or become auto-promoted
+  by an algorithm that runs on `bookings.status` transitions /
+  `reviews` inserts. Affects every listing card across the owner feed.
+
+- **Message anti-leakage policy.** Messaging ships with a SOFT nudge:
+  `containsContactInfo(body)` in `src/lib/messages.ts` matches Saudi
+  phone formats (Latin + Arabic-Indic digits), email shape, and the
+  WhatsApp / Telegram / Snap / Instagram / email keyword list in
+  English and Arabic transliterations. On match, the compose `onSend`
+  in `src/app/bookings/[id].tsx` shows
+  `confirmDialog(t('messages.contact_warning'))` — if the user
+  confirms, the message still sends. This protects platform
+  commission lightly; observed-and-sent leaks remain possible.
+  Pre-launch decision: stay at SOFT nudge or escalate to HARD
+  block-and-rephrase. Recommendation is to spot-check message logs
+  via admin first (no current admin UI for this — would need a small
+  message-search screen) and decide based on observed leak rate.
+  Escalation is mechanical — change the call site from
+  "confirm and send" to "block until rephrased" using the same
+  regex. False positives are the real risk; tightening too early
+  frustrates legitimate conversations.
+
 ---
 
 ## 12. Roles
