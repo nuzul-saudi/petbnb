@@ -278,6 +278,26 @@ launch.
   regex. False positives are the real risk; tightening too early
   frustrates legitimate conversations.
 
+- **Pre-booking inquiry path.** Messaging today (Step 9 / Round 5)
+  is BOOKING-SCOPED ONLY — `messages.booking_id` is NOT NULL since
+  migration 0001, so a thread cannot exist before the owner has
+  committed to a booking request. The trust conversation an owner
+  needs BEFORE handing their cat to a stranger has no home in the
+  product. Building this as Round 5b / Step 9.5. Design lives in
+  [`docs/round-5b-inquiry-plan.md`](./docs/round-5b-inquiry-plan.md):
+  a new `inquiries` parent table + `messages.inquiry_id` (nullable)
+  + a CHECK constraint enforcing exactly one of `booking_id` or
+  `inquiry_id` per row. RLS limits inquiry threads to the two
+  participants + active_user + admin-on-SELECT. UI adds a
+  "Message host" CTA on the listing detail, a compose surface
+  reusing the existing `MessagesSection`, and a `/inquiries` inbox
+  mirroring `/bookings`. Anti-leakage stays at the existing soft
+  nudge but flag this as the highest-priority surface for admin
+  spot-checks — pre-booking is where commission leaks. **Must
+  ship before launch** — without it the messaging product solves
+  only post-acceptance coordination, not the trust conversation
+  that should precede the booking.
+
 ---
 
 ## 12. Roles
@@ -497,3 +517,42 @@ Implementation lives in:
 - `src/app/admin/hosts.tsx` (review queue, rewritten — was an
   `is_verified=false` filter; now a proper application detail view)
 - Profile screen's `HostStatusPanel` (`src/app/profile.tsx`)
+
+### Round 5 review — 2026-06-17 / pre-booking trust gap
+
+Surfaced when the founder reviewed the deployed messaging surface
+and asked: "can an owner message a host from the listing page
+before committing to a booking request? If not, the trust
+conversation only starts after they've already committed — backwards
+for 'hand my cat to a stranger.'"
+
+**Audit answer:** no. `messages.booking_id` is NOT NULL since
+migration 0001; every `listMessages` / `sendMessage` call requires a
+booking id; `MessagesSection` only mounts inside
+`src/app/bookings/[id].tsx`. The listing-detail CTAs are "Request
+booking" or guest-sign-in only — no "Message host". So the only
+trust-building conversation the product supports happens AFTER the
+owner has already committed to a booking request. Backwards.
+
+**Decision:** build a pre-booking inquiry path as Round 5b / Step
+9.5 BEFORE kicking off the merchant-account application (the
+payments work has a multi-day external gate; inquiry path is local
+code work — start the long-running one, work on inquiry in parallel).
+Without this, the Step 9 messaging product solves only
+post-acceptance coordination, not the trust conversation that
+should precede the booking.
+
+**Design lives in [`docs/round-5b-inquiry-plan.md`](./docs/round-5b-inquiry-plan.md)** —
+covers the existing-state audit of every migration touching
+`public.messages` (0001 + 0002 + 0004; nothing else), the
+recommended data model (Option A: `inquiries` parent table + a
+nullable `messages.inquiry_id` + a CHECK constraint that messages
+reference exactly one of `booking_id` or `inquiry_id`), the
+migration shape, the RLS design composing with the existing
+messages policies, the route + UI layout, the anti-leakage stance
+(stay at soft nudge but flag pre-booking as the highest-risk
+commission-leak surface), and one OPEN decision left for the
+founder: when an inquiry becomes a booking, does the booking thread
+start fresh (option α, simpler) or carry the inquiry messages over
+(option β, unified UX but cancel-deletion footgun via cascade).
+Pre-launch tracking is in Section 11.

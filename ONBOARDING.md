@@ -1481,7 +1481,7 @@ change:
 - Update both the migration file AND `src/types/database.ts` in the
   same commit when changing the schema.
 - Add i18n keys in the same commit as the component that uses them.
-- Use feminine Arabic register (ـكِ not ـكَ).
+- Use masculine Arabic register (ـك not ـكِ). Founder decision 2026-06-14 — see §9.
 - Use `logWarn`/`logInfo`/`logError` from `lib/log.ts`, not raw
   `console.*`.
 - Use `confirmDialog` from `lib/confirm.ts` for destructive actions.
