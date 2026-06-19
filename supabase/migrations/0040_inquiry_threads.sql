@@ -75,12 +75,11 @@ create table public.inquiries (
   -- so a self-inquiry would have already been rejected by the
   -- starter_id <> host_id implication. This constraint catches the
   -- case where a future migration loosens either of those clauses.
-  constraint inquiries_no_self_inquiry check (starter_id <> host_id),
-  -- One inquiry thread per (listing, starter) pair. Re-tapping
-  -- "Message host" returns the existing thread, not a duplicate.
-  -- The application layer is expected to UPSERT against this
-  -- constraint.
-  constraint inquiries_unique_pair unique (listing_id, starter_id)
+  constraint inquiries_no_self_inquiry check (starter_id <> host_id)
+  -- The "one thread per (listing, starter) pair" rule lives in the
+  -- partial unique INDEX below (inquiries_one_open_per_pair) — it
+  -- has to be a partial index, not a table constraint, so it sits
+  -- outside the CREATE TABLE block.
 );
 
 -- Inbox queries (host-side and owner-side) read by participant
@@ -95,6 +94,28 @@ create index inquiries_starter_id_last_msg_idx
 -- listing" UI).
 create index inquiries_listing_id_idx
   on public.inquiries (listing_id);
+
+-- At most one OPEN thread per (listing, starter) pair. Partial on
+-- status='open' so a fresh thread can be opened after a previous
+-- one converts (booking accepted out of it) or closes (archived).
+-- Without the WHERE clause, an owner would be permanently locked
+-- out of re-engaging with the same host on the same listing once
+-- the prior thread terminates (and guard_inquiry_update blocks
+-- reopen).
+--
+-- A partial unique can't live as a table-level constraint in
+-- PostgreSQL — it has to be a unique INDEX, which is why this
+-- sits outside the CREATE TABLE block.
+--
+-- APP-LAYER NOTE (UI round): the "re-tap Message host returns
+-- the existing thread" logic cannot be a blind ON CONFLICT
+-- upsert against this index. The app must SELECT the open thread
+-- first and only INSERT if none exists. If any future code path
+-- uses ON CONFLICT, it MUST target
+-- (listing_id, starter_id) WHERE status = 'open'.
+create unique index inquiries_one_open_per_pair
+  on public.inquiries (listing_id, starter_id)
+  where status = 'open';
 
 alter table public.inquiries enable row level security;
 
@@ -418,9 +439,15 @@ begin
 end;
 $$;
 
+-- WHEN clause skips the function call entirely on booking-scoped
+-- inserts (high-volume — every booking-thread message). The
+-- in-function `if new.inquiry_id is not null` is kept below as
+-- defense-in-depth in case a future migration changes this trigger
+-- to fire conditionally for another reason.
 create trigger touch_inquiry_last_message_at
   after insert on public.messages
   for each row
+  when (new.inquiry_id is not null)
   execute function public.touch_inquiry_last_message_at();
 
 
@@ -435,9 +462,15 @@ create trigger touch_inquiry_last_message_at
 --   expect: 5 rows —
 --     inquiries_host_id_last_msg_idx
 --     inquiries_listing_id_idx
+--     inquiries_one_open_per_pair
 --     inquiries_pkey
 --     inquiries_starter_id_last_msg_idx
---     inquiries_unique_pair
+--
+-- 1a. The one-open-per-pair index is partial on status='open'.
+--   select indexdef from pg_indexes
+--   where schemaname = 'public'
+--     and indexname = 'inquiries_one_open_per_pair';
+--   expect indexdef to contain: WHERE (status = 'open'::text)
 --
 -- 2. messages.booking_id is nullable; messages.inquiry_id exists.
 --   select column_name, is_nullable, data_type

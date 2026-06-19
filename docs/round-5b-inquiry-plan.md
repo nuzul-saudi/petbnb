@@ -288,9 +288,32 @@ number) will do, in order:
    (FK to profiles, NOT NULL), `status` (text NOT NULL, CHECK in the
    three-state enum, default `'open'`), `created_at`,
    `last_message_at` (nullable).
-2. **Add UNIQUE `(listing_id, starter_id)`** — one inquiry per
-   owner-host pair per listing. Re-tapping "Message host" should
-   return the existing thread, not create a duplicate.
+2. **Add PARTIAL UNIQUE INDEX `(listing_id, starter_id)
+   WHERE status = 'open'`** — at most one OPEN thread per
+   owner-host pair per listing. Re-tapping "Message host" returns
+   the open thread if one exists. **Why partial, not full:**
+   `guard_inquiry_update` makes both `converted` and `closed`
+   terminal — they cannot transition back to `open`. A full unique
+   constraint would permanently lock an owner out of re-engaging
+   the same host on the same listing once the prior thread ends.
+   The partial index lets a fresh inquiry start after a previous
+   one converts/closes. PostgreSQL doesn't allow partial unique as
+   a table constraint — it must be a unique INDEX, defined outside
+   the CREATE TABLE block.
+
+   **CHANGE-1 NOTE for the UI round (Strategy review 2026-06-19) —
+   IMPLEMENTATION ONLY, do NOT build now, recorded here for the
+   UI round:** with a partial unique index, the "re-tap Message
+   host returns the existing thread" flow CANNOT be a blind
+   `ON CONFLICT` upsert. The app must:
+   1. SELECT the open thread for `(listing_id, starter_id)` first.
+   2. If a row exists with `status='open'`, reuse its id.
+   3. Only INSERT a new row if no open thread is found.
+   If any code path ever does use `ON CONFLICT`, it MUST target
+   `(listing_id, starter_id) WHERE status = 'open'` — the only
+   shape the partial index can resolve. A full
+   `ON CONFLICT (listing_id, starter_id)` will fail because no
+   total unique constraint exists with that name.
 3. **Index `inquiries(host_id, last_message_at DESC NULLS LAST)`**
    and `inquiries(starter_id, last_message_at DESC NULLS LAST)` for
    the two inbox queries (one per role).
@@ -453,9 +476,11 @@ Tapping "Message host" → either:
 
 - **5a — Modal compose** (simpler): a bottom-sheet or fullscreen
   modal with the host's avatar + name at the top and the existing
-  `MessagesSection` mounted. On first send, the inquiry row is
-  created (UPSERT against the `(listing_id, starter_id)` UNIQUE,
-  conflict → fetch existing). Closes back to the listing.
+  `MessagesSection` mounted. On first send, the app SELECTs an
+  open thread for the `(listing_id, starter_id)` pair; if none,
+  INSERTs a new row. See the CHANGE-1 NOTE in §3 — blind
+  `ON CONFLICT` does NOT work because the unique index is partial
+  on `status='open'`. Closes back to the listing.
 - **5b — Dedicated route** (better deep-link UX): `/inquiries/[id]`
   or `/listings/[id]/inquire`. Same UI, navigable via URL, browser
   history works, refresh-safe. Recommended.
