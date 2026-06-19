@@ -178,6 +178,10 @@ export function AppHeader({
               onPress={goAndClose('/bookings')}
             />
             <MenuItem
+              label={t('nav.inquiries')}
+              onPress={goAndClose('/inquiries')}
+            />
+            <MenuItem
               label={t('profile.my_pets_link')}
               onPress={goAndClose('/pets')}
             />

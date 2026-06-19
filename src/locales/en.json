@@ -770,9 +770,30 @@
     "back_to_inbox": "← Back to inbox",
     "status_converted": "This conversation became a booking.",
     "status_closed": "This conversation is archived. No new messages can be sent.",
+    "status_open_pill": "Open",
+    "status_converted_pill": "Booked",
+    "status_closed_pill": "Archived",
     "close_button": "Archive conversation",
     "close_confirm": "Archive this conversation? You won't be able to send new messages here.",
     "closing": "Archiving…"
+  },
+  "myinquiries": {
+    "title": "My inquiries",
+    "subtitle": "Your pre-booking conversations with hosts.",
+    "host_title": "Guest inquiries",
+    "host_subtitle": "Guest questions on your listings before a booking request.",
+    "back": "← Back",
+    "loading": "Loading…",
+    "load_failed": "Couldn't load inquiries",
+    "empty": "No inquiries yet",
+    "empty_body": "Start a conversation from any listing page via the \"Message host\" button.",
+    "host_empty": "No guest messages yet",
+    "host_empty_body": "When a guest messages you from your listing page, the conversation will appear here.",
+    "no_messages_yet": "No messages yet",
+    "just_now": "Just now",
+    "minutes_ago": "{n}m ago",
+    "hours_ago": "{n}h ago",
+    "days_ago": "{n}d ago"
   },
   "messages": {
     "section_title": "Messages",
@@ -787,6 +808,7 @@
   "nav": {
     "home": "Home",
     "bookings": "My Bookings",
+    "inquiries": "My Inquiries",
     "my_listings": "My Listings",
     "account": "My Account",
     "guest_sign_in": "Sign in",
