@@ -761,24 +761,31 @@ export type Database = {
       };
 
       // ---------------------------------------------------------------------
+      // 0040: booking_id is now nullable; inquiry_id added (nullable).
+      // The messages_one_thread_check CHECK constraint enforces that
+      // exactly one of booking_id / inquiry_id is set per row, so any
+      // given row in practice has one populated and the other null.
       messages: {
         Row: {
           id: string;
-          booking_id: string;
+          booking_id: string | null;
+          inquiry_id: string | null;
           sender_id: string;
           body: string;
           created_at: string;
         };
         Insert: {
           id?: string;
-          booking_id: string;
+          booking_id?: string | null;
+          inquiry_id?: string | null;
           sender_id: string;
           body: string;
           created_at?: string;
         };
         Update: {
           id?: string;
-          booking_id?: string;
+          booking_id?: string | null;
+          inquiry_id?: string | null;
           sender_id?: string;
           body?: string;
           created_at?: string;
@@ -792,8 +799,74 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
+            foreignKeyName: 'messages_inquiry_id_fkey';
+            columns: ['inquiry_id'];
+            isOneToOne: false;
+            referencedRelation: 'inquiries';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'messages_sender_id_fkey';
             columns: ['sender_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+
+      // ---------------------------------------------------------------------
+      // 0040: pre-booking inquiry threads. A first-class parent of
+      // inquiry-scoped messages (see messages.inquiry_id above). UPSERT
+      // against the (listing_id, starter_id) UNIQUE constraint to fetch-
+      // or-create a thread when the owner taps "Message host".
+      inquiries: {
+        Row: {
+          id: string;
+          listing_id: string;
+          starter_id: string;
+          host_id: string;
+          status: Database['public']['Enums']['inquiry_status'];
+          created_at: string;
+          updated_at: string;
+          last_message_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          starter_id: string;
+          host_id: string;
+          status?: Database['public']['Enums']['inquiry_status'];
+          created_at?: string;
+          updated_at?: string;
+          last_message_at?: string | null;
+        };
+        Update: {
+          // id / listing_id / starter_id / host_id / created_at are
+          // immutable per the guard_inquiry_update trigger; status
+          // transitions limited to open → converted | closed.
+          status?: Database['public']['Enums']['inquiry_status'];
+          updated_at?: string;
+          last_message_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'inquiries_listing_id_fkey';
+            columns: ['listing_id'];
+            isOneToOne: false;
+            referencedRelation: 'listings';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'inquiries_starter_id_fkey';
+            columns: ['starter_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'inquiries_host_id_fkey';
+            columns: ['host_id'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
@@ -1017,6 +1090,11 @@ export type Database = {
       host_gender: 'female' | 'male';
       host_application_status: 'pending' | 'approved' | 'rejected';
       host_pet_type_accepted: 'cats' | 'dogs' | 'cats_and_dogs';
+      // 0040 — pre-booking inquiry threads.
+      // open      → active, accepting new messages
+      // converted → terminal; a booking was accepted out of this thread
+      // closed    → terminal; archived by a participant
+      inquiry_status: 'open' | 'converted' | 'closed';
       booking_status:
         | 'requested'
         | 'accepted'
