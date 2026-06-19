@@ -13,6 +13,7 @@ import { SearchWhenModal } from '@/components/SearchWhenModal';
 import { findCity, findDistrict } from '@/lib/cities';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import { openInquiry } from '@/lib/inquiries';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { listReviewsForHost, type HostReview } from '@/lib/reviews';
 import { useAuth } from '@/lib/auth';
@@ -56,6 +57,13 @@ export default function ListingDetailScreen() {
   const [stayStart, setStayStart] = useState<string | null>(carriedStart);
   const [stayEnd, setStayEnd] = useState<string | null>(carriedEnd);
   const [whenOpen, setWhenOpen] = useState(false);
+  // Round 5b — Message host CTA. The inquiry is created (or the
+  // existing open one is fetched) lazily on tap, then the route
+  // navigates to /inquiries/[id]. We track only the in-flight state
+  // here so the user sees a loading state on the button while the
+  // request lands; errors surface via setMessageError below.
+  const [openingInquiry, setOpeningInquiry] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   // searchForward now reads from LOCAL state (Feature 2) so any
   // post-arrival edit on the detail page travels to /request.
@@ -419,7 +427,14 @@ export default function ListingDetailScreen() {
           {/* CTA gates on listing ownership.
               Own listing → Edit CTA (a host can't book their own
               listing; DB RLS backs this up). Otherwise → Request
-              booking CTA, or a sign-in CTA for guests. */}
+              booking CTA, or a sign-in CTA for guests.
+
+              Round 5b — "Message host" secondary CTA. Hidden on
+              the host's own listing (the Edit CTA above covers
+              what they need). Guest taps → /sign-in with
+              returnTo pointing back to this URL. Signed-in
+              non-host taps → openInquiry() fetch-or-creates the
+              open thread, then navigates to /inquiries/[id]. */}
           <View style={styles.ctaWrap}>
             {isOwnListing ? (
               <Button
@@ -429,27 +444,72 @@ export default function ListingDetailScreen() {
                 fullWidth
               />
             ) : !session ? (
-              <Button
-                label={t('listing.guest_sign_in_to_book')}
-                onPress={() =>
-                  router.push(
-                    `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}/request${searchForward}`)}`,
-                  )
-                }
-                variant="primary"
-                fullWidth
-              />
+              <>
+                <Button
+                  label={t('listing.guest_sign_in_to_book')}
+                  onPress={() =>
+                    router.push(
+                      `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}/request${searchForward}`)}`,
+                    )
+                  }
+                  variant="primary"
+                  fullWidth
+                />
+                <View style={styles.secondaryCtaSpacer} />
+                <Button
+                  label={t('listing.message_host_button')}
+                  onPress={() =>
+                    router.push(
+                      `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}`)}`,
+                    )
+                  }
+                  variant="secondary"
+                  fullWidth
+                />
+              </>
             ) : (
-              <Button
-                label={t('listing.request_button')}
-                onPress={() =>
-                  router.push(
-                    `/listings/${listing.id}/request${searchForward}`,
-                  )
-                }
-                variant="primary"
-                fullWidth
-              />
+              <>
+                <Button
+                  label={t('listing.request_button')}
+                  onPress={() =>
+                    router.push(
+                      `/listings/${listing.id}/request${searchForward}`,
+                    )
+                  }
+                  variant="primary"
+                  fullWidth
+                />
+                <View style={styles.secondaryCtaSpacer} />
+                <Button
+                  label={
+                    openingInquiry
+                      ? t('listing.message_host_opening')
+                      : t('listing.message_host_button')
+                  }
+                  onPress={async () => {
+                    if (openingInquiry) return;
+                    setOpeningInquiry(true);
+                    setMessageError(null);
+                    try {
+                      const inquiry = await openInquiry(
+                        listing.id,
+                        listing.host_id,
+                      );
+                      router.push(`/inquiries/${inquiry.id}` as never);
+                    } catch (e) {
+                      logWarn('[listing.open_inquiry_failed]', e);
+                      setMessageError(t('listing.message_host_failed'));
+                    } finally {
+                      setOpeningInquiry(false);
+                    }
+                  }}
+                  variant="secondary"
+                  fullWidth
+                />
+                {messageError ? (
+                  <Text style={styles.inquiryError}>{messageError}</Text>
+                ) : null}
+              </>
             )}
           </View>
 
@@ -888,6 +948,20 @@ const styles = StyleSheet.create({
   },
   ctaWrap: {
     marginTop: spacing.lg,
+  },
+  // Round 5b — gap between the primary CTA (Request booking /
+  // Sign in to book) and the secondary "Message host" CTA below it.
+  secondaryCtaSpacer: {
+    height: spacing.sm,
+  },
+  // Inline error surface for the Message host tap, in case
+  // openInquiry throws (network / RLS reject / etc).
+  inquiryError: {
+    marginTop: spacing.sm,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.terracotta,
+    textAlign: 'center',
   },
   // Feature 2 — stay-dates widget. Pressable card above the CTA
   // showing the carried-in dates (or "Add stay dates" prompt).

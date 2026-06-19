@@ -61,6 +61,9 @@
     "no_resident_pets": "No resident pets",
     "offers_grooming": "Grooming available",
     "request_button": "Request booking",
+    "message_host_button": "Message host",
+    "message_host_opening": "Opening…",
+    "message_host_failed": "Couldn't open the conversation. Please try again.",
     "edit_button": "Edit listing",
     "back": "← Back",
     "stay_dates_label": "Stay dates",
@@ -758,6 +761,18 @@
     "loading": "Loading…",
     "error": "Something went wrong, please try again later",
     "retry": "Try again"
+  },
+  "inquiry": {
+    "title": "Pre-booking conversation",
+    "loading": "Loading…",
+    "load_failed": "Couldn't load the conversation",
+    "not_found": "Conversation not found",
+    "back_to_inbox": "← Back to inbox",
+    "status_converted": "This conversation became a booking.",
+    "status_closed": "This conversation is archived. No new messages can be sent.",
+    "close_button": "Archive conversation",
+    "close_confirm": "Archive this conversation? You won't be able to send new messages here.",
+    "closing": "Archiving…"
   },
   "messages": {
     "section_title": "Messages",
