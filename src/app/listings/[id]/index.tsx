@@ -1,5 +1,5 @@
 import { logWarn } from '@/lib/log';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,8 +37,18 @@ export default function ListingDetailScreen() {
     endDate?: string;
     petId?: string;
     petIds?: string;
+    // Round 5b post-review: intent carried through the auth funnel.
+    // When a guest taps "Message host" we route them to
+    //   /sign-in?returnTo=/listings/[id]?action=inquire
+    // The auth chain treats returnTo as opaque (it just startsWith('/')
+    // checks and redirects), so after sign-in they land back here with
+    // params.action === 'inquire'. The useEffect below auto-fires
+    // openInquiry once on that signal so the trust intent doesn't get
+    // dropped at the post-auth bounce.
+    action?: string;
   }>();
   const id = typeof params.id === 'string' ? params.id : '';
+  const intentAction = typeof params.action === 'string' ? params.action : null;
 
   // Feature 2 — smart listing page. Dates carried in from search
   // prefill the local state below; without dates the widget shows
@@ -64,6 +74,13 @@ export default function ListingDetailScreen() {
   // request lands; errors surface via setMessageError below.
   const [openingInquiry, setOpeningInquiry] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  // Round 5b post-review — loop guard for the action=inquire
+  // auto-fire effect below. The ref protects against multiple fires
+  // within the same mount (e.g., React.StrictMode double-effect,
+  // listing reload while action is still in the URL). URL-level
+  // cleanup via router.setParams strips ?action= before navigation
+  // so a browser back to this screen won't re-trigger.
+  const autoFiredInquiryRef = useRef(false);
 
   // searchForward now reads from LOCAL state (Feature 2) so any
   // post-arrival edit on the detail page travels to /request.
@@ -133,6 +150,54 @@ export default function ListingDetailScreen() {
       cancelled = true;
     };
   }, [listing?.host_id]);
+
+  // Round 5b — single source of truth for the inquiry-open path.
+  // Used both by the manual "Message host" button tap and the
+  // post-auth auto-fire effect below, so neither can drift from the
+  // other. Reuses the double-tap-safe openInquiry helper from
+  // src/lib/inquiries (SELECT-then-INSERT with 23505 race recovery).
+  const handleOpenInquiry = useCallback(async () => {
+    if (!listing || !user) return;
+    if (openingInquiry) return;
+    setOpeningInquiry(true);
+    setMessageError(null);
+    try {
+      const inquiry = await openInquiry(listing.id, listing.host_id);
+      router.push(`/inquiries/${inquiry.id}` as never);
+    } catch (e) {
+      logWarn('[listing.open_inquiry_failed]', e);
+      setMessageError(t('listing.message_host_failed'));
+    } finally {
+      setOpeningInquiry(false);
+    }
+  }, [listing, user, openingInquiry, router, t]);
+
+  // Round 5b post-review — auto-fire the inquiry path when a guest
+  // returns from the auth funnel with ?action=inquire in the URL.
+  //
+  // Without this effect, the trust intent is dropped at the post-
+  // auth bounce — most users won't re-tap the CTA they tapped
+  // before sign-in.
+  //
+  // Loop guard (autoFiredInquiryRef): the entire body runs AT MOST
+  // ONCE per mount. router.setParams strips the action param so a
+  // browser-back to this screen won't re-trigger on re-mount.
+  //
+  // Self-inquiry guard: if the post-auth user happens to be the
+  // listing's host, silently skip — no self-inquiry. Strips the
+  // param anyway so the URL doesn't carry leftover state.
+  useEffect(() => {
+    if (intentAction !== 'inquire') return;
+    if (!listing || !user) return; // wait for both to settle
+    if (autoFiredInquiryRef.current) return;
+    autoFiredInquiryRef.current = true;
+    // Remove the action param from the URL. setParams replaces the
+    // current entry; undefined removes that key. Prevents
+    // back-navigation re-fires AND keeps the URL clean for sharing.
+    router.setParams({ action: undefined } as Record<string, undefined>);
+    if (user.id === listing.host_id) return;
+    void handleOpenInquiry();
+  }, [intentAction, listing, user, router, handleOpenInquiry]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   // R2C3 guest mode (2026-06-11): listing detail is browsable by anon.
@@ -459,8 +524,15 @@ export default function ListingDetailScreen() {
                 <Button
                   label={t('listing.message_host_button')}
                   onPress={() =>
+                    // Round 5b post-review fix — embed the inquiry
+                    // intent in returnTo so it survives the auth
+                    // funnel. After sign-in the user lands back here
+                    // with ?action=inquire and the auto-fire effect
+                    // below opens the thread for them. Without this,
+                    // the trust intent gets dropped at the post-auth
+                    // bounce (most users won't re-tap the CTA).
                     router.push(
-                      `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}`)}`,
+                      `/sign-in?returnTo=${encodeURIComponent(`/listings/${listing.id}?action=inquire`)}`,
                     )
                   }
                   variant="secondary"
@@ -486,23 +558,7 @@ export default function ListingDetailScreen() {
                       ? t('listing.message_host_opening')
                       : t('listing.message_host_button')
                   }
-                  onPress={async () => {
-                    if (openingInquiry) return;
-                    setOpeningInquiry(true);
-                    setMessageError(null);
-                    try {
-                      const inquiry = await openInquiry(
-                        listing.id,
-                        listing.host_id,
-                      );
-                      router.push(`/inquiries/${inquiry.id}` as never);
-                    } catch (e) {
-                      logWarn('[listing.open_inquiry_failed]', e);
-                      setMessageError(t('listing.message_host_failed'));
-                    } finally {
-                      setOpeningInquiry(false);
-                    }
-                  }}
+                  onPress={() => void handleOpenInquiry()}
                   variant="secondary"
                   fullWidth
                 />
