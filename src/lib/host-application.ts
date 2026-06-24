@@ -51,6 +51,21 @@ export type HostApplicationRow = Pick<
  * and host_application_status='pending'. The form is responsible for
  * validating non-null fields before calling this. RLS lets the user
  * update their own profile row.
+ *
+ * 2026-06-24 — converted from UPDATE to UPSERT (insert-or-update).
+ * The previous UPDATE silently no-op'd when the profile row was
+ * missing (PostgREST returns 204 with zero rows affected, no error).
+ * This trap bit the petbnb10 manual-cleanup test session: deleting
+ * profile but not auth.users left an orphaned auth row; subsequent
+ * application submit "succeeded" at the HTTP layer but wrote
+ * nothing. With upsert against the (id) primary key, a missing row
+ * gets inserted with the application fields populated.
+ *
+ * The normal signup path is unaffected — the on_auth_user_created
+ * trigger inserts the profile row immediately when verifyOtp
+ * creates the auth.users row, so by the time this helper runs there
+ * IS a row to update. Upsert just makes the function resilient to
+ * the orphaned-auth edge case.
  */
 export async function submitHostApplication(
   userId: string,
@@ -59,18 +74,21 @@ export async function submitHostApplication(
   if (!supabase) throw new Error('Supabase not configured');
   const { error } = await supabase
     .from('profiles')
-    .update({
-      full_name: input.fullName.trim(),
-      role: 'host',
-      host_application_status: 'pending',
-      host_application_submitted_at: new Date().toISOString(),
-      host_gender: input.gender,
-      host_city: input.city,
-      host_neighborhood: input.neighborhood,
-      host_pet_type_accepted: input.petTypeAccepted,
-      host_experience_years: input.experienceYears,
-    })
-    .eq('id', userId);
+    .upsert(
+      {
+        id: userId,
+        full_name: input.fullName.trim(),
+        role: 'host',
+        host_application_status: 'pending',
+        host_application_submitted_at: new Date().toISOString(),
+        host_gender: input.gender,
+        host_city: input.city,
+        host_neighborhood: input.neighborhood,
+        host_pet_type_accepted: input.petTypeAccepted,
+        host_experience_years: input.experienceYears,
+      },
+      { onConflict: 'id' },
+    );
   if (error) throw error;
 }
 
@@ -139,6 +157,12 @@ export async function rejectHostApplication(
  * creation RLS (0039) checks host_profile_complete=true; without
  * this flip, INSERTs on listings are denied even after admin
  * approval.
+ *
+ * Kept as UPDATE (not upsert) because by this point the user MUST
+ * have a profile row — they're an approved host applicant, which
+ * means submitHostApplication already ran and persisted their row.
+ * If the row is missing here, something has gone catastrophically
+ * wrong and a silent insert would mask the real problem.
  */
 export async function markHostProfileComplete(
   userId: string,
