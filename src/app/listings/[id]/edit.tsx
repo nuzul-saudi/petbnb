@@ -29,12 +29,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { ListingForm, type ListingFormValues } from '@/components/ListingForm';
 import { useAuth } from '@/lib/auth';
+import {
+  listBlockedRanges,
+  type BlockedRange,
+} from '@/lib/availability';
 import { confirmDialog } from '@/lib/confirm';
 import { useTranslation } from '@/lib/i18n';
 import {
@@ -56,6 +65,12 @@ export default function EditListingScreen() {
   const id = typeof params.id === 'string' ? params.id : '';
 
   const [data, setData] = useState<ListingEditData | null>(null);
+  // Blocked ranges fetched in parallel with the edit data. Used to
+  // render the live "X periods blocked" summary on the Manage
+  // availability link, including the soonest upcoming range so the
+  // host can confirm at a glance that their settings are applied
+  // without navigating into the sub-page (2026-06-24).
+  const [blockedRanges, setBlockedRanges] = useState<BlockedRange[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -72,8 +87,14 @@ export default function EditListingScreen() {
 
   const refetch = useCallback(async () => {
     if (!id) return;
-    const next = await getListingForEdit(id);
+    // Edit data + blocked ranges in parallel — they're independent
+    // queries, so no reason to serialize them.
+    const [next, ranges] = await Promise.all([
+      getListingForEdit(id),
+      listBlockedRanges(id).catch(() => [] as BlockedRange[]),
+    ]);
     setData(next);
+    setBlockedRanges(ranges);
   }, [id]);
 
   useEffect(() => {
@@ -94,6 +115,18 @@ export default function EditListingScreen() {
       cancelled = true;
     };
   }, [id, refetch, t]);
+
+  // 2026-06-24 — refetch on focus. The host navigates from this
+  // screen out to /photos and /availability sub-pages, mutates,
+  // then comes back. Without the focus-refetch, the edit screen
+  // would render the stale snapshot from initial mount (no photos,
+  // no blocked dates) even though those sub-pages successfully
+  // wrote to the DB. Same pattern as bookings/[id]'s focus refetch.
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   // ---- early returns: auth → load → ownership ----
 
@@ -246,6 +279,35 @@ export default function EditListingScreen() {
         ? t('listings.edit.photo_count_one')
         : t('listings.edit.photo_count', { count: String(photoCount) });
 
+  // 2026-06-24 — live availability summary. The host needs to see
+  // at a glance: (a) how many ranges they've blocked, (b) what the
+  // next one is (so they remember "right, I blocked next week").
+  // No blocked ranges → fall back to the prompt copy that explains
+  // what this row does.
+  const blockedCount = blockedRanges.length;
+  const upcomingRange = blockedRanges.find(
+    (r) => r.end_date >= new Date().toISOString().slice(0, 10),
+  );
+  const availabilityMetaLabel =
+    blockedCount === 0
+      ? t('listings.edit.manage_availability_meta')
+      : blockedCount === 1
+        ? upcomingRange
+          ? t('listings.edit.availability_one_with_next', {
+              start: upcomingRange.start_date,
+              end: upcomingRange.end_date,
+            })
+          : t('listings.edit.availability_one')
+        : upcomingRange
+          ? t('listings.edit.availability_many_with_next', {
+              count: String(blockedCount),
+              start: upcomingRange.start_date,
+              end: upcomingRange.end_date,
+            })
+          : t('listings.edit.availability_many', {
+              count: String(blockedCount),
+            });
+
   const busy = saving || togglingActive || discarding;
 
   return (
@@ -292,7 +354,10 @@ export default function EditListingScreen() {
 
         {/* Milestone B — Manage availability link. Same row pattern
             as the photos link above; routes to the availability
-            screen where the host can add/remove blocked date ranges. */}
+            screen where the host can add/remove blocked date ranges.
+            Meta label is LIVE (2026-06-24) — shows the blocked-period
+            count + the soonest upcoming range so the host can verify
+            without navigating into the sub-page. */}
         <Pressable
           onPress={() => router.push(`/listings/${id}/availability`)}
           style={styles.photosLink}
@@ -305,9 +370,7 @@ export default function EditListingScreen() {
             <Text style={styles.photosLinkTitle}>
               {t('listings.edit.manage_availability')}
             </Text>
-            <Text style={styles.photosLinkMeta}>
-              {t('listings.edit.manage_availability_meta')}
-            </Text>
+            <Text style={styles.photosLinkMeta}>{availabilityMetaLabel}</Text>
           </View>
           <Text style={styles.photosLinkChevron}>
             {locale === 'ar' ? '‹' : '›'}

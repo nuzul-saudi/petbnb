@@ -165,7 +165,11 @@
       "discard_confirm": "Discard your pending edits? This can't be undone.",
       "discard_failed": "Couldn't discard pending edits. Please try again.",
       "manage_availability": "Manage availability",
-      "manage_availability_meta": "Block dates you can't host"
+      "manage_availability_meta": "Block dates you can't host",
+      "availability_one": "1 period blocked",
+      "availability_one_with_next": "Blocked: {start} → {end}",
+      "availability_many": "{count} periods blocked",
+      "availability_many_with_next": "{count} periods blocked. Next: {start} → {end}"
     },
     "availability": {
       "title": "Availability",

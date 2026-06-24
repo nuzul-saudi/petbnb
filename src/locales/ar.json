@@ -165,7 +165,11 @@
       "discard_confirm": "هل تريد تجاهل تعديلاتك قيد المراجعة؟ لا يمكن التراجع.",
       "discard_failed": "تعذّر تجاهل التعديلات، حاولي مرة أخرى.",
       "manage_availability": "إدارة التوفر",
-      "manage_availability_meta": "حدّدي الأيام التي لا تستضيفين فيها"
+      "manage_availability_meta": "حدّد الأيام التي لا تستضيف فيها",
+      "availability_one": "فترة واحدة موقوفة",
+      "availability_one_with_next": "فترة موقوفة: {start} → {end}",
+      "availability_many": "{count} فترات موقوفة",
+      "availability_many_with_next": "{count} فترات موقوفة. التالية: {start} → {end}"
     },
     "availability": {
       "title": "التوفر",
