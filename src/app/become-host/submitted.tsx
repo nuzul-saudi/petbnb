@@ -4,6 +4,18 @@
 // and a button to continue browsing the site (they can book stays
 // while their application is pending; only listing creation is
 // gated on admin approval).
+//
+// 2026-06-24 — removed the
+//   if (!profile?.host_application_status) <Redirect />
+// guard. It was firing as a race condition: submit handler awaits
+// the UPDATE + refreshProfile, then router.replace's here, but
+// the React context update from setProfile hadn't propagated by
+// the first render of THIS screen. Guard redirected back to the
+// form, which remounted empty — net effect for the user was
+// "form silently clears, looks like submit failed."
+// The deep-link "fake confirmation" risk this guard guarded
+// against is negligible (the screen has no consequences — it's
+// just a text confirmation + Continue button to home).
 
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -17,15 +29,10 @@ import { colors, fonts, radii, spacing } from '@/theme/tokens';
 export default function HostApplicationSubmittedScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { initializing, session, profile } = useAuth();
+  const { initializing, session } = useAuth();
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session) return <Redirect href="/sign-in?flow=host" />;
-  // If the application wasn't actually submitted, send them back to
-  // the form. Defense against deep-linking to this screen.
-  if (!profile?.host_application_status) {
-    return <Redirect href="/become-host/application" />;
-  }
 
   return (
     <SafeAreaView style={styles.safe}>
