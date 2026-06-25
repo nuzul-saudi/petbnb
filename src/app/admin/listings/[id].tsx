@@ -191,7 +191,13 @@ export default function AdminListingDetailScreen() {
       } else {
         await approveNewListing(detail.listing.id);
       }
-      await load();
+      // 2026-06-25 — after a successful approve, return to the admin
+      // home so the founder sees the queue counts update. Pre-fix
+      // behavior re-fetched the same detail screen, which then
+      // rendered the now-approved listing as an editable admin record
+      // with a 'Save' button — confusing because the action they
+      // wanted was 'approve and move on,' not 'edit further.'
+      router.replace('/admin');
     } catch (e) {
       logWarn('[admin.listing.approve_failed]', e);
       setError(
