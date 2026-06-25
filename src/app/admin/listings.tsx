@@ -27,38 +27,65 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { listPendingReviews, type AdminReview } from '@/lib/admin';
+import {
+  listAllListings,
+  listPendingReviews,
+  type AdminReview,
+} from '@/lib/admin';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
+// 2026-06-25 — chip-toggled view.
+//
+// Two entries land on this screen:
+//   - 'Listings awaiting approval' admin-home card → ?filter=review
+//   - 'All listings' admin-home nav link          → ?filter=all
+//
+// The page reads ?filter from the URL on mount and defaults the
+// chip accordingly. Defaults to 'all' when the param is missing
+// (matches the menu label expectation that "All listings" shows
+// every listing, not just the queue).
+type FilterMode = 'review' | 'all';
+
 export default function AdminListingsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const initialFilter: FilterMode =
+    params.filter === 'review' ? 'review' : 'all';
 
+  const [filter, setFilter] = useState<FilterMode>(initialFilter);
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setReviews(await listPendingReviews());
-    } catch (e) {
-      logWarn('[admin.listings.load_failed]', e);
-      setError(t('admin.load_failed'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+  const load = useCallback(
+    async (mode: FilterMode) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const rows =
+          mode === 'review'
+            ? await listPendingReviews()
+            : await listAllListings();
+        setReviews(rows);
+      } catch (e) {
+        logWarn('[admin.listings.load_failed]', e);
+        setError(t('admin.load_failed'));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t],
+  );
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load]),
+      load(filter);
+    }, [load, filter]),
   );
 
   return (
@@ -67,7 +94,54 @@ export default function AdminListingsScreen() {
         <Pressable onPress={() => router.replace('/admin')} style={styles.backLink}>
           <Text style={styles.backText}>{t('admin.back')}</Text>
         </Pressable>
-        <Text style={styles.title}>{t('admin.review_queue_title')}</Text>
+        <Text style={styles.title}>
+          {filter === 'review'
+            ? t('admin.review_queue_title')
+            : t('admin.all_listings_title')}
+        </Text>
+      </View>
+
+      {/* Filter chips. Tap toggles the dataset; URL param updates
+          so back/forward survives. */}
+      <View style={styles.filterRow}>
+        <Pressable
+          onPress={() => {
+            setFilter('all');
+            router.setParams({ filter: 'all' });
+          }}
+          style={[
+            styles.filterChip,
+            filter === 'all' && styles.filterChipActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.filterChipText,
+              filter === 'all' && styles.filterChipTextActive,
+            ]}
+          >
+            {t('admin.filter_all')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            setFilter('review');
+            router.setParams({ filter: 'review' });
+          }}
+          style={[
+            styles.filterChip,
+            filter === 'review' && styles.filterChipActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.filterChipText,
+              filter === 'review' && styles.filterChipTextActive,
+            ]}
+          >
+            {t('admin.filter_review')}
+          </Text>
+        </Pressable>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -184,6 +258,33 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: colors.mossDeep,
     textAlign: 'right',
+  },
+  // 2026-06-25 — filter chip row, sits between the header and the list.
+  filterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  filterChip: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    backgroundColor: colors.paper,
+  },
+  filterChipActive: {
+    backgroundColor: colors.mossDeep,
+    borderColor: colors.mossDeep,
+  },
+  filterChipText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  filterChipTextActive: {
+    color: colors.cream,
   },
   error: {
     fontFamily: fonts.body,

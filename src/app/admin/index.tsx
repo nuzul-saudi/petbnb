@@ -97,7 +97,9 @@ export default function AdminHome() {
         </Pressable>
 
         <Pressable
-          onPress={() => router.push('/admin/listings')}
+          onPress={() =>
+            router.push('/admin/listings?filter=review' as never)
+          }
           disabled={!pendingListingsCount}
           style={[
             styles.card,
@@ -143,7 +145,9 @@ export default function AdminHome() {
         </Pressable>
 
         <Pressable
-          onPress={() => router.push('/admin/listings')}
+          onPress={() =>
+            router.push('/admin/listings?filter=all' as never)
+          }
           style={styles.navRow}
         >
           <Text style={styles.navText}>{t('admin.nav_all_listings')}</Text>

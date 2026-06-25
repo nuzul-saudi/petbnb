@@ -252,6 +252,115 @@ export async function listPendingReviews(): Promise<AdminReview[]> {
   return reviews;
 }
 
+/**
+ * 2026-06-25 — alternate fetch for the "All listings" admin view.
+ * Returns EVERY listing regardless of status or draft state,
+ * matching the meaning of the admin menu's "جميع الإعلانات" link.
+ *
+ * Shape mirrors AdminReview so the same row renderer + detail
+ * navigation work for both modes. The reviewType field is
+ * synthesized: 'new_listing' / 'pending_edit' if the row IS in the
+ * review queue, else a sentinel 'none' marker that the UI can
+ * render differently (e.g. neutral status pill instead of an action
+ * call-to-attention).
+ *
+ * RLS: admin reads all rows via is_admin() bypass on the SELECT
+ * policies of listings + listing_drafts + listing_photos +
+ * listing_photo_drafts (0024 + 0004).
+ */
+export async function listAllListings(): Promise<AdminReview[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('listings')
+    .select(
+      `
+      *,
+      host:profiles!listings_host_id_fkey(id, full_name, is_verified, is_suspended),
+      listing_photos(photo_url, sort_order),
+      listing_drafts(updated_at),
+      listing_photo_drafts(created_at)
+    `,
+    );
+  if (error) throw error;
+
+  const out: AdminReview[] = [];
+
+  for (const row of data ?? []) {
+    const fieldDraft = (row.listing_drafts ?? null) as
+      | { updated_at: string }
+      | null;
+    const photoDrafts = (row.listing_photo_drafts ?? []) as {
+      created_at: string;
+    }[];
+    const hasFieldDraft = fieldDraft !== null;
+    const hasPhotoDraft = photoDrafts.length > 0;
+
+    // Classify same as listPendingReviews but DON'T skip non-queue
+    // rows — every listing belongs in the All view.
+    let reviewType: AdminReviewType;
+    if (row.status === 'pending' && !hasFieldDraft && !hasPhotoDraft) {
+      reviewType = 'new_listing';
+    } else if (
+      (row.status === 'approved' ||
+        row.status === 'paused' ||
+        row.status === 'admin_disabled') &&
+      (hasFieldDraft || hasPhotoDraft)
+    ) {
+      reviewType = 'pending_edit';
+    } else {
+      // Live / inactive with no drafts — use new_listing as a
+      // fallback classification (it just controls the badge color
+      // in the UI). A more elaborate 'live' variant is overkill
+      // for the row renderer.
+      reviewType = 'new_listing';
+    }
+
+    // Sort key: prefer review draft activity, fall back to
+    // created_at for live listings. Same DESC order keeps the
+    // most recent activity at the top.
+    const reviewedAt =
+      hasFieldDraft && fieldDraft
+        ? fieldDraft.updated_at
+        : hasPhotoDraft && photoDrafts.length
+          ? photoDrafts
+              .map((p) => p.created_at)
+              .reduce((a, b) => (a > b ? a : b))
+          : row.created_at;
+
+    const photos = (row.listing_photos ?? []) as {
+      photo_url: string;
+      sort_order: number;
+    }[];
+    const cover = photos.length
+      ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
+      : null;
+
+    const {
+      listing_photos: _p1,
+      listing_drafts: _p2,
+      listing_photo_drafts: _p3,
+      ...rest
+    } = row as typeof row & {
+      listing_photos?: unknown;
+      listing_drafts?: unknown;
+      listing_photo_drafts?: unknown;
+    };
+
+    out.push({
+      ...(rest as Tables<'listings'>),
+      host: (row.host ?? null) as AdminListing['host'],
+      cover_photo: cover,
+      reviewType,
+      reviewedAt,
+      hasFieldDraft,
+      hasPhotoDraft,
+    });
+  }
+
+  out.sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt));
+  return out;
+}
+
 export type AdminListingPhoto = {
   id: string;
   photo_url: string;
