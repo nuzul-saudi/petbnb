@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
-import { DateField } from '@/components/DateField';
+import { SearchWhenModal } from '@/components/SearchWhenModal';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import {
@@ -72,14 +72,8 @@ function isAddonAvailable(type: AddonType, listing: ListingDetail): boolean {
 }
 
 // ISO-date 'YYYY-MM-DD' arithmetic: returns the date one day after the
-// ISO-date 'YYYY-MM-DD' arithmetic: returns the date one day after the
-// given ISO date. Used to force endDate strictly > startDate. Sub-night
-// bookings (hourly) would change this rule.
-function nextDayIso(iso: string): string {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
+// nextDayIso was retired 2026-06-26 with the date-card UX swap. The
+// SearchWhenModal's RangeCalendar handles end-day clamping internally.
 
 export default function BookingRequestScreen() {
   const router = useRouter();
@@ -117,6 +111,10 @@ export default function BookingRequestScreen() {
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [pets, setPets] = useState<Tables<'pets'>[]>([]);
   const [blockedRanges, setBlockedRanges] = useState<BlockedRange[]>([]);
+  // 2026-06-26 — Airbnb-style date card opens the SearchWhenModal
+  // (same modal the home-page search hero uses). Modal hosts the
+  // RangeCalendar, which dims blocked dates.
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   // Round 6 — batch-sign pet photos for the multi-pet picker.
   const signedPetPhotos = useSignedPetPhotoUrls(pets.map((p) => p.photo_url));
@@ -638,58 +636,46 @@ export default function BookingRequestScreen() {
             schema; component's onChange returns (startDate, endDate)
             as strings or null. We map null \xe2\x86\x92 '' to preserve the
             existing string-typed local state. */}
-        {/* 2026-06-26 — reverted to the two-DateField pattern to
-            match the main page's date selector style (founder
-            decision: the inline calendar was visually inconsistent
-            with the rest of the app). Blocked-date protection is
-            preserved via the hint line below + the hard validate()
-            gate + the disabled Send-request CTA. */}
-        <View style={styles.field}>
-          <Text style={styles.label}>{t('booking.start_date_label')}</Text>
-          <DateField
-            value={startDate}
-            onChange={(v) => {
-              setStartDate(v);
-              if (endDate && endDate <= v) setEndDate('');
-            }}
-            min={todayIso()}
-          />
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.label}>{t('booking.end_date_label')}</Text>
-          <DateField
-            value={endDate}
-            onChange={setEndDate}
-            min={startDate ? nextDayIso(startDate) : todayIso()}
-          />
-          {endDateError ? (
-            <Text style={styles.errorText}>{endDateError}</Text>
-          ) : null}
-        </View>
-
-        {/* Visible blocked-dates hint. Up to 3 upcoming ranges, with
-            "+ N more" if there are extras. Past ranges roll off. */}
-        {(() => {
-          const today = todayIso();
-          const upcoming = blockedRanges
-            .filter((r) => r.end_date >= today)
-            .slice(0, 3);
-          if (upcoming.length === 0) return null;
-          const moreCount =
-            blockedRanges.filter((r) => r.end_date >= today).length -
-            upcoming.length;
-          return (
-            <Text style={styles.blockedHint}>
-              📅 {t('booking.blocked_dates_hint')}{' '}
-              {upcoming
-                .map((r) => `${r.start_date} → ${r.end_date}`)
-                .join(' · ')}
-              {moreCount > 0
-                ? ' · ' + t('booking.blocked_dates_more', { n: moreCount })
-                : ''}
+        {/* 2026-06-26 — Airbnb-style two-cell date card. Single
+            bordered container with CHECK-IN / CHECKOUT cells split
+            by a vertical divider. Tapping either cell opens the
+            shared SearchWhenModal (RangeCalendar inside), which now
+            dims blocked dates and rejects taps on them. */}
+        <Pressable
+          onPress={() => setDatePickerOpen(true)}
+          style={styles.dateCard}
+        >
+          <View style={styles.dateCardCell}>
+            <Text style={styles.dateCardLabel}>
+              {t('booking.check_in')}
             </Text>
-          );
-        })()}
+            <Text
+              style={[
+                styles.dateCardValue,
+                !startDate && styles.dateCardValuePlaceholder,
+              ]}
+            >
+              {startDate || t('booking.add_date')}
+            </Text>
+          </View>
+          <View style={styles.dateCardDivider} />
+          <View style={styles.dateCardCell}>
+            <Text style={styles.dateCardLabel}>
+              {t('booking.check_out')}
+            </Text>
+            <Text
+              style={[
+                styles.dateCardValue,
+                !endDate && styles.dateCardValuePlaceholder,
+              ]}
+            >
+              {endDate || t('booking.add_date')}
+            </Text>
+          </View>
+        </Pressable>
+        {endDateError ? (
+          <Text style={styles.errorText}>{endDateError}</Text>
+        ) : null}
 
         {nights > 0 ? (
           <Text style={styles.summary}>
@@ -994,6 +980,22 @@ export default function BookingRequestScreen() {
           <Text style={styles.ctaText}>{submitLabel}</Text>
         </Pressable>
       </ScrollView>
+
+      {/* 2026-06-26 — date range picker modal. Same SearchWhenModal
+          the home page uses, now extended with blockedRanges so the
+          host's unavailable days render dimmed + struck-through and
+          can't be tapped. */}
+      <SearchWhenModal
+        visible={datePickerOpen}
+        startDate={startDate || null}
+        endDate={endDate || null}
+        blockedRanges={blockedRanges}
+        onApply={({ startDate: s, endDate: e }) => {
+          setStartDate(s ?? '');
+          setEndDate(e ?? '');
+        }}
+        onClose={() => setDatePickerOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -1337,15 +1339,40 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.md,
   },
-  // 2026-06-26 — visible "Blocked dates: X → Y" hint below the date
-  // fields on the booking request screen. Uses the rose tint so it
-  // visually matches the calendar block color (now retired) and
-  // reads as a soft warning, not an error.
-  blockedHint: {
+  // 2026-06-26 — Airbnb-style two-cell date card. Single bordered
+  // container, two cells split by a vertical divider. Mirrors the
+  // pattern in the Airbnb reservation block.
+  dateCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    overflow: 'hidden',
+  },
+  dateCardCell: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    gap: 2,
+  },
+  dateCardDivider: {
+    width: 1,
+    backgroundColor: colors.whisper,
+  },
+  dateCardLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.inkSoft,
+    textTransform: 'uppercase',
+  },
+  dateCardValue: {
     fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.terracotta,
-    marginTop: spacing.xs,
-    lineHeight: 18,
+    fontSize: 15,
+    color: colors.ink,
+  },
+  dateCardValuePlaceholder: {
+    color: colors.inkSoft,
   },
 });

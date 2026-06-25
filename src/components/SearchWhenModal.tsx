@@ -18,6 +18,13 @@ export type SearchWhenModalProps = {
   endDate: string | null;
   onApply: (next: { startDate: string | null; endDate: string | null }) => void;
   onClose: () => void;
+  /**
+   * 2026-06-26 — half-open blocked ranges from the host. Forwarded to
+   * the inner RangeCalendar so blocked days render dimmed + struck
+   * through and are non-tappable. Optional; the home-page search
+   * hero doesn't pass any (no listing context yet).
+   */
+  blockedRanges?: { start_date: string; end_date: string }[];
 };
 
 export function SearchWhenModal({
@@ -26,6 +33,7 @@ export function SearchWhenModal({
   endDate,
   onApply,
   onClose,
+  blockedRanges,
 }: SearchWhenModalProps) {
   const { t } = useTranslation();
   const [draftStart, setDraftStart] = useState<string | null>(startDate);
@@ -80,6 +88,7 @@ export function SearchWhenModal({
               setDraftEnd(e);
             }}
             onRangeComplete={onRangeComplete}
+            blockedRanges={blockedRanges}
           />
 
           <View style={styles.footer}>

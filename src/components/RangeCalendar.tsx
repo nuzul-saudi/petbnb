@@ -43,6 +43,14 @@ export type RangeCalendarProps = {
   onRangeComplete?: (start: string, end: string) => void;
   /** Earliest selectable day, 'yyyy-mm-dd'. Defaults to today. */
   minDate?: string;
+  /**
+   * 2026-06-26 — half-open [start_date, end_date) ranges the host
+   * has blocked. Days inside any range render dimmed (rose tint)
+   * and are non-tappable. Matches the listing_blocked_dates
+   * schema's half-open convention. Empty array = no blocks (the
+   * home-page search hero passes empty).
+   */
+  blockedRanges?: { start_date: string; end_date: string }[];
 };
 
 export function RangeCalendar({
@@ -51,8 +59,20 @@ export function RangeCalendar({
   onChange,
   onRangeComplete,
   minDate,
+  blockedRanges,
 }: RangeCalendarProps) {
   const { t, locale } = useTranslation();
+  // 2026-06-26 — half-open isBlocked check. start_date inclusive,
+  // end_date exclusive. Matches listing_blocked_dates schema and
+  // src/lib/range-overlap.ts. The home-page search hero passes
+  // no blocked ranges (empty array → never true).
+  const isDayBlocked = (date: string): boolean => {
+    if (!blockedRanges || blockedRanges.length === 0) return false;
+    for (const r of blockedRanges) {
+      if (date >= r.start_date && date < r.end_date) return true;
+    }
+    return false;
+  };
 
   // viewMonth is a "yyyy-mm-01" anchor for the visible page. Init
   // from startDate, or today if none.
@@ -140,6 +160,9 @@ export function RangeCalendar({
           }
           const { date, day } = cell;
           const isPast = date < min;
+          // 2026-06-26 — host-blocked day. Visually rose-tinted +
+          // non-tappable; same disabled treatment as past dates.
+          const isBlocked = isDayBlocked(date);
           const isStart = startDate != null && date === startDate;
           const isEnd = endDate != null && date === endDate;
           const isInRange =
@@ -148,13 +171,18 @@ export function RangeCalendar({
             date > startDate &&
             date < effectiveEnd;
           const isToday = date === todayIso();
+          const isUnselectable = isPast || isBlocked;
 
           return (
             <Pressable
               key={date}
               onPress={() => onDayTap(date)}
-              disabled={isPast}
-              style={[styles.dayCell, isInRange && styles.dayCellInRange]}
+              disabled={isUnselectable}
+              style={[
+                styles.dayCell,
+                isInRange && styles.dayCellInRange,
+                isBlocked && styles.dayCellBlocked,
+              ]}
               {...(Platform.OS === 'web'
                 ? {
                     onHoverIn: () => setHoverDate(date),
@@ -172,6 +200,7 @@ export function RangeCalendar({
                   style={[
                     styles.dayText,
                     isPast && styles.dayTextPast,
+                    isBlocked && styles.dayTextBlocked,
                     isToday && !isStart && !isEnd && styles.dayTextToday,
                     (isStart || isEnd) && styles.dayTextEndpoint,
                   ]}
@@ -332,6 +361,12 @@ const styles = StyleSheet.create({
   dayCellInRange: {
     backgroundColor: colors.whisper,
   },
+  // 2026-06-26 — host-blocked day. Soft rose tint, full cell width so
+  // adjacent blocked days form a visible band like the in-range cells.
+  dayCellBlocked: {
+    backgroundColor: colors.rose,
+    opacity: 0.35,
+  },
   dayInner: {
     width: CELL_SIZE - 4,
     height: CELL_SIZE - 4,
@@ -350,6 +385,10 @@ const styles = StyleSheet.create({
   dayTextPast: {
     color: colors.inkSoft,
     opacity: 0.4,
+  },
+  dayTextBlocked: {
+    color: colors.inkSoft,
+    textDecorationLine: 'line-through',
   },
   dayTextToday: {
     fontFamily: fonts.bodyBold,
