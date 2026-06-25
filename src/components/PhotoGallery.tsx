@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
+  Text,
   useWindowDimensions,
   View,
   type NativeScrollEvent,
@@ -9,7 +11,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 
-import { colors } from '@/theme/tokens';
+import { colors, fonts } from '@/theme/tokens';
 
 type Photo = { id: string; photo_url: string };
 
@@ -87,6 +89,10 @@ export function PhotoGallery({
   }
 
   const [index, setIndex] = useState(0);
+  // 2026-06-26 — desktop browsers don't expose a usable affordance
+  // for horizontally swiping a paging ScrollView. Add a ref so the
+  // arrow buttons can programmatically scrollTo the prev/next page.
+  const scrollRef = useRef<ScrollView | null>(null);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
@@ -94,6 +100,19 @@ export function PhotoGallery({
     // scroll offset by it yields the active page index.
     const i = Math.round(x / renderWidth);
     if (i !== index) setIndex(i);
+  };
+
+  const goPrev = () => {
+    if (index === 0) return;
+    const next = index - 1;
+    setIndex(next);
+    scrollRef.current?.scrollTo({ x: next * renderWidth, animated: true });
+  };
+  const goNext = () => {
+    if (index >= photos.length - 1) return;
+    const next = index + 1;
+    setIndex(next);
+    scrollRef.current?.scrollTo({ x: next * renderWidth, animated: true });
   };
 
   // alignSelf:'center' is a no-op on mobile (where renderWidth ===
@@ -109,9 +128,13 @@ export function PhotoGallery({
     return <View style={[styles.placeholder, containerStyle]} />;
   }
 
+  const canPrev = photos.length > 1 && index > 0;
+  const canNext = photos.length > 1 && index < photos.length - 1;
+
   return (
     <View style={containerStyle}>
       <ScrollView
+        ref={scrollRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -128,6 +151,31 @@ export function PhotoGallery({
           />
         ))}
       </ScrollView>
+
+      {/* 2026-06-26 — prev / next arrow buttons. Desktop users
+          can't swipe a paging ScrollView with a mouse, so the dots
+          alone are confusing. Arrows only render when there's more
+          than one photo and there's somewhere to go. */}
+      {canPrev ? (
+        <Pressable
+          onPress={goPrev}
+          style={[styles.arrow, styles.arrowLeft]}
+          accessibilityRole="button"
+          accessibilityLabel="Previous photo"
+        >
+          <Text style={styles.arrowGlyph}>‹</Text>
+        </Pressable>
+      ) : null}
+      {canNext ? (
+        <Pressable
+          onPress={goNext}
+          style={[styles.arrow, styles.arrowRight]}
+          accessibilityRole="button"
+          accessibilityLabel="Next photo"
+        >
+          <Text style={styles.arrowGlyph}>›</Text>
+        </Pressable>
+      ) : null}
 
       {photos.length > 1 ? (
         <View style={styles.dots} pointerEvents="none">
@@ -146,6 +194,33 @@ export function PhotoGallery({
 const styles = StyleSheet.create({
   placeholder: {
     backgroundColor: colors.whisper,
+  },
+  // 2026-06-26 — prev / next arrow buttons. Sized for both touch
+  // (44pt) and mouse target. Subtle background tint that doesn't
+  // compete with the photo content but stays visible against any
+  // image.
+  arrow: {
+    position: 'absolute',
+    top: '50%',
+    width: 44,
+    height: 44,
+    marginTop: -22,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowLeft: {
+    left: 12,
+  },
+  arrowRight: {
+    right: 12,
+  },
+  arrowGlyph: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 28,
+    color: '#FFFFFF',
+    lineHeight: 28,
   },
   dots: {
     position: 'absolute',
