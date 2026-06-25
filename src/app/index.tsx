@@ -659,9 +659,20 @@ function OwnerFeedHome() {
     return items;
   }, [items, sortBy]);
 
+  // 2026-06-26 — gate the initial feed load on `hydrated`. Pre-fix,
+  // the load callback fired immediately on mount with city='riyadh'
+  // (the default), then fired AGAIN once the hydration effect
+  // resolved and setCity('dammam') changed the load's identity.
+  // Two requests in flight; the slower one won. On slow networks
+  // the user saw the wrong city's listings until they touched the
+  // chip again to force a refetch.
+  //
+  // Now the first load only runs once hydration has settled, so
+  // the very first network call uses the persisted city.
   useEffect(() => {
+    if (!hydrated) return;
     load();
-  }, [load]);
+  }, [load, hydrated]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
