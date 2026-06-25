@@ -288,6 +288,8 @@
     "pet_vaccination_warning_expired": "Heads up: one of your selected cats has a rabies or FVRCP date more than a year old — a renewal is recommended. You can still send the request, but the sitter may ask for an up-to-date vaccination record.",
     "blocked_range_warning": "These dates overlap a period the sitter has blocked. Please pick different dates — the request can't be sent.",
     "blocked_dates_error": "Selected dates are blocked. Please pick dates outside the blocked periods before sending the request.",
+    "blocked_dates_hint": "Unavailable dates:",
+    "blocked_dates_more": "+{n} more periods",
     "pet_care_notes_label": "Care notes",
     "pet_vaccination_label": "Vaccinations",
     "vaccine_rabies": "Rabies:",

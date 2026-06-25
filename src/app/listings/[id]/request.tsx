@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
-import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
+import { DateField } from '@/components/DateField';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import {
@@ -72,9 +72,14 @@ function isAddonAvailable(type: AddonType, listing: ListingDetail): boolean {
 }
 
 // ISO-date 'YYYY-MM-DD' arithmetic: returns the date one day after the
-// nextDayIso was retired 2026-06-25 when the DateField swap removed
-// its only caller (the end-date `min` prop). The new
-// AvailabilityCalendar lets the user pick any day from start onward.
+// ISO-date 'YYYY-MM-DD' arithmetic: returns the date one day after the
+// given ISO date. Used to force endDate strictly > startDate. Sub-night
+// bookings (hourly) would change this rule.
+function nextDayIso(iso: string): string {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function BookingRequestScreen() {
   const router = useRouter();
@@ -633,22 +638,58 @@ export default function BookingRequestScreen() {
             schema; component's onChange returns (startDate, endDate)
             as strings or null. We map null \xe2\x86\x92 '' to preserve the
             existing string-typed local state. */}
+        {/* 2026-06-26 — reverted to the two-DateField pattern to
+            match the main page's date selector style (founder
+            decision: the inline calendar was visually inconsistent
+            with the rest of the app). Blocked-date protection is
+            preserved via the hint line below + the hard validate()
+            gate + the disabled Send-request CTA. */}
         <View style={styles.field}>
-          <Text style={styles.label}>{t('listing.stay_dates_label')}</Text>
-          <AvailabilityCalendar
-            startDate={startDate || null}
-            endDate={endDate || null}
-            onChange={(sel) => {
-              setStartDate(sel.startDate ?? '');
-              setEndDate(sel.endDate ?? '');
+          <Text style={styles.label}>{t('booking.start_date_label')}</Text>
+          <DateField
+            value={startDate}
+            onChange={(v) => {
+              setStartDate(v);
+              if (endDate && endDate <= v) setEndDate('');
             }}
-            blockedRanges={blockedRanges}
-            minDate={todayIso()}
+            min={todayIso()}
+          />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>{t('booking.end_date_label')}</Text>
+          <DateField
+            value={endDate}
+            onChange={setEndDate}
+            min={startDate ? nextDayIso(startDate) : todayIso()}
           />
           {endDateError ? (
             <Text style={styles.errorText}>{endDateError}</Text>
           ) : null}
         </View>
+
+        {/* Visible blocked-dates hint. Up to 3 upcoming ranges, with
+            "+ N more" if there are extras. Past ranges roll off. */}
+        {(() => {
+          const today = todayIso();
+          const upcoming = blockedRanges
+            .filter((r) => r.end_date >= today)
+            .slice(0, 3);
+          if (upcoming.length === 0) return null;
+          const moreCount =
+            blockedRanges.filter((r) => r.end_date >= today).length -
+            upcoming.length;
+          return (
+            <Text style={styles.blockedHint}>
+              📅 {t('booking.blocked_dates_hint')}{' '}
+              {upcoming
+                .map((r) => `${r.start_date} → ${r.end_date}`)
+                .join(' · ')}
+              {moreCount > 0
+                ? ' · ' + t('booking.blocked_dates_more', { n: moreCount })
+                : ''}
+            </Text>
+          );
+        })()}
 
         {nights > 0 ? (
           <Text style={styles.summary}>
@@ -1295,5 +1336,16 @@ const styles = StyleSheet.create({
     color: colors.terracotta,
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  // 2026-06-26 — visible "Blocked dates: X → Y" hint below the date
+  // fields on the booking request screen. Uses the rose tint so it
+  // visually matches the calendar block color (now retired) and
+  // reads as a soft warning, not an error.
+  blockedHint: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.terracotta,
+    marginTop: spacing.xs,
+    lineHeight: 18,
   },
 });
