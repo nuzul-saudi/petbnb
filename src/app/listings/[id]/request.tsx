@@ -1,7 +1,6 @@
 import { logWarn } from '@/lib/log';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
-import { DateField } from '@/components/DateField';
+import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import {
@@ -73,13 +72,9 @@ function isAddonAvailable(type: AddonType, listing: ListingDetail): boolean {
 }
 
 // ISO-date 'YYYY-MM-DD' arithmetic: returns the date one day after the
-// given ISO date. Used to force endDate strictly > startDate. Sub-night
-// bookings (hourly) would change this rule.
-function nextDayIso(iso: string): string {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
+// nextDayIso was retired 2026-06-25 when the DateField swap removed
+// its only caller (the end-date `min` prop). The new
+// AvailabilityCalendar lets the user pick any day from start onward.
 
 export default function BookingRequestScreen() {
   const router = useRouter();
@@ -138,7 +133,6 @@ export default function BookingRequestScreen() {
   // Ref for the departure date input — used to auto-focus after the
   // user picks an arrival date. Web-only (HTMLInputElement); on native
   // the date picker UX is modal-based so auto-open isn't meaningful.
-  const endDateRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!listingId || !user) return;
@@ -279,28 +273,10 @@ export default function BookingRequestScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pets, isEditMode, isRebookMode]);
 
-  // Calendar UX: when user picks arrival, focus the departure field so
-  // they can continue without an extra tap. Web-only; native picker
-  // auto-open requires a modal we don't have yet (Section 13 TODO).
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    if (startDate && !endDate) {
-      const el = endDateRef.current;
-      if (!el) return;
-      el.focus();
-      // showPicker() opens the native date picker on Chrome/Safari. Firefox
-      // got it in 101+. Optional-chain it so unsupported browsers just keep
-      // the focus behavior they had before.
-      try {
-        el.showPicker?.();
-      } catch {
-        // Some browsers throw NotAllowedError if called outside a user
-        // gesture. The setState that triggered this effect is itself a
-        // user gesture, but Safari has been picky. Swallow silently —
-        // focus alone still works.
-      }
-    }
-  }, [startDate, endDate]);
+  // 2026-06-25 — the start \xe2\x86\x92 end auto-focus effect was retired with
+  // the DateField swap. AvailabilityCalendar handles the two-tap
+  // selection internally: first tap sets start, second tap sets end.
+  // No focus management needed on the parent.
 
   // Drop per-pet entries whose pet is no longer selected.
   useEffect(() => {
@@ -650,25 +626,24 @@ export default function BookingRequestScreen() {
           {pickLocalized(listing.title_ar, listing.title_en, locale)}
         </Text>
 
-        {/* Dates — DateField branches on platform */}
+        {/* 2026-06-25 — replaced the two DateField inputs with a
+            single AvailabilityCalendar that grays out blocked dates
+            inside the picker, so the guest physically can't select
+            them. Half-open semantics match the listing_blocked_dates
+            schema; component's onChange returns (startDate, endDate)
+            as strings or null. We map null \xe2\x86\x92 '' to preserve the
+            existing string-typed local state. */}
         <View style={styles.field}>
-          <Text style={styles.label}>{t('booking.start_date_label')}</Text>
-          <DateField
-            value={startDate}
-            onChange={(v) => {
-              setStartDate(v);
-              if (endDate && endDate <= v) setEndDate('');
+          <Text style={styles.label}>{t('listing.stay_dates_label')}</Text>
+          <AvailabilityCalendar
+            startDate={startDate || null}
+            endDate={endDate || null}
+            onChange={(sel) => {
+              setStartDate(sel.startDate ?? '');
+              setEndDate(sel.endDate ?? '');
             }}
-            min={todayIso()}
-          />
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.label}>{t('booking.end_date_label')}</Text>
-          <DateField
-            value={endDate}
-            onChange={setEndDate}
-            min={startDate ? nextDayIso(startDate) : todayIso()}
-            inputRef={endDateRef}
+            blockedRanges={blockedRanges}
+            minDate={todayIso()}
           />
           {endDateError ? (
             <Text style={styles.errorText}>{endDateError}</Text>
