@@ -175,17 +175,29 @@ export function AppHeader({
             />
             {/* 2026-06-25 — host-side primary action: 'My Listings.'
                 Routes to the home feed which already renders the
-                host's listings as section cards. Hosts can also
-                book stays (post-0039) so 'My Bookings' stays below
-                this, just demoted. Owner accounts skip this entry. */}
+                host's listings as section cards. Owner accounts
+                skip this entry. */}
             {profile?.role === 'host' ? (
               <MenuItem
                 label={t('nav.my_listings')}
                 onPress={goAndClose('/')}
               />
             ) : null}
+            {/* 2026-06-26 — label diverges by role.
+                /bookings is a dual-purpose screen:
+                  - owners see bookings they made
+                  - hosts see reservations on their listings
+                'My Bookings' makes sense for owners. For hosts it
+                reads as 'bookings I made,' which is ambiguous since
+                hosts have a separate owner account for that. Use
+                'Reservations' (الحجوزات) for hosts \xe2\x80\x94 same
+                destination, unambiguous about whose perspective. */}
             <MenuItem
-              label={t('nav.bookings')}
+              label={
+                profile?.role === 'host'
+                  ? t('nav.reservations')
+                  : t('nav.bookings')
+              }
               onPress={goAndClose('/bookings')}
             />
             <MenuItem
