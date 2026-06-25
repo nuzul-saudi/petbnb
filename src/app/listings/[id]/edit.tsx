@@ -310,15 +310,49 @@ export default function EditListingScreen() {
 
   const busy = saving || togglingActive || discarding;
 
+  // 2026-06-25 — Cancel handler with confirm dialog (Option B).
+  // Photos and blocked dates are saved on their own sub-screens
+  // and committed there — Cancel on /edit only reverts in-progress
+  // changes to the listing's FORM fields, NOT photos or dates.
+  // Without this dialog the user assumes Cancel undoes everything
+  // (Airbnb-style edit session model), which our architecture
+  // doesn't support today. Confirm dialog sets expectations.
+  const onCancelWithConfirm = async () => {
+    const hasSideStateThatPersists =
+      data.photos.length > 0 || blockedRanges.length > 0;
+    if (hasSideStateThatPersists) {
+      const ok = await confirmDialog(t('listings.edit.cancel_confirm'));
+      if (!ok) return;
+    }
+    onCancel();
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable onPress={onCancel} style={styles.backLink}>
+          <Pressable onPress={onCancelWithConfirm} style={styles.backLink}>
             <Text style={styles.backText}>{t('listings.edit.back')}</Text>
           </Pressable>
           <Text style={styles.title}>{t('listings.edit.title')}</Text>
+        </View>
+
+        {/* 2026-06-25 — saved-state banner (Option B). Explicitly
+            communicates that photos and blocked dates are NOT
+            session-provisional — they're committed on their own
+            sub-screens. Without this, hosts assume "Save / Cancel
+            on this page covers everything" and either re-tap Save
+            looking for confirmation OR tap Cancel hoping to undo
+            a photo upload. Banner sets the model up front. */}
+        <View style={styles.savedBanner}>
+          <Text style={styles.savedBannerIcon}>✓</Text>
+          <Text style={styles.savedBannerText}>
+            {t('listings.edit.saved_banner', {
+              photos: String(data.photos.length),
+              periods: String(blockedRanges.length),
+            })}
+          </Text>
         </View>
 
         {/* Manage photos — sits above the form so it's reachable
@@ -386,7 +420,7 @@ export default function EditListingScreen() {
           cancelLabel={t('listings.form.cancel_button')}
           requireDirty
           onSave={onSave}
-          onCancel={onCancel}
+          onCancel={onCancelWithConfirm}
         />
 
         {/* Discard pending changes — only when a draft exists.
@@ -550,6 +584,30 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.inkSoft,
     marginLeft: spacing.sm,
+  },
+  // 2026-06-25 — saved-state banner above the sub-page links.
+  // Soft tint that signals "everything below is already persisted"
+  // — both photos and dates are saved on their own sub-screens.
+  savedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.whisper,
+    borderRadius: radii.md,
+    marginBottom: spacing.sm,
+  },
+  savedBannerIcon: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    color: colors.moss,
+  },
+  savedBannerText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    lineHeight: 18,
   },
   discardBlock: {
     gap: spacing.sm,
