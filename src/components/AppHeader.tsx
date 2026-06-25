@@ -173,6 +173,17 @@ export function AppHeader({
               label={t('nav.account')}
               onPress={goAndClose('/profile')}
             />
+            {/* 2026-06-25 — host-side primary action: 'My Listings.'
+                Routes to the home feed which already renders the
+                host's listings as section cards. Hosts can also
+                book stays (post-0039) so 'My Bookings' stays below
+                this, just demoted. Owner accounts skip this entry. */}
+            {profile?.role === 'host' ? (
+              <MenuItem
+                label={t('nav.my_listings')}
+                onPress={goAndClose('/')}
+              />
+            ) : null}
             <MenuItem
               label={t('nav.bookings')}
               onPress={goAndClose('/bookings')}
