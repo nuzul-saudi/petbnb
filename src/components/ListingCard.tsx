@@ -36,6 +36,15 @@ type Props = {
     isFavorited: boolean;
     onToggle: () => void;
   };
+  /**
+   * Host-side only (2026-06-25). When the host views their own listings
+   * on /, this line summarizes the blocked-date state ("1 period
+   * blocked, next: 2026-06-25 → 2026-06-30") so they can confirm at a
+   * glance without opening the listing detail or the availability
+   * sub-screen. The owner feed never passes this — owners shouldn't
+   * see another host's blocked-date inventory.
+   */
+  availabilityHint?: string;
 };
 
 // "جديد" (new host) badge is shown unconditionally for now — every
@@ -48,6 +57,7 @@ export function ListingCard({
   onPress,
   statusBadge,
   favorite,
+  availabilityHint,
 }: Props) {
   const { t, locale } = useTranslation();
 
@@ -157,6 +167,14 @@ export function ListingCard({
             ? ` · ${t('feed.distance_label', { km: toArabicDigits(listing.distance_km.toFixed(1)) })}`
             : ''}
         </Text>
+
+        {/* Host-side availability hint (2026-06-25). Only rendered
+            when the host home passes one; owner feed never does. */}
+        {availabilityHint ? (
+          <Text style={styles.availabilityHint} numberOfLines={1}>
+            📅 {availabilityHint}
+          </Text>
+        ) : null}
 
         {/* Status badge (host home, 7.1b) takes the slot when supplied.
             Otherwise the rating line, falling back to "new host". */}
@@ -288,6 +306,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
+  },
+  availabilityHint: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.inkSoft,
+    marginTop: 2,
   },
   rating: {
     fontFamily: fonts.bodyBold,

@@ -19,6 +19,10 @@ import { Button } from '@/components/Button';
 import { CategoryStrip } from '@/components/CategoryStrip';
 import { ListingCard } from '@/components/ListingCard';
 import { SearchHero } from '@/components/SearchHero';
+import {
+  listBlockedRangesByListing,
+  type BlockedRange,
+} from '@/lib/availability';
 import { SearchWhereModal } from '@/components/SearchWhereModal';
 import { SearchWhenModal } from '@/components/SearchWhenModal';
 import { SearchWhichPetModal } from '@/components/SearchWhichPetModal';
@@ -129,6 +133,40 @@ function pickStatusBadge(
 }
 
 // ---------------------------------------------------------------------------
+// 2026-06-25 — pickAvailabilityHint. Returns the localized
+// blocked-period summary for a single listing's blocked ranges, or
+// undefined when there are none (the ListingCard treats undefined
+// as "don't render the hint line"). Mirrors the labels used on the
+// /listings/[id]/edit Manage availability link so the host sees the
+// same sentence in both surfaces.
+// ---------------------------------------------------------------------------
+function pickAvailabilityHint(
+  ranges: BlockedRange[],
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string | undefined {
+  if (ranges.length === 0) return undefined;
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = ranges.find((r) => r.end_date >= today);
+  if (ranges.length === 1) {
+    return upcoming
+      ? t('listings.edit.availability_one_with_next', {
+          start: upcoming.start_date,
+          end: upcoming.end_date,
+        })
+      : t('listings.edit.availability_one');
+  }
+  return upcoming
+    ? t('listings.edit.availability_many_with_next', {
+        count: String(ranges.length),
+        start: upcoming.start_date,
+        end: upcoming.end_date,
+      })
+    : t('listings.edit.availability_many', {
+        count: String(ranges.length),
+      });
+}
+
+// ---------------------------------------------------------------------------
 // Host-only home (Step 7.1a — replaces the placeholder).
 // Read-only list of the host's own listings + a Create entry point. No
 // listing writes (those start in 7.2). Persona switch, host theme, and
@@ -145,6 +183,13 @@ function HostHome() {
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
+  // 2026-06-25 — blocked ranges per listing, batch-fetched after
+  // the listings load. Used to render the per-card availability
+  // hint ("1 period blocked, next: …"). Owners never see this —
+  // the prop only flows from HostHome's ListingCard render.
+  const [blockedByListing, setBlockedByListing] = useState<
+    Map<string, BlockedRange[]>
+  >(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +202,16 @@ function HostHome() {
       try {
         const rows = await listOwnListings(profile.id);
         setItems(rows);
+        // Batch-fetch blocked ranges for the host's listings. Errors
+        // here aren't fatal to the page — fall back to an empty map
+        // so the cards render without the availability hint.
+        try {
+          const map = await listBlockedRangesByListing(rows.map((r) => r.id));
+          setBlockedByListing(map);
+        } catch (e) {
+          logWarn('[host_home.blocked_ranges_failed]', e);
+          setBlockedByListing(new Map());
+        }
       } catch (e) {
         logWarn('[host_home.load_failed]', e);
         setError(t('feed.load_failed'));
@@ -298,6 +353,10 @@ function HostHome() {
               listing={item}
               onPress={() => router.push(`/listings/${item.id}`)}
               statusBadge={pickStatusBadge(item, t)}
+              availabilityHint={pickAvailabilityHint(
+                blockedByListing.get(item.id) ?? [],
+                t,
+              )}
             />
           )}
           stickySectionHeadersEnabled={false}

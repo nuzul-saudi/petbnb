@@ -38,6 +38,32 @@ export async function listBlockedRanges(
 }
 
 /**
+ * Batch variant — fetch blocked ranges for many listings in one round
+ * trip and group by listing_id. Used by HostHome (2026-06-25) to
+ * render the per-card availability hint without issuing one query
+ * per listing card. Empty array on no input, no error on missing
+ * supabase client.
+ */
+export async function listBlockedRangesByListing(
+  listingIds: string[],
+): Promise<Map<string, BlockedRange[]>> {
+  const out = new Map<string, BlockedRange[]>();
+  if (!supabase || listingIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from('listing_blocked_dates')
+    .select('*')
+    .in('listing_id', listingIds)
+    .order('start_date', { ascending: true });
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const list = out.get(row.listing_id) ?? [];
+    list.push(row);
+    out.set(row.listing_id, list);
+  }
+  return out;
+}
+
+/**
  * Insert a new blocked range. Throws on overlap with an existing
  * range only if the host's RLS rejects (we don't dedupe client-side;
  * overlaps within a listing's blocked set are harmless).
