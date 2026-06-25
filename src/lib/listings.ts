@@ -540,6 +540,11 @@ export async function createListing(input: {
   hasResidentPets: boolean;
   residentPetsNote: string | null;
   offersGrooming: boolean;
+  // 0041 — per-host service-addon opt-ins. Optional for back-compat;
+  // omitting them defaults to false at the DB layer.
+  offersVet?: boolean;
+  offersInsurance?: boolean;
+  offersTransport?: boolean;
   hostGender: 'female' | 'male';
   requiresVaccination: boolean;
   /** Round 12 / Step 5.7. Optional for back-compat — defaults to ['cat']
@@ -561,6 +566,9 @@ export async function createListing(input: {
       has_resident_pets: input.hasResidentPets,
       resident_pets_note: input.residentPetsNote,
       offers_grooming: input.offersGrooming,
+      offers_vet: input.offersVet ?? false,
+      offers_insurance: input.offersInsurance ?? false,
+      offers_transport: input.offersTransport ?? false,
       host_gender: input.hostGender,
       requires_vaccination: input.requiresVaccination,
       // Gated: when species support is off, the column doesn't
@@ -610,6 +618,10 @@ export type UpdateListingPatch = {
   hasResidentPets?: boolean;
   residentPetsNote?: string | null;
   offersGrooming?: boolean;
+  // 0041 — per-host service-addon opt-ins.
+  offersVet?: boolean;
+  offersInsurance?: boolean;
+  offersTransport?: boolean;
   hostGender?: 'female' | 'male';
   requiresVaccination?: boolean;
   /** Round 12 / Step 5.7. text[] of accepted species. */
@@ -721,6 +733,16 @@ export async function updateListing(
     if (patch.offersGrooming !== undefined) {
       row.offers_grooming = patch.offersGrooming;
     }
+    // 0041 — per-host service-addon opt-ins.
+    if (patch.offersVet !== undefined) {
+      row.offers_vet = patch.offersVet;
+    }
+    if (patch.offersInsurance !== undefined) {
+      row.offers_insurance = patch.offersInsurance;
+    }
+    if (patch.offersTransport !== undefined) {
+      row.offers_transport = patch.offersTransport;
+    }
     if (patch.hostGender !== undefined) row.host_gender = patch.hostGender;
     if (patch.requiresVaccination !== undefined) {
       row.requires_vaccination = patch.requiresVaccination;
@@ -772,6 +794,16 @@ export async function updateListing(
     if (patch.offersGrooming !== undefined) {
       draftPatch.offers_grooming = patch.offersGrooming;
     }
+    // 0041 — per-host service-addon opt-ins on the draft.
+    if (patch.offersVet !== undefined) {
+      draftPatch.offers_vet = patch.offersVet;
+    }
+    if (patch.offersInsurance !== undefined) {
+      draftPatch.offers_insurance = patch.offersInsurance;
+    }
+    if (patch.offersTransport !== undefined) {
+      draftPatch.offers_transport = patch.offersTransport;
+    }
     if (patch.hostGender !== undefined) {
       draftPatch.host_gender = patch.hostGender;
     }
@@ -814,6 +846,15 @@ export async function updateListing(
         ? patch.residentPetsNote
         : current.resident_pets_note,
     offers_grooming: patch.offersGrooming ?? current.offers_grooming,
+    // 0041 — per-host service-addon opt-ins on the snapshot.
+    // Listings rows have these as NOT NULL with default false; if
+    // current.offers_* is somehow null (pre-0041 row read before
+    // backfill, vanishingly unlikely), fall back to false.
+    offers_vet: patch.offersVet ?? current.offers_vet ?? false,
+    offers_insurance:
+      patch.offersInsurance ?? current.offers_insurance ?? false,
+    offers_transport:
+      patch.offersTransport ?? current.offers_transport ?? false,
     host_gender: patch.hostGender ?? current.host_gender,
     requires_vaccination:
       patch.requiresVaccination ?? current.requires_vaccination,
@@ -863,6 +904,10 @@ export type ListingEditData = {
     hasResidentPets: boolean;
     residentPetsNote: string | null;
     offersGrooming: boolean;
+    // 0041 — per-host service-addon opt-ins.
+    offersVet: boolean;
+    offersInsurance: boolean;
+    offersTransport: boolean;
     hostGender: 'female' | 'male';
     requiresVaccination: boolean;
     acceptsSpecies: ('cat' | 'dog')[];
@@ -945,6 +990,21 @@ export async function getListingForEdit(
       hasResidentPets: src.has_resident_pets,
       residentPetsNote: src.resident_pets_note,
       offersGrooming: src.offers_grooming,
+      // 0041 — per-host service-addon opt-ins. Drafts have these as
+      // nullable; null means "not edited in this draft" so fall
+      // back to the live listing's value.
+      offersVet:
+        (draft && draft.offers_vet !== null
+          ? draft.offers_vet
+          : data.offers_vet) ?? false,
+      offersInsurance:
+        (draft && draft.offers_insurance !== null
+          ? draft.offers_insurance
+          : data.offers_insurance) ?? false,
+      offersTransport:
+        (draft && draft.offers_transport !== null
+          ? draft.offers_transport
+          : data.offers_transport) ?? false,
       hostGender: src.host_gender as 'female' | 'male',
       requiresVaccination: src.requires_vaccination,
       // Round 12 / Step 5.7. Narrow the DB's string[] to the

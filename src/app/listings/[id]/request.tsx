@@ -53,10 +53,18 @@ import type { Tables } from '@/types/database';
 // Listing-level availability gate. Pricing (scope/cadence/price) comes from
 // ADDON_CONFIG in @/lib/pricing; this map only says whether the listing
 // supports a given add-on. Missing key = always available.
+//
+// 2026-06-25 (migration 0041) — gate every addon by its per-host
+// offers_* flag. Booking request now hides any addon the host hasn't
+// opted in to. Default for ALL flags is false on new listings — hosts
+// must explicitly enable each service in their listing edit screen.
 const ADDON_AVAILABILITY: Partial<
   Record<AddonType, (l: ListingDetail) => boolean>
 > = {
   grooming: (l) => l.offers_grooming,
+  vet: (l) => l.offers_vet,
+  insurance: (l) => l.offers_insurance,
+  transport: (l) => l.offers_transport,
 };
 
 function isAddonAvailable(type: AddonType, listing: ListingDetail): boolean {
@@ -497,6 +505,13 @@ export default function BookingRequestScreen() {
       return t('booking.max_pets_exceeded', { count: maxPets });
     }
     if (selectedPetIds.size === 0) return t('booking.pet_required');
+    // 2026-06-25 — hard block on dates overlapping the host's blocked
+    // ranges. The DB trigger from 0027 rejects this at the accept-side
+    // anyway; the booking-request submit doesn't need to wait for that
+    // round trip and the host's queue stays clean.
+    if (isRangeBlocked(startDate, endDate, blockedRanges)) {
+      return t('booking.blocked_dates_error');
+    }
     return null;
   };
 
@@ -947,14 +962,16 @@ export default function BookingRequestScreen() {
             submitting ||
             pets.length === 0 ||
             tooManyPets ||
-            !!endDateError
+            !!endDateError ||
+            blockedRangeWarning
           }
           style={[
             styles.cta,
             (submitting ||
               pets.length === 0 ||
               tooManyPets ||
-              !!endDateError) &&
+              !!endDateError ||
+              blockedRangeWarning) &&
               styles.ctaDisabled,
           ]}
         >

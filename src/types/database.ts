@@ -223,6 +223,11 @@ export type Database = {
           status: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier: Database['public']['Enums']['listing_tier'];
           offers_grooming: boolean;
+          // 0041 — per-host service-addon opt-ins. NOT NULL with
+          // default false on listings; nullable on listing_drafts.
+          offers_vet: boolean;
+          offers_insurance: boolean;
+          offers_transport: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
           // Milestone A (migration 0026) — host requires vaccinated
           // pets only. Mirrored on listing_drafts and copied through
@@ -253,6 +258,9 @@ export type Database = {
           status?: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
+          offers_vet?: boolean;
+          offers_insurance?: boolean;
+          offers_transport?: boolean;
           host_gender: Database['public']['Enums']['host_gender'];
           requires_vaccination?: boolean;
           additional_pet_discount?: number;
@@ -277,6 +285,9 @@ export type Database = {
           status?: 'pending' | 'approved' | 'paused' | 'admin_disabled';
           tier?: Database['public']['Enums']['listing_tier'];
           offers_grooming?: boolean;
+          offers_vet?: boolean;
+          offers_insurance?: boolean;
+          offers_transport?: boolean;
           host_gender?: Database['public']['Enums']['host_gender'];
           requires_vaccination?: boolean;
           additional_pet_discount?: number;
@@ -422,6 +433,12 @@ export type Database = {
           has_resident_pets: boolean;
           resident_pets_note: string | null;
           offers_grooming: boolean;
+          // 0041 — per-host service-addon opt-ins on the draft.
+          // Nullable: null = "draft does not touch this flag",
+          // fall back to the live row's value during prefill.
+          offers_vet: boolean | null;
+          offers_insurance: boolean | null;
+          offers_transport: boolean | null;
           host_gender: 'female' | 'male';
           requires_vaccination: boolean;
           accepts_species: string[];
@@ -442,6 +459,9 @@ export type Database = {
           has_resident_pets: boolean;
           resident_pets_note?: string | null;
           offers_grooming: boolean;
+          offers_vet?: boolean | null;
+          offers_insurance?: boolean | null;
+          offers_transport?: boolean | null;
           host_gender: 'female' | 'male';
           requires_vaccination?: boolean;
           accepts_species?: string[];
@@ -462,6 +482,9 @@ export type Database = {
           has_resident_pets?: boolean;
           resident_pets_note?: string | null;
           offers_grooming?: boolean;
+          offers_vet?: boolean | null;
+          offers_insurance?: boolean | null;
+          offers_transport?: boolean | null;
           host_gender?: 'female' | 'male';
           requires_vaccination?: boolean;
           accepts_species?: string[];

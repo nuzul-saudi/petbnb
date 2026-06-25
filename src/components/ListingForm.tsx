@@ -68,6 +68,13 @@ export type ListingFormValues = {
   hasResidentPets: boolean;
   residentPetsNote: string | null;
   offersGrooming: boolean;
+  // 0041 — per-host service-addon opt-ins. Default false on new
+  // listings; the booking-request screen filters its addon
+  // checkboxes by these flags so guests only see what the host
+  // actually offers.
+  offersVet: boolean;
+  offersInsurance: boolean;
+  offersTransport: boolean;
   hostGender: HostGender;
   requiresVaccination: boolean;
   // Round 12 / Step 5.7 — at least one species must be selected. The
@@ -143,6 +150,16 @@ export function ListingForm({
   );
   const [offersGrooming, setOffersGrooming] = useState(
     initialValues?.offersGrooming ?? false,
+  );
+  // 0041 — per-host service-addon opt-ins.
+  const [offersVet, setOffersVet] = useState(
+    initialValues?.offersVet ?? false,
+  );
+  const [offersInsurance, setOffersInsurance] = useState(
+    initialValues?.offersInsurance ?? false,
+  );
+  const [offersTransport, setOffersTransport] = useState(
+    initialValues?.offersTransport ?? false,
   );
   const [hostGender, setHostGender] = useState<HostGender | null>(
     initialValues?.hostGender ?? null,
@@ -279,6 +296,9 @@ export function ListingForm({
       hasResidentPets,
       residentPetsNote: hasResidentPets ? residentNote.trim() || null : null,
       offersGrooming,
+      offersVet,
+      offersInsurance,
+      offersTransport,
       hostGender: hostGender!,
       requiresVaccination,
       acceptsSpecies,
@@ -305,6 +325,9 @@ export function ListingForm({
   const initialHasResident = initialValues?.hasResidentPets ?? false;
   const initialResidentNote = initialValues?.residentPetsNote ?? '';
   const initialOffersGrooming = initialValues?.offersGrooming ?? false;
+  const initialOffersVet = initialValues?.offersVet ?? false;
+  const initialOffersInsurance = initialValues?.offersInsurance ?? false;
+  const initialOffersTransport = initialValues?.offersTransport ?? false;
   const initialHostGender = initialValues?.hostGender ?? null;
   const initialRequiresVaccination =
     initialValues?.requiresVaccination ?? false;
@@ -326,6 +349,9 @@ export function ListingForm({
     hasResidentPets !== initialHasResident ||
     residentNote !== initialResidentNote ||
     offersGrooming !== initialOffersGrooming ||
+    offersVet !== initialOffersVet ||
+    offersInsurance !== initialOffersInsurance ||
+    offersTransport !== initialOffersTransport ||
     hostGender !== initialHostGender ||
     requiresVaccination !== initialRequiresVaccination ||
     speciesDirty;
@@ -519,6 +545,48 @@ export function ListingForm({
         <Text style={styles.toggleText}>
           {offersGrooming ? '✓' : '○'}{' '}
           {t('listings.form.offers_grooming_label')}
+        </Text>
+      </Pressable>
+
+      {/* 0041 — per-host service-addon opt-ins (vet, insurance,
+          transport). Default false; host opts in. Booking-request
+          screen filters its addon checkboxes by these flags. */}
+      <Pressable
+        onPress={() => setOffersVet((v) => !v)}
+        style={[
+          styles.toggleRow,
+          offersVet && styles.toggleRowActive,
+        ]}
+      >
+        <Text style={styles.toggleText}>
+          {offersVet ? '✓' : '○'}{' '}
+          {t('listings.form.offers_vet_label')}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() => setOffersInsurance((v) => !v)}
+        style={[
+          styles.toggleRow,
+          offersInsurance && styles.toggleRowActive,
+        ]}
+      >
+        <Text style={styles.toggleText}>
+          {offersInsurance ? '✓' : '○'}{' '}
+          {t('listings.form.offers_insurance_label')}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() => setOffersTransport((v) => !v)}
+        style={[
+          styles.toggleRow,
+          offersTransport && styles.toggleRowActive,
+        ]}
+      >
+        <Text style={styles.toggleText}>
+          {offersTransport ? '✓' : '○'}{' '}
+          {t('listings.form.offers_transport_label')}
         </Text>
       </Pressable>
 
