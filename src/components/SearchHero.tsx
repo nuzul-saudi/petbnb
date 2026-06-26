@@ -54,8 +54,11 @@ export function SearchHero({
   const { t, locale } = useTranslation();
   // FIX 4 (2026-06-26) — search button background switches from
   // hardcoded mossDeep to theme.accent so host viewers see gold.
-  // The 🔍 emoji is flagged as off-roster by the design review
-  // but replacing it cleanly needs an SVG icon — deferred.
+  // L3 (2026-06-27) — emoji \xf0\x9f\x94\x8d replaced with the text label
+  // t('search.button') ("\xd8\xa7\xd8\xa8\xd8\xad\xd8\xab" / "Search"). The design system
+  // has no icon set yet; introducing one is a brand-level decision
+  // out of scope for this round. Text reads cleanly, themes via
+  // theme.accent on the background + colors.cream on the text.
   const theme = useTheme();
 
   // Where summary: "District, City" when set, "City" when only city,
@@ -137,7 +140,7 @@ export function SearchHero({
         accessibilityRole="button"
         accessibilityLabel={t('search.button')}
       >
-        <Text style={styles.searchButtonIcon}>🔍</Text>
+        <Text style={styles.searchButtonLabel}>{t('search.button')}</Text>
       </Pressable>
     </View>
   );
@@ -205,18 +208,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.whisper,
     marginVertical: spacing.sm,
   },
+  // L3 (2026-06-27) — was a 44\xc3\x9744 circle holding the \xf0\x9f\x94\x8d emoji. Now
+  // a pill holding the t('search.button') text label. Height stays
+  // 44 (search-bar baseline); width is content-driven with
+  // horizontal padding so 'Search' / '\xd8\xa7\xd8\xa8\xd8\xad\xd8\xab' both fit cleanly.
+  // borderRadius stays 22 \xe2\x80\x94 with the new auto width that's a
+  // capsule shape, matching the rest of the rounded surfaces.
   searchButton: {
-    width: 44,
     height: 44,
     borderRadius: 22,
+    paddingHorizontal: spacing.lg,
     backgroundColor: colors.mossDeep,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
     marginStart: spacing.xs,
   },
-  searchButtonIcon: {
-    fontSize: 18,
+  searchButtonLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
     color: colors.cream,
   },
 });
