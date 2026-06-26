@@ -708,7 +708,10 @@ function OwnerFeedHome() {
   }, [load]);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    // 2026-06-26 (part c) — explicit edges pin. Same as the default
+    // today, but pinned so a future react-native-safe-area-context
+    // update can't silently change the default edge set under us.
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       {/* Move 2 — top-level category strip. Pet Hosts is active;
           the other two render as "coming soon" and absorb taps. */}
