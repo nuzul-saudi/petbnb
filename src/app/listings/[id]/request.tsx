@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { Button } from '@/components/Button';
 import { SearchWhenModal } from '@/components/SearchWhenModal';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
@@ -700,19 +701,17 @@ export default function BookingRequestScreen() {
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>{t('booking.no_pets_title')}</Text>
             <Text style={styles.emptyBody}>{t('booking.no_pets_body')}</Text>
-            <Pressable
+            {/* FIX 4 — empty-state add-pet CTA via shared Button. */}
+            <Button
+              label={t('booking.no_pets_button')}
               onPress={() =>
                 router.push({
                   pathname: '/pets/[id]',
                   params: { id: 'new' },
                 })
               }
-              style={styles.emptyButton}
-            >
-              <Text style={styles.emptyButtonText}>
-                {t('booking.no_pets_button')}
-              </Text>
-            </Pressable>
+              variant="primary"
+            />
           </View>
         ) : (
           <View style={styles.petList}>
@@ -958,27 +957,24 @@ export default function BookingRequestScreen() {
           </Text>
         ) : null}
 
-        <Pressable
+        {/* FIX 4 (2026-06-26) — was a hand-rolled Pressable styled
+            with styles.cta. Replaced with the shared Button so the
+            CTA inherits persona theming (host: gold), built-in
+            loading + disabled states, and the larger ≥44px tap
+            target the design system mandates. */}
+        <Button
+          label={submitLabel}
           onPress={onSubmit}
+          variant="primary"
+          fullWidth
+          loading={submitting}
           disabled={
-            submitting ||
             pets.length === 0 ||
             tooManyPets ||
             !!endDateError ||
             blockedRangeWarning
           }
-          style={[
-            styles.cta,
-            (submitting ||
-              pets.length === 0 ||
-              tooManyPets ||
-              !!endDateError ||
-              blockedRangeWarning) &&
-              styles.ctaDisabled,
-          ]}
-        >
-          <Text style={styles.ctaText}>{submitLabel}</Text>
-        </Pressable>
+        />
       </ScrollView>
 
       {/* 2026-06-26 — date range picker modal. Same SearchWhenModal

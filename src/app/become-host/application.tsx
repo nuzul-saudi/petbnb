@@ -29,6 +29,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
+import { Button } from '@/components/Button';
 import { useAuth } from '@/lib/auth';
 import { CITIES, findCity, type CityKey } from '@/lib/cities';
 import { SPECIES_ENABLED } from '@/lib/features';
@@ -247,17 +248,19 @@ export default function HostApplicationScreen() {
           ) : null}
         </Field>
 
-        <Pressable
+        {/* FIX 4 (2026-06-26) — shared Button replaces the
+            hand-rolled Pressable. Loading + disabled states are
+            built-in. Persona theming is irrelevant here (this is
+            a pre-host signup screen, viewer is guest), so it
+            renders the owner-mode moss either way. */}
+        <Button
+          label={t('host_application.submit_button')}
           onPress={onSubmit}
-          disabled={!canSubmit}
-          style={[styles.cta, !canSubmit && styles.ctaDisabled]}
-        >
-          <Text style={styles.ctaText}>
-            {submitting
-              ? t('host_application.submitting')
-              : t('host_application.submit_button')}
-          </Text>
-        </Pressable>
+          variant="primary"
+          fullWidth
+          loading={submitting}
+          disabled={!canSubmit && !submitting}
+        />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>

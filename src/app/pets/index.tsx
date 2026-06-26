@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { Button } from '@/components/Button';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
 import { findBreed } from '@/lib/breeds';
@@ -118,14 +119,17 @@ export default function PetsListScreen() {
         />
       )}
 
-      <Pressable
-        onPress={() =>
-          router.push({ pathname: '/pets/[id]', params: { id: 'new' } })
-        }
-        style={styles.addButton}
-      >
-        <Text style={styles.addButtonText}>{t('pets.add_button')}</Text>
-      </Pressable>
+      {/* FIX 4 — shared Button (was a hand-rolled Pressable). */}
+      <View style={styles.addButtonWrap}>
+        <Button
+          label={t('pets.add_button')}
+          onPress={() =>
+            router.push({ pathname: '/pets/[id]', params: { id: 'new' } })
+          }
+          variant="primary"
+          fullWidth
+        />
+      </View>
     </SafeAreaView>
   );
 }
@@ -222,16 +226,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.inkSoft,
   },
-  addButton: {
+  // FIX 4 — wrap that preserves the margin-around-button layout the
+  // old hand-rolled style had. The Button itself handles its own
+  // height, color, label styling.
+  addButtonWrap: {
     margin: spacing.xl,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.moss,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 15,
-    color: colors.cream,
   },
 });

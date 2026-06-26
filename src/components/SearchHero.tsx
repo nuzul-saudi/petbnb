@@ -12,6 +12,7 @@ import { findCity, findDistrict } from '@/lib/cities';
 import { pickLocalized } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { speciesEmoji, type Species } from '@/lib/species';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export type SearchHeroProps = {
@@ -51,6 +52,11 @@ export function SearchHero({
   hideWhichPet,
 }: SearchHeroProps) {
   const { t, locale } = useTranslation();
+  // FIX 4 (2026-06-26) — search button background switches from
+  // hardcoded mossDeep to theme.accent so host viewers see gold.
+  // The 🔍 emoji is flagged as off-roster by the design review
+  // but replacing it cleanly needs an SVG icon — deferred.
+  const theme = useTheme();
 
   // Where summary: "District, City" when set, "City" when only city,
   // hint when nothing. Defaulting to city is the right behavior —
@@ -127,7 +133,7 @@ export function SearchHero({
 
       <Pressable
         onPress={onPressSearch}
-        style={styles.searchButton}
+        style={[styles.searchButton, { backgroundColor: theme.accent }]}
         accessibilityRole="button"
         accessibilityLabel={t('search.button')}
       >
