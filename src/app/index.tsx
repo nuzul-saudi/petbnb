@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
@@ -186,6 +186,10 @@ function HostHome() {
   // moss on honey. Re-themed to host gold. Owner mode never reaches
   // HostHome so the change is host-only.
   const theme = useTheme();
+  // 2026-06-26 — same safe-area-aware list bottom padding as
+  // OwnerFeedHome; see comment there for rationale.
+  const insets = useSafeAreaInsets();
+  const listBottomPadding = Math.max(insets.bottom, spacing.xxl) + spacing.md;
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
   // 2026-06-25 — blocked ranges per listing, batch-fetched after
@@ -336,7 +340,10 @@ function HostHome() {
           // Same listing may appear in both sections (approved-with-draft);
           // disambiguate the React key with the section title.
           keyExtractor={(it, idx) => `${it.id}-${idx}`}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: listBottomPadding },
+          ]}
           renderSectionHeader={({ section }) => (
             // R2C4: tinted pill that matches the badge language —
             // gold for drafts (in-flight), moss for live (published).
@@ -389,6 +396,16 @@ function OwnerFeedHome() {
   const { t, locale, setLocale } = useTranslation();
   const { profile, user } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+  // 2026-06-26 — safe-area-aware bottom padding for the feed list.
+  // Web: protects the last card's price from being clipped behind
+  //   iOS Safari's bottom toolbar (the +html.tsx dvh fix shrinks the
+  //   viewport correctly, but the toolbar still overlays env() values
+  //   so we need a small breathing-room buffer here too).
+  // Native: insets.bottom already reflects the OS-reported home
+  //   indicator height; we just floor to spacing.xxl so non-Safe-Area
+  //   devices get comfortable padding too.
+  const insets = useSafeAreaInsets();
+  const listBottomPadding = Math.max(insets.bottom, spacing.xxl) + spacing.md;
 
   // Part C (2026-06-13) — responsive grid. FlatList's numColumns
   // doesn't allow live changes, so we re-mount the list (via
@@ -1016,7 +1033,10 @@ function OwnerFeedHome() {
           numColumns={numColumns}
           data={sortedItems}
           keyExtractor={(it) => it.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: listBottomPadding },
+          ]}
           columnWrapperStyle={
             numColumns > 1 ? styles.gridColumnWrapper : undefined
           }
