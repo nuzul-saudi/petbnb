@@ -24,7 +24,10 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
-import { DateField } from '@/components/DateField';
+// L1 (2026-06-27) — DateField swapped out for a single RangeCalendar.
+// The host's existing blocked ranges render dimmed + struck-through on
+// the calendar so they can't accidentally overlap a new selection.
+import { RangeCalendar } from '@/components/RangeCalendar';
 import {
   addBlockedRange,
   listBlockedRanges,
@@ -33,19 +36,10 @@ import {
 } from '@/lib/availability';
 import { useAuth } from '@/lib/auth';
 import { confirmDialog } from '@/lib/confirm';
-import { todayIso } from '@/lib/format';
+import { todayIso } from '@/lib/date';
 import { useTranslation } from '@/lib/i18n';
 import { getListingForEdit } from '@/lib/listings';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
-
-// ISO-date 'YYYY-MM-DD' arithmetic: one day after the given ISO date.
-// Mirrors the helper in /listings/[id]/request.tsx so the two date
-// surfaces use the same min-date language.
-function nextDayIso(iso: string): string {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
 
 export default function ListingAvailabilityScreen() {
   const router = useRouter();
@@ -213,33 +207,22 @@ export default function ListingAvailabilityScreen() {
           <Text style={styles.sectionLabel}>
             {t('listings.availability.add_section')}
           </Text>
-          <View style={styles.dateRow}>
-            <View style={styles.dateField}>
-              <Text style={styles.dateLabel}>
-                {t('listings.availability.start_label')}
-              </Text>
-              <DateField
-                value={newStart}
-                onChange={(v) => {
-                  setNewStart(v);
-                  // Same behavior as request.tsx — if the new start
-                  // invalidates an already-picked end, clear it.
-                  if (newEnd && newEnd <= v) setNewEnd('');
-                }}
-                min={todayIso()}
-              />
-            </View>
-            <View style={styles.dateField}>
-              <Text style={styles.dateLabel}>
-                {t('listings.availability.end_label')}
-              </Text>
-              <DateField
-                value={newEnd}
-                onChange={setNewEnd}
-                min={newStart ? nextDayIso(newStart) : todayIso()}
-              />
-            </View>
-          </View>
+          {/* L1 (2026-06-27) — was two DateField text inputs in a
+              row (start + end). Now one RangeCalendar: tap start,
+              tap end, range fills. The host's existing blocked
+              ranges are passed in so they render dimmed + struck on
+              the grid — visual prevention of overlap, on top of the
+              DB-level 0027 trigger gate. */}
+          <RangeCalendar
+            startDate={newStart || null}
+            endDate={newEnd || null}
+            onChange={({ startDate, endDate }) => {
+              setNewStart(startDate ?? '');
+              setNewEnd(endDate ?? '');
+            }}
+            minDate={todayIso()}
+            blockedRanges={ranges}
+          />
           {addError ? <Text style={styles.error}>{addError}</Text> : null}
           <Button
             label={
@@ -250,7 +233,11 @@ export default function ListingAvailabilityScreen() {
             onPress={onAdd}
             variant="primary"
             loading={adding}
-            disabled={adding}
+            // L1 — also disable when no range picked. Was only
+            // disabled while adding, which left the button tappable
+            // with empty state and only blocked at the add_invalid
+            // error string.
+            disabled={adding || !newStart || !newEnd}
             fullWidth
           />
         </View>
@@ -355,16 +342,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.whisper,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  dateField: { flex: 1, gap: spacing.xs },
-  dateLabel: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.inkSoft,
   },
   rangeRow: {
     flexDirection: 'row',
