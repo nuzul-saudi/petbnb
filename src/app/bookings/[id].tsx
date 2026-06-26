@@ -66,6 +66,7 @@ import {
   type AddonSelection,
   type AddonType,
 } from "@/lib/pricing";
+import { useTheme } from "@/theme/theme";
 import { colors, fonts, radii, shadows, spacing } from "@/theme/tokens";
 
 export default function BookingDetailScreen() {
@@ -74,6 +75,12 @@ export default function BookingDetailScreen() {
   const { initializing, session, user, profile } = useAuth();
   const { refreshPendingHostCount } = useHostNotifications();
   const toggleLocale = () => setLocale(locale === "ar" ? "en" : "ar");
+  // FIX 1 (2026-06-26) — persona-aware accents. Hosts viewing a
+  // booking now see gold for the host card heading, total line,
+  // and CR phase labels instead of stranded moss on honey. Header
+  // success ✓ + title are intentionally left for FIX 6 to rebuild
+  // status-aware (declined/cancelled shouldn't show success ✓).
+  const theme = useTheme();
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === "string" ? params.id : "";
 
@@ -1064,7 +1071,7 @@ export default function BookingDetailScreen() {
 
           <View style={styles.summaryDivider} />
 
-          <Text style={styles.totalLine}>
+          <Text style={[styles.totalLine, { color: theme.accent }]}>
             {t("booking.total_paid", {
               total: formatSAR(
                 isLegacyBooking
@@ -1137,7 +1144,7 @@ export default function BookingDetailScreen() {
             duplicate the pet block here. */}
         {!isHostMode && booking.host ? (
           <View style={styles.hostCard}>
-            <Text style={styles.hostCardHeading}>
+            <Text style={[styles.hostCardHeading, { color: theme.accent }]}>
               {t('booking.host_section_title')}
             </Text>
             <View style={styles.hostCardRow}>

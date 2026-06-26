@@ -17,6 +17,7 @@ import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import type { ListingFeedItem } from '@/lib/listings';
 import { speciesEmoji, type Species } from '@/lib/species';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 type Props = {
@@ -60,6 +61,12 @@ export function ListingCard({
   availabilityHint,
 }: Props) {
   const { t, locale } = useTranslation();
+  // FIX 1 (2026-06-26) — theme accent for host name + price. Owner
+  // mode resolves to moss (byte-identical pre-fix); host mode now
+  // renders deep-gold + gold-ink instead of stranded moss against
+  // the honey AppShell. Verified ✓ pinned to colors.verified (moss
+  // both personas) — it's the brand trust mark, not an accent.
+  const theme = useTheme();
 
   const host = listing.host;
   const hostName = host
@@ -155,7 +162,10 @@ export function ListingCard({
               <Text style={styles.avatarInitial}>{initial}</Text>
             </View>
           )}
-          <Text style={styles.hostName} numberOfLines={1}>
+          <Text
+            style={[styles.hostName, { color: theme.accent }]}
+            numberOfLines={1}
+          >
             {hostName ?? '—'}
           </Text>
           <Text style={styles.verifiedMark}>✓</Text>
@@ -199,7 +209,7 @@ export function ListingCard({
         </Text>
 
         <View style={styles.priceRow}>
-          <Text style={styles.price}>
+          <Text style={[styles.price, { color: theme.accent }]}>
             {formatSAR(listing.nightly_price_sar)}{' '}
             <Text style={styles.priceSuffix}>
               {t('listing.nightly_suffix')}
@@ -293,14 +303,21 @@ const styles = StyleSheet.create({
   },
   hostName: {
     flex: 1,
-    fontFamily: fonts.bodyBold,
+    // FIX 1 — host names switch from Tajawal to Reem Kufi per the
+    // design system (type scale lists host names under headings).
+    fontFamily: fonts.headingBold,
     fontSize: 14,
+    // color overridden inline with theme.accent at the call site so
+    // host mode picks up gold; the static value here is a fallback
+    // and would only render if theme isn't threaded.
     color: colors.mossDeep,
   },
   verifiedMark: {
     fontFamily: fonts.bodyBold,
     fontSize: 13,
-    color: colors.moss,
+    // FIX 1 — trust mark via the dedicated alias, NOT theme.accent.
+    // Stays moss in both personas (see colors.verified comment).
+    color: colors.verified,
   },
   location: {
     fontFamily: fonts.body,

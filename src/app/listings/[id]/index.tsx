@@ -17,6 +17,7 @@ import { openInquiry } from '@/lib/inquiries';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { listReviewsForHost, type HostReview } from '@/lib/reviews';
 import { useAuth } from '@/lib/auth';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function ListingDetailScreen() {
@@ -24,6 +25,11 @@ export default function ListingDetailScreen() {
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+  // FIX 1 (2026-06-26) — persona-aware accent. Host viewing their
+  // own listing now gets gold for title, section headings, host
+  // name, amenity ✓ marks. Verified ✓ stays moss via
+  // colors.verified (trust mark, never themed).
+  const theme = useTheme();
 
   // Bilingual content fallback — _en field if present in current locale,
   // else the Arabic primary. listing/host may be null on first render.
@@ -267,7 +273,7 @@ export default function ListingDetailScreen() {
 
         <View style={styles.body}>
           {/* Section 2: title + price. */}
-          <Text style={styles.title}>
+          <Text style={[styles.title, { color: theme.accent }]}>
             {pickLocalized(listing.title_ar, listing.title_en, locale)}
           </Text>
           <View style={styles.priceRow}>
@@ -310,7 +316,10 @@ export default function ListingDetailScreen() {
                 {t('listing.section.host')}
               </Text>
               <View style={styles.hostNameRow}>
-                <Text style={styles.hostName} numberOfLines={1}>
+                <Text
+                  style={[styles.hostName, { color: theme.accent }]}
+                  numberOfLines={1}
+                >
                   {listing.host
                     ? pickLocalized(
                         listing.host.full_name,
@@ -369,7 +378,7 @@ export default function ListingDetailScreen() {
           {listing.description_ar || listing.description_en ? (
             <>
               <View style={styles.sectionDivider} />
-              <Text style={styles.sectionHeading}>
+              <Text style={[styles.sectionHeading, { color: theme.accent }]}>
                 {t('listing.section.about')}
               </Text>
               <Text style={styles.description}>
@@ -384,7 +393,7 @@ export default function ListingDetailScreen() {
 
           {/* Section 5: amenities. */}
           <View style={styles.sectionDivider} />
-          <Text style={styles.sectionHeading}>
+          <Text style={[styles.sectionHeading, { color: theme.accent }]}>
             {t('listing.section.amenities')}
           </Text>
           <View style={styles.amenities}>
@@ -409,7 +418,7 @@ export default function ListingDetailScreen() {
           {/* Section 6: reviews. */}
           <View style={styles.sectionDivider} />
           <View style={styles.sectionHeadingRow}>
-            <Text style={styles.sectionHeading}>
+            <Text style={[styles.sectionHeading, { color: theme.accent }]}>
               {t('listing.section.reviews')}
             </Text>
             {reviews.length > 0 ? (
@@ -451,7 +460,7 @@ export default function ListingDetailScreen() {
               address, NO precise pin. A female host's exact home
               location stays private until a booking is confirmed. */}
           <View style={styles.sectionDivider} />
-          <Text style={styles.sectionHeading}>
+          <Text style={[styles.sectionHeading, { color: theme.accent }]}>
             {t('listing.section.location')}
           </Text>
           <Text style={styles.locationText}>
@@ -640,9 +649,12 @@ function formatLongDate(iso: string, locale: 'ar' | 'en'): string {
 }
 
 function Amenity({ label, note }: { label: string; note?: string }) {
+  // FIX 1 — sub-component needs its own theme handle. Owner = moss,
+  // host = gold for the amenity ✓ marks.
+  const theme = useTheme();
   return (
     <View style={styles.amenity}>
-      <Text style={styles.amenityCheck}>✓</Text>
+      <Text style={[styles.amenityCheck, { color: theme.accent }]}>✓</Text>
       <View style={{ flex: 1 }}>
         <Text style={styles.amenityLabel}>{label}</Text>
         {note ? <Text style={styles.amenityNote}>{note}</Text> : null}
@@ -941,7 +953,11 @@ const styles = StyleSheet.create({
   verifiedMark: {
     fontFamily: fonts.bodyBold,
     fontSize: 16,
-    color: colors.moss,
+    // FIX 1 — trust mark via dedicated alias (stays moss in both
+    // personas). The amenityCheck above this in the file is also a
+    // ✓ but it's themed per-persona at the JSX call site — only
+    // THIS verifiedMark is the brand trust signal.
+    color: colors.verified,
   },
   sitterMeta: {
     fontFamily: fonts.body,

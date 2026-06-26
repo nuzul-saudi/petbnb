@@ -46,6 +46,7 @@ import {
   listOwnListings,
   type ListingFeedItem,
 } from '@/lib/listings';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export default function HomeScreen() {
@@ -181,6 +182,10 @@ function HostHome() {
   const { profile } = useAuth();
   const { refreshPendingHostCount } = useHostNotifications();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
+  // FIX 1 (2026-06-26) — the "Live" section pill on HostHome was
+  // moss on honey. Re-themed to host gold. Owner mode never reaches
+  // HostHome so the change is host-only.
+  const theme = useTheme();
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
   // 2026-06-25 — blocked ranges per listing, batch-fetched after
@@ -339,7 +344,10 @@ function HostHome() {
               style={[
                 styles.sectionHeaderPill,
                 section.tone === 'live'
-                  ? styles.sectionHeaderPillLive
+                  ? [
+                      styles.sectionHeaderPillLive,
+                      { backgroundColor: theme.accent },
+                    ]
                   : styles.sectionHeaderPillDrafts,
               ]}
             >
