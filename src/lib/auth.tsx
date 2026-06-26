@@ -10,11 +10,14 @@ import { logWarn } from '@/lib/log';
 //   - initializing flag for the brief boot window while we read storage
 //
 // ============================================================================
-// KNOWN: If "Confirm email" is enabled in Supabase Auth and you hit a
-// "please confirm your email" step after entering the OTP, flip "Confirm
-// email" OFF in Authentication → Providers → Email. Supabase's behavior
-// here has been inconsistent across versions; OTP verification *should*
-// double as confirmation but doesn't always.
+// Supabase email-delivery config (locked 2026-06-27): the project is wired
+// for 6-digit OTP code delivery, NOT confirmation links. Authentication →
+// Providers → Email → "Confirm email" is OFF, and the Magic Link template
+// embeds {{ .Token }} (the 6-digit code) instead of {{ .ConfirmationURL }}.
+// Do NOT flip "Confirm email" back on — verify.tsx expects the user to
+// type a code, and detectSessionInUrl is intentionally false in
+// src/lib/supabase.ts so a confirmation link landing back on the app
+// would NOT establish a session. Changing either requires updating both.
 // ============================================================================
 // TODO(pre-launch): swap email OTP → Saudi phone OTP.
 //   - Add Send SMS Hook (Edge Function calling Unifonic/Taqnyat).
