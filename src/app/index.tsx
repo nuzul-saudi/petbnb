@@ -848,6 +848,10 @@ function OwnerFeedHome() {
           // no visual hint to swipe). iOS shows it briefly
           // during pan; web shows a faint persistent bar.
           showsHorizontalScrollIndicator={true}
+          // 2026-06-27 — flexShrink:0 + minHeight pin this row
+          // against flex-column compression on iOS Safari. See
+          // styles.filterRowScrollContainer comment for details.
+          style={styles.filterRowScrollContainer}
           contentContainerStyle={styles.filterRowScrollable}
         >
           {(
@@ -900,6 +904,8 @@ function OwnerFeedHome() {
           // no visual hint to swipe). iOS shows it briefly
           // during pan; web shows a faint persistent bar.
           showsHorizontalScrollIndicator={true}
+          // 2026-06-27 — same compression-pin as the sort row above.
+          style={styles.filterRowScrollContainer}
           contentContainerStyle={styles.filterRowScrollable}
         >
           <Pressable
@@ -1265,6 +1271,20 @@ const styles = StyleSheet.create({
     paddingEnd: spacing.lg,
     paddingBottom: spacing.md,
   },
+  // 2026-06-27 — outer style for the sortMenu + moreFilters
+  // ScrollViews. flexShrink:0 keeps the flex column from
+  // compressing the row when the iOS Safari viewport shrinks
+  // (the parent is capped at 100dvh by +html.tsx, the feed
+  // FlatList is flex:1, and without this pin the rows lost
+  // their intrinsic height to satisfy the FlatList). minHeight
+  // is a hard floor sized to one chip row: filterChip
+  // paddingV:8×2 + border:2 + filterChipText fontSize:12 /
+  // lineHeight:18 = 36, plus filterRowScrollable paddingBottom:
+  // 12 = 48, rounded to 52 for safety.
+  filterRowScrollContainer: {
+    flexShrink: 0,
+    minHeight: 52,
+  },
   // Compact bar (2026-06-12 progressive-disclosure). Sort dropdown
   // trigger + "More filters" toggle sit on the same row, separated by
   // a flex spacer. Replaces the chip-strip sort row and provides the
@@ -1275,6 +1295,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
+    // 2026-06-27 — flexShrink:0 keeps the header band's compact bar
+    // from collapsing under iOS Safari's dynamic-viewport pressure.
+    // Intrinsic height (pill button paddingV:4×2 + text 13 + border
+    // ≈ 25) is small enough that only flexShrink:0 is needed here;
+    // no explicit minHeight required.
+    flexShrink: 0,
   },
   compactBarButton: {
     paddingHorizontal: spacing.md,
@@ -1370,6 +1396,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
+    // 2026-06-27 — same flexShrink:0 pin as compactBar above.
+    flexShrink: 0,
   },
   cityChip: {
     paddingHorizontal: spacing.md,

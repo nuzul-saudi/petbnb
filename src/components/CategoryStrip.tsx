@@ -45,6 +45,16 @@ export function CategoryStrip({ active, onSelect }: Props) {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      // 2026-06-27 — flexShrink:0 + minHeight pin the strip against
+      // the flex-column-compression bug. Parent (SafeAreaView) is
+      // capped at 100dvh by +html.tsx and the feed FlatList is
+      // flex:1; without flexShrink:0 here, the strip gave up its
+      // own intrinsic height when iOS Safari's address bar shrunk
+      // the viewport, collapsing to a sliver. minHeight backs that
+      // up with a hard floor sized to one full tile (emoji 32 +
+      // label 18 + comingSoon 14 + tile paddingV 8 + row paddingT/B
+      // 20 ≈ 92, rounded to 96 for safety).
+      style={styles.scrollContainer}
       contentContainerStyle={styles.row}
     >
       {CATEGORIES.map((c) => {
@@ -91,6 +101,14 @@ export function CategoryStrip({ active, onSelect }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // 2026-06-27 — see comment on the ScrollView's style prop.
+  // flexShrink:0 prevents flex-column compression from the parent
+  // when the iOS Safari viewport shrinks; minHeight is a hard
+  // floor sized to one full tile's worth of intrinsic content.
+  scrollContainer: {
+    flexShrink: 0,
+    minHeight: 96,
+  },
   row: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
