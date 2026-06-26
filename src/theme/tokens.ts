@@ -32,6 +32,16 @@ export const colors = {
   terracotta: '#B45842',
   rose: '#D49389',
   whisper: '#E8DFCC',
+
+  // 2026-06-26 — explicit trust-mark alias. Pinned to moss in BOTH
+  // personas; the verified ✓ is the brand trust signal and must NOT
+  // re-theme with the persona accent. Use this where you'd otherwise
+  // write `colors.moss` for a ✓ — e.g. ListingCard's verified mark,
+  // listing-detail amenity checks. Decoupling the alias from the
+  // raw moss color means FIX 1's host-theme sweep (replace
+  // colors.moss with theme.accent in components) can't accidentally
+  // re-tint the ✓ if someone forgets the exception.
+  verified: '#2D4A2F', // same as moss
 } as const;
 
 export const radii = {
