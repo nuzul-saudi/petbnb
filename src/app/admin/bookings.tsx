@@ -5,14 +5,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { listAllBookings, type AdminBooking } from '@/lib/admin';
-import { formatSAR, toArabicDigits } from '@/lib/format';
+import { formatDateRange } from '@/lib/date';
+import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
 
 export default function AdminBookingsScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +74,12 @@ export default function AdminBookingsScreen() {
                 {t('admin.booking_owner')}: {item.owner?.full_name ?? '—'}
               </Text>
               <Text style={styles.rowMeta}>
-                {t('admin.booking_dates')}: {toArabicDigits(item.start_date)} → {toArabicDigits(item.end_date)} ({toArabicDigits(item.nights)})
+                {/* L2 (2026-06-27) — last admin ISO leak swept. Was
+                    toArabicDigits piping raw ISO ("2026-07-01"); now
+                    formatDateRange + raw nights ("Jul 1 → Jul 5 (4)"). */}
+                {t('admin.booking_dates')}:{' '}
+                {formatDateRange(item.start_date, item.end_date, locale)} (
+                {item.nights})
               </Text>
               <Text style={styles.rowTotal}>
                 {t('admin.booking_total')}: {formatSAR(item.total_sar)}
