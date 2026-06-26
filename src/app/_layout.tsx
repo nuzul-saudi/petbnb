@@ -15,7 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/lib/auth';
 import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
-import { HostNotificationsProvider } from '@/lib/persona';
+import { HostNotificationsProvider } from '@/lib/host-notifications';
 import { useTheme } from '@/theme/theme';
 
 // Locale-aware layout direction. On web we drive flow via document.dir;

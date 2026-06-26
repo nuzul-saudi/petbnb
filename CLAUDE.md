@@ -120,7 +120,7 @@ The single most important risk-mitigation feature. Not optional polish.
 
 - RTL by default. Test every screen in RTL.
 - All text in Arabic via i18n. Natural Saudi tone, not stiff MSA.
-- Arabic-Indic numerals in display where appropriate (helper function).
+- **LATIN display digits everywhere** (locked decision, test-round-3 2026-05-27). `toArabicDigits()` in `src/lib/format.ts` is a deliberate no-op pass-through; do NOT reintroduce Arabic-Indic conversion. Rationale: Arabic-Indic digits scan poorly against the Latin digits Saudis see in WhatsApp / Snap / banking apps. Pinned by a regression test in `tests/format.test.ts` since 2026-06-26 — flipping this needs a founder re-decision + that test rewritten in the same PR.
 - Currency always "ر.س", never "$".
 - `host_gender` on listings + owner filter "female hosts only" (real feature).
 - Saudi phone format +966 5X XXX XXXX in the auth flow.

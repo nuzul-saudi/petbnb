@@ -39,7 +39,7 @@ import { SPECIES_ENABLED } from '@/lib/features';
 import { pickLocalized, toArabicDigits } from '@/lib/format';
 import { getCurrentLocation, type Coords } from '@/lib/geo';
 import { useTranslation } from '@/lib/i18n';
-import { useHostNotifications } from '@/lib/persona';
+import { useHostNotifications } from '@/lib/host-notifications';
 import { speciesEmoji } from '@/lib/species';
 import {
   listActiveListings,
@@ -378,7 +378,10 @@ function HostHome() {
 }
 
 // ---------------------------------------------------------------------------
-// Owner / both home — the listings feed.
+// Owner home — the listings feed.
+// (Pre-0039 this was 'Owner / both home' since 'both' users also
+// landed here. 0039 dropped the 'both' role; owners are the only
+// audience now.)
 // ---------------------------------------------------------------------------
 
 function OwnerFeedHome() {

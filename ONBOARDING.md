@@ -343,7 +343,7 @@ Petbnb/
 │   │   ├── supabase.ts             ← Typed Supabase client + pingSupabase()
 │   │   ├── auth.tsx                ← AuthProvider + useAuth(). Note KNOWN/TODO blocks for SMS swap.
 │   │   ├── i18n.tsx                ← LocaleProvider + useTranslation() + module-scope t()
-│   │   ├── persona.tsx             ← HostNotificationsProvider — exposes pendingHostCount + refreshPendingHostCount. Filename kept from the pre-0039 persona context (which managed owner/host toggling), now host-notifications only.
+│   │   ├── host-notifications.tsx ← HostNotificationsProvider — exposes pendingHostCount + refreshPendingHostCount. (Renamed from persona.tsx on 2026-06-26 as part of the design-review cleanup; the file was renamed but the exports were already named HostNotifications* since 0039.)
 │   │   ├── host-application.ts     ← 0039 helpers: submitHostApplication, listPendingHostApplications, approveHostApplication, rejectHostApplication, markHostProfileComplete.
 │   │   ├── format.ts               ← formatSAR (whole SAR), pickLocalized, todayIso, formatRiyadhStamp. toArabicDigits is now a deliberate pass-through.
 │   │   ├── locale-storage.ts       ← AsyncStorage cache for locale
@@ -379,8 +379,8 @@ Petbnb/
 │   │   └── rtl.ts              ← useReadingTextAlign() (mostly unused after the audit)
 │   │
 │   ├── locales/
-│   │   ├── ar.json             ← Arabic strings — feminine register
-│   │   └── en.json             ← English mirror. 524 keys at parity.
+│   │   ├── ar.json             ← Arabic strings — **MASCULINE** register (locked 2026-06-14; superseded the original feminine register decision)
+│   │   └── en.json             ← English mirror.
 │   │
 │   └── assets/
 │       └── breeds/             ← Cat-breed JPGs from Wikimedia
@@ -620,11 +620,10 @@ create both" decision — owner and host are different accounts.
 **Auth context** lives in `src/lib/auth.tsx` (`.tsx` because JSX). `useAuth()`
 returns `{ initializing, session, user, profile, signOut, refreshProfile }`.
 
-**Host notifications context** lives in `src/lib/persona.tsx` (filename kept
-from the pre-0039 persona context). `useHostNotifications()` returns
-`{ pendingHostCount, refreshPendingHostCount }`. The host-side AppHeader
-inbox badge reads this; pre-0039 it also owned the owner/host toggle, but
-that's gone.
+**Host notifications context** lives in `src/lib/host-notifications.tsx` (renamed 2026-06-26 from `src/lib/persona.tsx` as part of the design-review cleanup; the file's exports were already `HostNotificationsProvider` / `useHostNotifications` since 0039 \xe2\x80\x94 the filename was the last vestige.
+`useHostNotifications()` returns `{ pendingHostCount,
+refreshPendingHostCount }`. The host-side AppHeader inbox badge reads this;
+pre-0039 it also owned the owner/host toggle, but that's gone.
 
 ### Routing gates (current state, post-0039)
 

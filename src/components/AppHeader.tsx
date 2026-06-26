@@ -17,7 +17,7 @@ import { useState } from 'react';
 
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
-import { useHostNotifications } from '@/lib/persona';
+import { useHostNotifications } from '@/lib/host-notifications';
 import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 

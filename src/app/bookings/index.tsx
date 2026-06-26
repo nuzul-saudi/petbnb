@@ -15,7 +15,7 @@ import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { formatDateRange } from '@/lib/date';
 import { useTranslation } from '@/lib/i18n';
 import { getLastSeenBatch } from '@/lib/last-seen-storage';
-import { useHostNotifications } from '@/lib/persona';
+import { useHostNotifications } from '@/lib/host-notifications';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
 

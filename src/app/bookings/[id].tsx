@@ -36,7 +36,7 @@ import { useAuth } from "@/lib/auth";
 import { confirmDialog } from "@/lib/confirm";
 import { sendMessage, containsContactInfo } from "@/lib/messages";
 import { markSeen } from "@/lib/last-seen-storage";
-import { useHostNotifications } from "@/lib/persona";
+import { useHostNotifications } from "@/lib/host-notifications";
 import { findMyReview, type Review } from "@/lib/reviews";
 import {
   acceptBookingAsHost,
