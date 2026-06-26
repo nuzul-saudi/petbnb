@@ -280,6 +280,7 @@ Petbnb/
 ├── src/
 │   ├── app/                    ← Expo Router file-based routes
 │   │   ├── _layout.tsx         ← Root: AuthProvider + LocaleProvider + HostNotificationsProvider + Stack
+│   │   ├── +html.tsx           ← Web-only HTML shell override. viewport-fit=cover + dvh-aware sizing chain (Round 6, 2026-06-26). Native builds skip this file entirely.
 │   │   ├── index.tsx           ← Signed-in home, role-branched (owner / host / admin). Owner feed + HostHome live here.
 │   │   ├── suspended.tsx       ← Account-suspended dedicated screen
 │   │   ├── profile.tsx         ← Customer profile (edit name + pets link + avatar). For role='host': HostStatusPanel (pending/approved/rejected/verified states).
@@ -345,7 +346,8 @@ Petbnb/
 │   │   ├── i18n.tsx                ← LocaleProvider + useTranslation() + module-scope t()
 │   │   ├── host-notifications.tsx ← HostNotificationsProvider — exposes pendingHostCount + refreshPendingHostCount. (Renamed from persona.tsx on 2026-06-26 as part of the design-review cleanup; the file was renamed but the exports were already named HostNotifications* since 0039.)
 │   │   ├── host-application.ts     ← 0039 helpers: submitHostApplication, listPendingHostApplications, approveHostApplication, rejectHostApplication, markHostProfileComplete.
-│   │   ├── format.ts               ← formatSAR (whole SAR), pickLocalized, todayIso, formatRiyadhStamp. toArabicDigits is now a deliberate pass-through.
+│   │   ├── format.ts               ← formatSAR (whole SAR), pickLocalized, formatRiyadhStamp. toArabicDigits is a deliberate pass-through (pinned by tests/format.test.ts since 2026-06-26). todayIso re-exported from @/lib/date for back-compat — date math moved to lib/date.ts in Round 6.
+│   │   ├── date.ts                 ← Round 6 (2026-06-26). Owns all date math + display formatting. Exports: todayIso, addDaysIso, nextDayIso, daysInMonth, firstWeekdayOfMonth, monthAnchor, formatDate(iso, locale, 'short'|'medium'|'long'), formatDateRange. All output uses Latin digits.
 │   │   ├── locale-storage.ts       ← AsyncStorage cache for locale
 │   │   ├── log.ts                  ← logWarn/logInfo/logError. __DEV__-gated. Replaces raw console.*  (R1C5).
 │   │   ├── confirm.ts              ← confirmDialog(msg): Promise<boolean>. Web window.confirm + native Alert.alert (R1C4).
@@ -385,11 +387,12 @@ Petbnb/
 │   └── assets/
 │       └── breeds/             ← Cat-breed JPGs from Wikimedia
 │
-├── tests/                      ← Vitest. 35 cases over pure libs only.
+├── tests/                      ← Vitest. 55 cases over pure libs only.
 │   ├── payments-policy.test.ts ← Fee rounding + refund tiers (incl. 01:30 Riyadh boundary)
 │   ├── pricing.test.ts         ← Multi-pet discount + add-on cadence
 │   ├── availability.test.ts    ← Half-open overlap predicates
-│   └── vaccination.test.ts     ← Missing/current/expired classification + 365-day boundary
+│   ├── vaccination.test.ts     ← Missing/current/expired classification + 365-day boundary
+│   └── format.test.ts          ← Round 6 (2026-06-26). Pins Latin-digit display decision: asserts toArabicDigits is a no-op pass-through + formatDate output for all locale × style combinations + regex check that no Arabic-Indic digits leak.
 │
 └── supabase/
     └── migrations/             ← Numbered SQL files. Apply via Supabase dashboard SQL Editor.
@@ -862,6 +865,147 @@ Out of scope this batch (deferred, listed for future work):
   Supabase Auth's email uniqueness on `auth.users`. A friendly
   pre-OTP "this email is already an owner" check would help.
 
+### Round 6 — design review batch + iOS Safari layout fix (2026-06-26 → 2026-06-27)
+
+A Claude Design handoff bundle (lives at
+`docs/design-review-2026-06-26/`) surfaced six numbered fixes
+(FIX 1 – FIX 6) plus a cleanup pass. Founder chose **Option C**
+(all six + cleanup, ~16.5h estimate). Mid-batch the founder
+also sent a mobile-Safari screenshot showing top-bar truncation
+on the WhatsApp in-app browser; the iOS-Safari fix got merged
+into the closing commits of the same round.
+
+**12 commits, range `28349f6..914cb9e`:**
+
+1. `28349f6` — Import the design-handoff bundle (README + HTML
+   mock) for permanent reference at
+   `docs/design-review-2026-06-26/`.
+2. `7f67c79` — Add `colors.verified = '#2D4A2F'` token alias to
+   `src/theme/tokens.ts`. The trust mark ✓ must NOT re-theme to
+   gold in host mode (a gold ✓ would suggest "host
+   self-verified" — defeats the trust signal). Pinned to moss
+   in both personas.
+3. `f5b8ccd` — **FIX 1.** Sweep hardcoded `colors.mossDeep` →
+   inline `theme.accent` overrides at ListingCard (host name +
+   price), listing detail (title + section headings + host name
+   + amenity check), HostHome (Live pill), and booking detail
+   (total + host card heading + success circle). Host names
+   switch font from Tajawal to Reem Kufi
+   (`fonts.headingBold`). Trust-mark style swaps `colors.moss`
+   → `colors.verified`. Static `mossDeep` left in the
+   `StyleSheet.create({...})` blocks as a never-wins fallback.
+4. `0c184cc` — **FIX 4.** Replace hand-rolled Pressable submit
+   CTAs with `<Button>` at 4 sites: booking request submit (now
+   in the sticky bar — see FIX 5), become-host application
+   submit, pet add, search hero search button. Removed
+   `styles.cta` / `styles.emptyButton` everywhere. 🔍 magnifier
+   on SearchHero deferred — needs an SVG/icon-library decision
+   (tracked in CLAUDE §11).
+5. `c27db11` — **FIX 6.** Status-aware booking detail header.
+   Replace the celebratory `✓` rendered for every status with
+   an IIFE that branches on `booking.status`:
+   `requested → ⏳ neutral`, `accepted/active/completed → ✓
+   theme.accent`, `declined/cancelled → ✕ terracotta`,
+   `disputed → ! terracotta`. New i18n keys
+   `booking.awaiting_title` / `negative_title` /
+   `disputed_title`. Fixes the bug where a declined booking
+   showed "Request confirmed" with a green checkmark.
+6. `9d44bfd` — **FIX 3.** New `src/lib/date.ts` collapses date
+   math from two old homes (the `todayIso` previously in
+   `format.ts` plus the `addDaysIso` / `daysInMonth` /
+   `firstWeekdayOfMonth` that lived only in
+   `AvailabilityCalendar.tsx`). Adds `formatDate(iso, locale,
+   style?)` with three styles (short/medium/long) and
+   `formatDateRange(start, end, locale)`. Sweep raw-ISO leaks
+   at booking detail, booking list, request flow date card,
+   and request summary card — all four now use `formatDate`.
+   New regression test `tests/format.test.ts` (9 cases) pins
+   the Latin-digit decision: asserts `toArabicDigits('123') ===
+   '123'` and that no Arabic-Indic digits appear in any
+   `formatDate` output across locale × style combos.
+7. `ae44df1` — **FIX 5.** Sticky booking-summary bar on
+   `/listings/[id]/request`. Pinned to viewport
+   (`position: 'absolute'; bottom: 0`) with paper background +
+   whisper top border + soft top shadow. Running total +
+   nights + pet count summary on the leading edge; submit
+   `<Button>` on the trailing edge. Scroll content gets
+   `paddingBottom: 120` to clear the bar. KeyboardAvoidingView
+   wrapper + scroll-to-field on blocked-date overlap both
+   deferred (need native device validation — tracked in
+   CLAUDE §11).
+8. `ca4f48b` — **FIX 2 (partial).** Delete dead
+   `src/components/AvailabilityCalendar.tsx` (480 lines, zero
+   callers). DateField migration to `RangeCalendar mode=
+   "single"` deferred at the 4 live callers — RangeCalendar
+   has no `mode` prop yet (tracked in CLAUDE §11).
+9. `b57eba3` — **Cleanup.** `git mv src/lib/persona.tsx →
+   src/lib/host-notifications.tsx` + sed across all 5 import
+   sites (`_layout.tsx`, `index.tsx`, `bookings/index.tsx`,
+   `bookings/[id].tsx`, `AppHeader.tsx`). Sync CLAUDE.md §7
+   to the locked Latin-digits decision (replaced the old
+   "Arabic-Indic numerals" wording). Sync ONBOARDING.md to
+   the masculine register (was still referencing "feminine"
+   in some legacy lines).
+10. `bdf611b` — **iOS Safari pass 1.** Founder sent a WhatsApp
+    screenshot showing CategoryStrip emojis (🏠 🐾 🛍️) clipped
+    at the bottom and filter chip Arabic descenders (ج/ع/ي)
+    dropping below the chip border. Two style bumps:
+    `CategoryStrip.emoji.lineHeight` 26 → 32 (iOS emoji glyph
+    intrinsic heights exceed a tight 26px line box) +
+    `filterChip.paddingVertical` xs → sm with explicit
+    `filterChipText.lineHeight: 18`.
+11. `a5086e5` — **iOS Safari pass 2 — root cause fix.**
+    Founder follow-up screenshot showed deeper clipping after
+    the address bar settled: top categories sliced to a
+    sliver, filter row cut mid-height, last-card price hidden
+    behind the bottom toolbar. Diagnosis (no `vh` usage; flex
+    chain pure; SafeAreaView present but no `viewport-fit=
+    cover` in the viewport meta, so iOS Safari was returning 0
+    for `env(safe-area-inset-*)`). Fix: NEW
+    `src/app/+html.tsx` overriding the Expo Router web shell —
+    adds `viewport-fit=cover` to the viewport meta AND injects
+    an inline `<style id="petbnb-viewport-fix">` placed AFTER
+    `ScrollViewStyleReset` to override its `height: 100%`
+    chain with `height: 100vh; height: 100dvh;` (vh fallback,
+    dvh override on supporting browsers). Plus
+    safe-area-aware FlatList bottom padding in both
+    OwnerFeedHome and HostHome via `useSafeAreaInsets()`:
+    `Math.max(insets.bottom, spacing.xxl) + spacing.md`.
+    Verified `react-native-safe-area-context`'s web
+    implementation reads `env()` via a hidden probe div
+    independent of body padding — adding body env() padding
+    would double-pad, deliberately omitted.
+12. `914cb9e` — Pin `<SafeAreaView edges={['top','bottom',
+    'left','right']}>` explicitly on the home page. Same as
+    today's package default but pinned so a future
+    safe-area-context update can't silently shift the layout.
+
+**Deferred items rolled to CLAUDE §11 pre-launch:** DateField →
+RangeCalendar single-mode migration; magnifier emoji
+replacement; KeyboardAvoidingView around the booking sticky
+bar; scroll-to-field + red-ring on blocked-date overlap; one
+missed admin ISO leak at `src/app/admin/bookings.tsx:76` (admin
+queue date metadata still piped through `toArabicDigits` —
+should be `formatDateRange`).
+
+**Web-shell conventions established this round** (applies to
+anything new you ship):
+
+- The web HTML shell lives in `src/app/+html.tsx`. Native does
+  not run this file. Add `<meta>` / `<style>` / `<link>` here
+  for web-only concerns.
+- For web shell sizing, do NOT use `height: 100%` or `100vh`
+  on the root — they break under iOS Safari's dynamic toolbar.
+  The dvh chain in `+html.tsx` overrides `ScrollViewStyleReset`
+  for the whole app. If you need full-viewport sizing in a
+  component, use `flex: 1` (RN-Web style); don't reach for
+  raw CSS units.
+- For safe-area-aware bottom padding on a scrollable list, use
+  `useSafeAreaInsets()` + `Math.max(insets.bottom, floor) +
+  buffer` instead of a hardcoded value. Pattern: `Math.max(
+  insets.bottom, spacing.xxl) + spacing.md` for feeds —
+  see `src/app/index.tsx` OwnerFeedHome / HostHome.
+
 ### Round 2 follow-up — reviews policy reconciliation (2026-06-11 evening)
 
 `ae1e857` — Migration 0030 fixes a collision discovered during smoke test:
@@ -1068,7 +1212,12 @@ voice direction, and stay as-is:
 - **Numbers — Latin everywhere.** Test-round-3 founder decision.
   `toArabicDigits()` in `src/lib/format.ts` is a deliberate pass-through
   kept for compile compatibility; **do NOT reintroduce Arabic-Indic
-  conversion**.
+  conversion**. **Pinned by `tests/format.test.ts` since Round 6
+  (2026-06-26)** — flipping requires a founder re-decision AND
+  rewriting the regression test in the same PR. For date display
+  use `formatDate` / `formatDateRange` from `src/lib/date.ts`
+  (never pipe ISO through `toArabicDigits` — that's the old
+  pre-Round-6 pattern and is what FIX 3 was sweeping out).
 - **Currency**: always `ر.س`. Never `$`. Use `formatSAR(amount)` — it
   returns whole-SAR strings (no decimals).
 - **Email and date inputs** are visually LTR (set `textAlign: 'left'`)

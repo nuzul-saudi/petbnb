@@ -140,6 +140,10 @@ The single most important risk-mitigation feature. Not optional polish.
 ```
 Warm, premium, trust-conveying. Deep moss green primary, sand/cream backgrounds, gold accents. NOT bright/cartoonish. Rounded corners 16–22px, soft shadows, generous spacing.
 
+**Persona-aware accent.** `useTheme().accent` resolves to `colors.mossDeep` for owner/admin and `colors.goldDeep` for host. Surfaces that should "go gold in host mode" (host name, price, section pills, success states) pass `theme.accent` as an inline style override on top of the static StyleSheet color. Static styles still ship `colors.mossDeep` as a defensive fallback (would only render if the theme provider failed to mount).
+
+**Trust-mark exception — `colors.verified`.** Pinned to `#2D4A2F` (moss) in BOTH personas via a dedicated token alias in `src/theme/tokens.ts`. Used for the verified ✓ next to host names. Do NOT replace with `theme.accent` — the trust mark must read as "platform-verified by Petbnb" and not as a persona accent (a gold ✓ in host mode would suggest the host verified themselves, defeating the trust signal). Added 2026-06-26 in commit `7f67c79` as part of the design-review batch.
+
 ---
 
 ## 9. Engineering principles
@@ -297,6 +301,51 @@ launch.
   ship before launch** — without it the messaging product solves
   only post-acceptance coordination, not the trust conversation
   that should precede the booking.
+
+- **DateField → RangeCalendar single-mode migration.** Today
+  `src/components/DateField.tsx` (web calendar picker + native
+  TextInput fallback) is still alive at 4 callers — two on
+  `/listings/[id]/availability` (host blocked-range start/end)
+  and two on `/pets/[id]` (vaccination + booster dates). The
+  design-review batch (commit `ca4f48b`) deleted the dead
+  `AvailabilityCalendar.tsx` but deferred the DateField swap
+  because `RangeCalendar` has no `mode` prop yet. Pre-launch
+  fix: add `mode: 'single' | 'range'` to `RangeCalendar`,
+  reroute the 4 DateField callers, then delete `DateField.tsx`.
+  Single calendar component for the whole app. Cosmetic but
+  matters for design consistency — the two pickers render
+  differently today (text input vs. visual grid). Logged
+  during Round 6 design review.
+
+- **🔍 magnifier emoji on the home search button.** Flagged in
+  the Claude Design handoff as off-roster (the rest of the UI is
+  emoji-light and uses Reem Kufi typography for visual weight,
+  not glyphs). `src/components/SearchHero.tsx:140` still renders
+  `🔍`. Replace with an inline SVG (or a vector icon library
+  decision) before launch. Comment at line 57 marks the known
+  gap. Cosmetic; doesn't block functionality.
+
+- **`KeyboardAvoidingView` around the booking-request sticky
+  bar.** `src/app/listings/[id]/request.tsx` ships a sticky
+  summary + submit Button pinned to the viewport bottom
+  (`position: 'absolute'; bottom: 0`). On native iOS, when the
+  notes TextInput focuses, the on-screen keyboard will cover the
+  bar. Needs a `KeyboardAvoidingView` wrapper at the SafeAreaView
+  level — but the right behavior (lift the bar with the keyboard
+  vs. let it stay anchored to viewport-bottom and the form
+  scrolls behind) needs to be validated on a real iOS device
+  first. Comment at `request.tsx:969` references it as the
+  intended next move.
+
+- **Scroll-to-field + red-ring on blocked-date overlap.** Same
+  request screen. Today, when the picked date range overlaps a
+  host's blocked range, the only signal is that the submit
+  Button goes disabled (via `blockedRangeWarning`). No visual
+  highlight on the date card, no scroll-into-view. Wire
+  `useRef` + `measureInWindow` + an animated border-color on
+  the date card so the error has somewhere to look. Owner can
+  miss the disabled-button-state otherwise. Logged during
+  Round 6 design review.
 
 ---
 
@@ -556,3 +605,63 @@ founder: when an inquiry becomes a booking, does the booking thread
 start fresh (option α, simpler) or carry the inquiry messages over
 (option β, unified UX but cancel-deletion footgun via cascade).
 Pre-launch tracking is in Section 11.
+
+### Round 6 — design review batch + iOS Safari layout fix (2026-06-26 → 2026-06-27)
+
+Surfaced when the founder ran the deployed build through a Claude
+Design handoff bundle (lives at `docs/design-review-2026-06-26/`).
+Six numbered fixes (FIX 1 – FIX 6) + a cleanup pass. Founder
+chose **Option C** (all six + cleanup). Mid-batch, a separate
+mobile-Safari clipping bug surfaced from a WhatsApp-browser
+screenshot — diagnosed as missing `viewport-fit=cover` + flex
+chain assuming a static viewport — and got merged into the same
+round as the closing commits.
+
+**Locked decisions reaffirmed during this round:**
+
+- **Latin display digits stay locked.** `toArabicDigits()` in
+  `src/lib/format.ts` is now PINNED by a regression test
+  (`tests/format.test.ts`) asserting it returns its input
+  verbatim. Flipping back to Arabic-Indic conversion requires a
+  founder re-decision AND that test rewritten in the same PR.
+  Already noted in §7; the test is the new enforcement layer.
+- **Masculine register stays locked.** No changes — re-confirmed
+  during the cleanup audit (commit `b57eba3` updated
+  `ONBOARDING.md` from "feminine" to "MASCULINE register (locked
+  2026-06-14)").
+- **`'both'` role is gone.** Already true post-0039; the cleanup
+  removed the stale `OwnerFeedHome` "Owner / both home" header
+  comment.
+
+**Outcome by fix:**
+
+| Fix | What | Commit | Status |
+|---|---|---|---|
+| FIX 1 | Sweep hardcoded `colors.moss` / `mossDeep` → `theme.accent` at host-mode surfaces (ListingCard, listing detail, HostHome, booking detail). Trust mark ✓ pinned via new `colors.verified` alias. Host names render in Reem Kufi (`fonts.headingBold`). | `7f67c79` + `f5b8ccd` | Applied. Static `mossDeep` left in StyleSheet blocks as defensive fallback (inline `theme.accent` always wins). |
+| FIX 2 | One date-range picker — delete `AvailabilityCalendar.tsx`; migrate 4 `DateField` callers to `RangeCalendar mode="single"`. | `ca4f48b` | **Partial.** AvailabilityCalendar (dead code) deleted. DateField migration deferred — `RangeCalendar` needs a `mode` prop first. Tracked in §11. |
+| FIX 3 | New `src/lib/date.ts` owns date math (collapsed `todayIso` / `addDaysIso` / `daysInMonth` / `firstWeekdayOfMonth` from two old homes) and adds `formatDate(iso, locale, style?)` returning Latin-digit display strings. Sweep raw ISO leaks at booking detail + booking list + request flow. Add regression test. | `9d44bfd` | Applied (with one missed leak: `src/app/admin/bookings.tsx:76` still pipes ISO through `toArabicDigits` — admin-only, cosmetic). |
+| FIX 4 | Route primary CTAs through the shared `<Button>` component (booking request submit, become-host submit, pet add). Remove hand-rolled `Pressable` + `styles.cta` / `styles.emptyButton`. | `0c184cc` | Applied at 4 sites. 🔍 magnifier emoji on `SearchHero` deferred — needs an SVG/icon-library decision. Tracked in §11. |
+| FIX 5 | Sticky booking-summary bar pinned to viewport on the request screen — running total + nights/pets summary + submit `<Button>` on the trailing edge. Top shadow + whisper top border. | `ae44df1` | Sticky bar applied. `KeyboardAvoidingView` wrapper + scroll-to-field red-ring on blocked-date overlap both deferred (need native device validation). Both tracked in §11. |
+| FIX 6 | Status-aware booking-detail header — IIFE branches glyph + circle color + title key + title color on `booking.status`. Six statuses mapped (requested → ⏳ neutral; accepted/active/completed → ✓ `theme.accent`; declined/cancelled → ✕ terracotta; disputed → ! terracotta). Fixes the previous bug where declined/cancelled/disputed all rendered a celebratory ✓. | `c27db11` | Applied. |
+| Cleanup | Rename `src/lib/persona.tsx` → `src/lib/host-notifications.tsx`. Update all import sites. Sync `CLAUDE.md` §7 + `ONBOARDING.md` to the locked Latin-digits + masculine-register state. Drop stale "/ both home" header comment from `OwnerFeedHome` (historical context retained in body). | `b57eba3` | Applied. |
+
+**iOS Safari layout fix (post-design-review, same batch):**
+
+Founder reported via WhatsApp screenshot that the home page on
+iOS Safari clipped the CategoryStrip, the filter chip row, and
+the bottom of listing cards once the address bar settled. After
+diagnosing (no `vh` usage; SafeAreaView present but no
+`viewport-fit=cover`; ScrollViewStyleReset's `height: 100%`
+chain assumes a static viewport), shipped:
+
+| Commit | What |
+|---|---|
+| `bdf611b` | `CategoryStrip.tsx` emoji `lineHeight` 26 → 32 (iOS emoji glyph intrinsic heights exceeded 26px). Home `filterChip` `paddingVertical` xs → sm + `filterChipText` explicit `lineHeight: 18` (Arabic descenders ج/ع/ي were dropping below the chip border). |
+| `a5086e5` | NEW `src/app/+html.tsx` — Expo Router web-only HTML shell override. Adds `viewport-fit=cover` to the viewport meta so iOS Safari supplies meaningful `env(safe-area-inset-*)`. Inline `<style id="petbnb-viewport-fix">` placed AFTER `ScrollViewStyleReset` to override its `height: 100%` with `height: 100vh; height: 100dvh;` (vh fallback + dvh override). Plus safe-area-aware FlatList bottom padding via `useSafeAreaInsets()` in both OwnerFeedHome and HostHome: `Math.max(insets.bottom, spacing.xxl) + spacing.md`. Verified `react-native-safe-area-context` web implementation does NOT read body env padding so body env() padding would double-pad — deliberately omitted. |
+| `914cb9e` | Pin `<SafeAreaView edges={['top','bottom','left','right']}>` explicitly on home — insulates against a future safe-area-context default change. |
+
+**Deferred items from Round 6 — all tracked in §11:** DateField
+→ RangeCalendar single-mode migration, magnifier emoji
+replacement, KeyboardAvoidingView around the booking sticky bar,
+scroll-to-field + red-ring on blocked-date overlap. None block
+function; all are pre-launch polish.
