@@ -895,14 +895,65 @@ export default function BookingDetailScreen() {
         confirmLeave={confirmLeaveIfDirty}
       />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.successCircle}>
-          <Text style={styles.successCheck}>✓</Text>
-        </View>
+        {/* FIX 6 (2026-06-26) — status-aware header. The previous
+            implementation rendered a celebratory \xe2\x9c\x93 + 'request
+            sent' for EVERY status, including declined / cancelled /
+            disputed (clearly wrong). Now branches glyph + circle
+            color + title key on booking.status:
+              requested            \xe2\x86\x92 \xe2\x8f\xb3 neutral (awaiting)
+              accepted/active/completed \xe2\x86\x92 \xe2\x9c\x93 theme accent (positive)
+              declined/cancelled   \xe2\x86\x92 \xe2\x9c\x95 terracotta (negative)
+              disputed             \xe2\x86\x92 ! terracotta (caution)
+            theme.accent threads the host \xe2\x86\x92 gold path for the
+            positive states. */}
+        {(() => {
+          const status = booking.status;
+          const isPositive =
+            status === "accepted" ||
+            status === "active" ||
+            status === "completed";
+          const isNeutral = status === "requested";
+          const isNegative = status === "declined" || status === "cancelled";
+          const isDisputed = status === "disputed";
 
-        <Text style={styles.title}>{t("booking.confirm_title")}</Text>
-        <Text style={styles.subtitle}>
-          {t(`booking.status_${booking.status}`)}
-        </Text>
+          const glyph = isPositive
+            ? "✓"
+            : isDisputed
+              ? "!"
+              : isNeutral
+                ? "⏳"
+                : "✕";
+          const circleColor = isPositive
+            ? theme.accent
+            : isDisputed || isNegative
+              ? colors.terracotta
+              : colors.inkSoft;
+          const titleKey = isPositive
+            ? "booking.confirm_title"
+            : isNeutral
+              ? "booking.awaiting_title"
+              : isDisputed
+                ? "booking.disputed_title"
+                : "booking.negative_title";
+          const titleColor =
+            isDisputed || isNegative ? colors.terracotta : colors.ink;
+
+          return (
+            <>
+              <View
+                style={[styles.successCircle, { backgroundColor: circleColor }]}
+              >
+                <Text style={styles.successCheck}>{glyph}</Text>
+              </View>
+              <Text style={[styles.title, { color: titleColor }]}>
+                {t(titleKey)}
+              </Text>
+              <Text style={styles.subtitle}>
+                {t(`booking.status_${booking.status}`)}
+              </Text>
+            </>
+          );
+        })()}
 
         <View style={styles.summaryCard}>
           {booking.listing ? (
