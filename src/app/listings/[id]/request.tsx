@@ -962,25 +962,49 @@ export default function BookingRequestScreen() {
           </Text>
         ) : null}
 
-        {/* FIX 4 (2026-06-26) — was a hand-rolled Pressable styled
-            with styles.cta. Replaced with the shared Button so the
-            CTA inherits persona theming (host: gold), built-in
-            loading + disabled states, and the larger ≥44px tap
-            target the design system mandates. */}
-        <Button
-          label={submitLabel}
-          onPress={onSubmit}
-          variant="primary"
-          fullWidth
-          loading={submitting}
-          disabled={
-            pets.length === 0 ||
-            tooManyPets ||
-            !!endDateError ||
-            blockedRangeWarning
-          }
-        />
+        {/* FIX 5 (2026-06-26) — submit Button moved out of the
+            ScrollView into the sticky footer below. Keeps the bottom
+            of the form scrollable above the sticky bar. */}
       </ScrollView>
+
+      {/* FIX 5 \xe2\x80\x94 sticky summary bar pinned to the viewport. Running
+          total + nights + pet count on the leading edge; shared Button
+          on the trailing edge. KeyboardAvoidingView wrapper at the
+          SafeAreaView level handles the on-screen keyboard so the bar
+          isn't hidden when a TextInput (e.g. notes) is focused. */}
+      <View style={styles.stickyBar}>
+        <View style={styles.stickyBarSummary}>
+          <Text style={styles.stickyBarTotal}>
+            {formatSAR(breakdown.totalSAR)}
+          </Text>
+          <Text style={styles.stickyBarMeta}>
+            {nights > 0
+              ? t('booking.nights_count', {
+                  nights: toArabicDigits(nights),
+                })
+              : t('booking.no_dates_hint')}
+            {' \xc2\xb7 '}
+            {t('booking.cats_count', {
+              n: toArabicDigits(selectedPetIds.size),
+            })}
+          </Text>
+        </View>
+        <View style={styles.stickyBarCta}>
+          <Button
+            label={submitLabel}
+            onPress={onSubmit}
+            variant="primary"
+            fullWidth
+            loading={submitting}
+            disabled={
+              pets.length === 0 ||
+              tooManyPets ||
+              !!endDateError ||
+              blockedRangeWarning
+            }
+          />
+        </View>
+      </View>
 
       {/* 2026-06-26 — date range picker modal. Same SearchWhenModal
           the home page uses, now extended with blockedRanges so the
@@ -1043,7 +1067,11 @@ const styles = StyleSheet.create({
   scroll: {
     padding: spacing.xl,
     gap: spacing.md,
-    paddingBottom: spacing.xxl,
+    // FIX 5 \xe2\x80\x94 reserve room for the sticky footer so the last form
+    // section isn't permanently hidden behind the bar (the bar's
+    // height is ~76px; padding it generously prevents jitter when
+    // the keyboard pops up).
+    paddingBottom: 120,
   },
   centered: {
     flex: 1,
@@ -1343,6 +1371,50 @@ const styles = StyleSheet.create({
   // 2026-06-26 — Airbnb-style two-cell date card. Single bordered
   // container, two cells split by a vertical divider. Mirrors the
   // pattern in the Airbnb reservation block.
+  // FIX 5 (2026-06-26) \xe2\x80\x94 sticky summary bar pinned to the bottom of
+  // the viewport. Always shows running total + nights/cats summary
+  // on the leading edge; submit Button on the trailing edge. Top
+  // shadow + whisper top border per the design review spec; paper
+  // background so the form content scrolls behind it tinted not
+  // covered.
+  stickyBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.paper,
+    borderTopWidth: 1,
+    borderTopColor: colors.whisper,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    // Soft top shadow per the design spec; renders on web via boxShadow
+    // and on native via shadow* (deprecated but still in our stack).
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  stickyBarSummary: {
+    flex: 1,
+    gap: 2,
+  },
+  stickyBarTotal: {
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.ink,
+  },
+  stickyBarMeta: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+  },
+  stickyBarCta: {
+    minWidth: 140,
+  },
   dateCard: {
     flexDirection: 'row',
     backgroundColor: colors.paper,
