@@ -31,14 +31,13 @@ export function nightsBetween(startIso: string, endIso: string): number {
   return Math.max(0, Math.round((e - s) / 86_400_000));
 }
 
-/** Today as yyyy-mm-dd in local time. Used as a min-date for date inputs. */
-export function todayIso(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+/** Today as yyyy-mm-dd in local time. Used as a min-date for date inputs.
+ *
+ *  Kept here as a re-export for back-compat — the canonical implementation
+ *  lives in src/lib/date.ts now (FIX 3, 2026-06-26). Existing call sites
+ *  that import from `@/lib/format` continue to work; new code should
+ *  import from `@/lib/date` directly. */
+export { todayIso } from '@/lib/date';
 
 /** Format an ISO timestamp as "YYYY-MM-DD HH:MM" in Asia/Riyadh time
  *  (UTC+3, no DST), 24-hour clock. Returns Latin digits in BOTH locales

@@ -59,6 +59,7 @@ import {
   pickLocalized,
   toArabicDigits,
 } from "@/lib/format";
+import { formatDate } from "@/lib/date";
 import { pickPhotosMulti, type PetPhotoSource } from "@/lib/pets";
 import { useTranslation } from "@/lib/i18n";
 import {
@@ -973,10 +974,13 @@ export default function BookingDetailScreen() {
 
           <View style={styles.summaryDivider} />
 
+          {/* FIX 3 (2026-06-26) — raw ISO via toArabicDigits leaked
+              like '٢٠٢٦-٠٧-٠١'. Now uses formatDate's short style
+              for a friendly Latin-digit span. */}
           <Text style={styles.summaryLine}>
             {t("booking.dates_range", {
-              start: toArabicDigits(booking.start_date),
-              end: toArabicDigits(booking.end_date),
+              start: formatDate(booking.start_date, locale, 'short'),
+              end: formatDate(booking.end_date, locale, 'short'),
             })}
           </Text>
           <Text style={styles.summaryLine}>

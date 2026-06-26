@@ -29,6 +29,7 @@ import {
   toArabicDigits,
   todayIso,
 } from '@/lib/format';
+import { formatDate } from '@/lib/date';
 import { useTranslation } from '@/lib/i18n';
 import {
   isRangeBlocked,
@@ -656,7 +657,9 @@ export default function BookingRequestScreen() {
                 !startDate && styles.dateCardValuePlaceholder,
               ]}
             >
-              {startDate || t('booking.add_date')}
+              {startDate
+                ? formatDate(startDate, locale, 'short')
+                : t('booking.add_date')}
             </Text>
           </View>
           <View style={styles.dateCardDivider} />
@@ -670,7 +673,9 @@ export default function BookingRequestScreen() {
                 !endDate && styles.dateCardValuePlaceholder,
               ]}
             >
-              {endDate || t('booking.add_date')}
+              {endDate
+                ? formatDate(endDate, locale, 'short')
+                : t('booking.add_date')}
             </Text>
           </View>
         </Pressable>

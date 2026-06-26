@@ -12,6 +12,7 @@ import {
   type MyBookingListItem,
 } from '@/lib/bookings';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
+import { formatDateRange } from '@/lib/date';
 import { useTranslation } from '@/lib/i18n';
 import { getLastSeenBatch } from '@/lib/last-seen-storage';
 import { useHostNotifications } from '@/lib/persona';
@@ -157,8 +158,10 @@ export default function MyBookingsScreen() {
                   🐈 {item.pets.map((p) => p.name).join('، ')}
                 </Text>
               ) : null}
+              {/* FIX 3 \xe2\x80\x94 was raw ISO via toArabicDigits. Now uses
+                  formatDateRange's short-form span. */}
               <Text style={styles.rowMeta}>
-                {toArabicDigits(item.start_date)} → {toArabicDigits(item.end_date)} ·{' '}
+                {formatDateRange(item.start_date, item.end_date, locale)} ·{' '}
                 {t('booking.nights_count', { nights: toArabicDigits(item.nights) })}
               </Text>
               <Text style={styles.rowTotal}>{formatSAR(item.total_sar)}</Text>
