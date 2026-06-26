@@ -279,9 +279,11 @@ export default function BookingRequestScreen() {
   }, [pets, isEditMode, isRebookMode]);
 
   // 2026-06-25 — the start \xe2\x86\x92 end auto-focus effect was retired with
-  // the DateField swap. AvailabilityCalendar handles the two-tap
-  // selection internally: first tap sets start, second tap sets end.
-  // No focus management needed on the parent.
+  // the DateField swap. SearchWhenModal's RangeCalendar handles the
+  // two-tap selection internally; first tap sets start, second tap
+  // sets end. No focus management needed on the parent. (Earlier
+  // intermediate refactor referenced an AvailabilityCalendar
+  // component which has since been deleted in FIX 2.)
 
   // Drop per-pet entries whose pet is no longer selected.
   useEffect(() => {
@@ -631,18 +633,13 @@ export default function BookingRequestScreen() {
           {pickLocalized(listing.title_ar, listing.title_en, locale)}
         </Text>
 
-        {/* 2026-06-25 — replaced the two DateField inputs with a
-            single AvailabilityCalendar that grays out blocked dates
-            inside the picker, so the guest physically can't select
-            them. Half-open semantics match the listing_blocked_dates
-            schema; component's onChange returns (startDate, endDate)
-            as strings or null. We map null \xe2\x86\x92 '' to preserve the
-            existing string-typed local state. */}
         {/* 2026-06-26 — Airbnb-style two-cell date card. Single
             bordered container with CHECK-IN / CHECKOUT cells split
             by a vertical divider. Tapping either cell opens the
-            shared SearchWhenModal (RangeCalendar inside), which now
-            dims blocked dates and rejects taps on them. */}
+            shared SearchWhenModal (RangeCalendar inside), which
+            dims blocked dates and rejects taps on them.
+            (Historical: an earlier intermediate refactor used an
+            inline AvailabilityCalendar component; deleted in FIX 2.) */}
         <Pressable
           onPress={() => setDatePickerOpen(true)}
           style={styles.dateCard}
