@@ -1,5 +1,5 @@
 import { logWarn } from '@/lib/log';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -380,6 +380,45 @@ export default function BookingRequestScreen() {
     return null;
   })();
 
+  // L4 (2026-06-27) — scroll-to-field + red-ring on blocked-date
+  // overlap. When the host's blocked ranges collide with the picked
+  // dates, the submit Button goes disabled (the existing behavior).
+  // Pre-L4 the user had no idea why \xe2\x80\x94 the disabled state was a
+  // silent dead-end. Now:
+  //   * scrollRef on the outer ScrollView
+  //   * dateCardRef on the date Pressable (measureInWindow gives y)
+  //   * dateCardErrorRing state flashes a terracotta border on the
+  //     date card for ~3 seconds.
+  // Triggered on submit-while-blocked AND auto-cleared when the
+  // user picks a fresh range (the next blocked-range collision
+  // re-triggers if it still overlaps).
+  const scrollRef = useRef<ScrollView>(null);
+  const dateCardRef = useRef<View>(null);
+  const [dateCardErrorRing, setDateCardErrorRing] = useState(false);
+  // Auto-clear ring when the user picks new dates \xe2\x80\x94 the visual
+  // alarm shouldn't linger past the user's response to it.
+  useEffect(() => {
+    if (dateCardErrorRing) setDateCardErrorRing(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate]);
+  const flashDateCardError = () => {
+    setDateCardErrorRing(true);
+    // measureInWindow returns absolute viewport coords; subtract the
+    // ScrollView's own offset to get the scroll target. measure() is
+    // RN-Web safe \xe2\x80\x94 onLayout would also work but only fires on
+    // mount/layout-change, not on demand.
+    dateCardRef.current?.measureInWindow((_x, y) => {
+      // Soft cushion above the card so the field isn't flush against
+      // the header bar after the scroll. spacing.xxl matches the
+      // generous-spacing convention in the design system.
+      const target = Math.max(0, y - 80);
+      scrollRef.current?.scrollTo({ y: target, animated: true });
+    });
+    // Auto-clear after 3s if the user hasn't responded yet (the
+    // startDate/endDate effect above clears earlier on user action).
+    setTimeout(() => setDateCardErrorRing(false), 3000);
+  };
+
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
 
@@ -502,6 +541,20 @@ export default function BookingRequestScreen() {
     const v = validate();
     if (v) {
       setError(v);
+      // L4 \xe2\x80\x94 if the validation failure is a date-related one
+      // (start invalid, end invalid, OR blocked-range collision),
+      // scroll the user to the date card and flash a red ring. The
+      // disabled Button on its own gave no signal about why submit
+      // didn't work; this puts the failure surface in front of the
+      // user. Pet-related and other validation errors keep the
+      // existing red error text without the scroll \xe2\x80\x94 those
+      // surfaces are closer to the Button so the user can find
+      // them.
+      const isDateFailure =
+        v === t('booking.invalid_start_date') ||
+        v === t('booking.invalid_end_date') ||
+        v === t('booking.blocked_dates_error');
+      if (isDateFailure) flashDateCardError();
       return;
     }
     setError(null);
@@ -602,7 +655,7 @@ export default function BookingRequestScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
         <Pressable
           onPress={() => {
             if (isEditMode && editBookingId) {
@@ -641,8 +694,18 @@ export default function BookingRequestScreen() {
             (Historical: an earlier intermediate refactor used an
             inline AvailabilityCalendar component; deleted in FIX 2.) */}
         <Pressable
+          ref={dateCardRef}
           onPress={() => setDatePickerOpen(true)}
-          style={styles.dateCard}
+          style={[
+            styles.dateCard,
+            // L4 \xe2\x80\x94 red ring when the user tried to submit with a
+            // blocked-date overlap. Cleared by the next dates change
+            // or by the 3s setTimeout in flashDateCardError.
+            dateCardErrorRing && {
+              borderColor: colors.terracotta,
+              borderWidth: 2,
+            },
+          ]}
         >
           <View style={styles.dateCardCell}>
             <Text style={styles.dateCardLabel}>
@@ -993,11 +1056,19 @@ export default function BookingRequestScreen() {
             variant="primary"
             fullWidth
             loading={submitting}
+            // L4 (2026-06-27) \xe2\x80\x94 blockedRangeWarning dropped from the
+            // disabled list. Was hiding the date error behind a
+            // dead-on-arrival button; now validate() catches the
+            // overlap on submit and triggers the scroll-to-card +
+            // red-ring via flashDateCardError() so the user sees
+            // WHY their submit failed. The other three conditions
+            // stay disabled because their fix surfaces are inline:
+            // pet-empty has its own add-pet CTA, tooManyPets shows
+            // the count limit, endDateError prints below the card.
             disabled={
               pets.length === 0 ||
               tooManyPets ||
-              !!endDateError ||
-              blockedRangeWarning
+              !!endDateError
             }
           />
         </View>
