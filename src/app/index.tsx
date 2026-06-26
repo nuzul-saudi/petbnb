@@ -1327,7 +1327,13 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    // 2026-06-26 \xe2\x80\x94 bumped paddingVertical from xs (4px) to sm
+    // (8px). The xs value was too tight for Arabic text on iOS
+    // Safari + the WhatsApp in-app browser: descenders on \xd8\xac, \xd8\xb9,
+    // \xd9\x8a pushed the bottom of the glyph below the chip border,
+    // making the chip look truncated. sm gives the text breathing
+    // room without visibly inflating the row.
+    paddingVertical: spacing.sm,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.whisper,
@@ -1357,6 +1363,10 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontFamily: fonts.body,
     fontSize: 12,
+    // 2026-06-26 \xe2\x80\x94 explicit lineHeight so Arabic glyphs with
+    // descenders render fully inside the chip on iOS Safari +
+    // WhatsApp in-app browser.
+    lineHeight: 18,
     color: colors.inkSoft,
   },
   filterChipTextActive: {

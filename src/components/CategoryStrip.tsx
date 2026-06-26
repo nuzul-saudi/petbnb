@@ -112,7 +112,13 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontSize: 22,
-    lineHeight: 26,
+    // 2026-06-26 \xe2\x80\x94 bumped lineHeight from 26 to 32. iOS Safari (and
+    // the WhatsApp in-app browser) renders system emojis like \xf0\x9f\x8f\xa0
+    // \xf0\x9f\x90\xbe \xf0\x9f\x9b\x8d with intrinsic glyph heights that exceed a tight 26px
+    // lineHeight, clipping the bottom of the emoji. 32 gives enough
+    // breathing room across all platforms without visibly inflating
+    // the tile spacing.
+    lineHeight: 32,
   },
   emojiDisabled: {
     opacity: 0.4,
