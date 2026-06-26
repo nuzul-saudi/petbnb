@@ -21,6 +21,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { todayIso } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 export type RangeCalendarProps = {
@@ -62,6 +63,13 @@ export function RangeCalendar({
   blockedRanges,
 }: RangeCalendarProps) {
   const { t, locale } = useTranslation();
+  // L5 (2026-06-27) — persona-aware accents. theme.accent resolves
+  // to colors.mossDeep in owner/admin mode (byte-identical to the
+  // pre-L5 render) and colors.goldDeep in host mode. Threads onto
+  // the month-name title, the today-marker, and the start/end
+  // endpoint circle. Static styles below still carry mossDeep as
+  // the never-wins fallback.
+  const theme = useTheme();
   // 2026-06-26 — half-open isBlocked check. start_date inclusive,
   // end_date exclusive. Matches listing_blocked_dates schema and
   // src/lib/range-overlap.ts. The home-page search hero passes
@@ -135,7 +143,9 @@ export function RangeCalendar({
         <Pressable onPress={goPrevMonth} style={styles.navButton} accessibilityLabel={t('rangeCalendar.prev_month')}>
           <Text style={styles.navGlyph}>‹</Text>
         </Pressable>
-        <Text style={styles.title}>{formatMonth(viewMonth, locale)}</Text>
+        <Text style={[styles.title, { color: theme.accent }]}>
+          {formatMonth(viewMonth, locale)}
+        </Text>
         <Pressable onPress={goNextMonth} style={styles.navButton} accessibilityLabel={t('rangeCalendar.next_month')}>
           <Text style={styles.navGlyph}>›</Text>
         </Pressable>
@@ -194,6 +204,7 @@ export function RangeCalendar({
                 style={[
                   styles.dayInner,
                   (isStart || isEnd) && styles.dayInnerEndpoint,
+                  (isStart || isEnd) && { backgroundColor: theme.accent },
                 ]}
               >
                 <Text
@@ -202,6 +213,9 @@ export function RangeCalendar({
                     isPast && styles.dayTextPast,
                     isBlocked && styles.dayTextBlocked,
                     isToday && !isStart && !isEnd && styles.dayTextToday,
+                    isToday &&
+                      !isStart &&
+                      !isEnd && { color: theme.accent },
                     (isStart || isEnd) && styles.dayTextEndpoint,
                   ]}
                 >
