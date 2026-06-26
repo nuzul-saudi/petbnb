@@ -21,6 +21,7 @@ every time a migration is run on prod.
 | 0030 (`reconcile_review_policies`) | 2026-06-11 | Same smoke run as 0029. |
 | 0040 (`inquiry_threads`) | 2026-06-27 | `select exists (select 1 from information_schema.tables where table_schema='public' and table_name='inquiries')` → `APPLIED`. |
 | 0041 (`per_host_service_offers`) | 2026-06-27 | `select count(*) from information_schema.columns where table_schema='public' and table_name='listings' and column_name in ('offers_vet','offers_insurance','offers_transport')` → `3`. All three columns present. |
+| 0042 (`promote_addon_flags`) | 2026-06-27 | Two `pg_get_functiondef ilike` checks against `pg_proc` for `promote_listing_draft`. Check 1: `has_grooming = has_vet = has_insurance = has_transport = t` — all four addon flags now copied by the RPC. Check 2: `has_species = has_vaccination = has_host_gender = has_resident_note = t` — prior 0023/0026/0034 extensions survived the redefinition. |
 
 ## Unconfirmed but presumed applied
 
@@ -41,19 +42,7 @@ surfaces, re-confirm the relevant migration via a one-row
 
 ## Known unwritten
 
-- **0042 — `promote_listing_draft` extension** for the addon columns
-  added by 0041 (`offers_vet`, `offers_insurance`, `offers_transport`).
-  0041's in-line comment defers this:
-
-  > promote_listing_draft (0023, extended 0026) then needs to copy
-  > these too — that RPC update lives in the next migration if/when we
-  > adopt the addons UI on the edit screen's draft path.
-
-  Without 0042, a host editing those three toggles on an *approved*
-  listing has their changes silently dropped at admin-approval time
-  because the promote RPC only carries `offers_grooming` from the
-  draft. Cosmetic until the addon-edit UI ships, but blocking from
-  that point on.
+_(none currently — 0042 landed on 2026-06-27 and is recorded above.)_
 
 ## Convention for future entries
 
