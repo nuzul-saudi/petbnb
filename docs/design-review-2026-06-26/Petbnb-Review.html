@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/petbnb-design-system-4fc49b4b-66c0-4bf8-8e20-be165996b447/tokens/typography.css">
+<link rel="stylesheet" href="_ds/petbnb-design-system-4fc49b4b-66c0-4bf8-8e20-be165996b447/tokens/colors.css">
+<link rel="stylesheet" href="_ds/petbnb-design-system-4fc49b4b-66c0-4bf8-8e20-be165996b447/tokens/themes.css">
+<link rel="stylesheet" href="_ds/petbnb-design-system-4fc49b4b-66c0-4bf8-8e20-be165996b447/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/petbnb-design-system-4fc49b4b-66c0-4bf8-8e20-be165996b447/styles.css">
+</helmet>
+
+<!-- ============ TITLE / LEGEND ============ -->
+<div style="position:absolute; left:0px; top:0px; width:1000px;">
+  <div data-drags-parent="1" style="font-family:var(--font-body); font-size:13px; color:var(--text-muted); margin-bottom:10px; letter-spacing:0.3px;">PETBNB — PERSONA &amp; UX REVIEW · before / after</div>
+  <div style="background:#fff; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:40px 44px;">
+    <h1 style="font-family:var(--font-heading); font-weight:700; font-size:38px; color:var(--moss-deep); margin:0 0 14px;">Finishing the persona system</h1>
+    <p style="font-family:var(--font-body); font-size:17px; line-height:1.6; color:var(--ink); margin:0 0 28px; max-width:760px;">The theme engine is sound — owner resolves to moss, host to honey + deep-gold with WCAG-AA-safe ink. But <strong>useTheme() is opt-in and almost nothing opts in</strong>, so host mode renders half-themed: the background flips to honey while host names, prices, ✓ marks and section pills stay hardcoded moss. Each frame shows the screen <em>as built today</em> beside the <em>corrected</em> version. Same persona wrapper — only the colour <em>source</em> changes.</p>
+    <div style="display:flex; gap:40px; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="display:inline-block; width:14px; height:14px; border-radius:3px; background:var(--terracotta);"></span>
+        <span style="font-family:var(--font-body); font-size:14px; color:var(--ink);"><strong>As built</strong> — uses <code style="font-family:monospace; background:var(--sand); padding:1px 5px; border-radius:4px;">var(--moss-deep)</code> directly</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="display:inline-block; width:14px; height:14px; border-radius:3px; background:var(--moss);"></span>
+        <span style="font-family:var(--font-body); font-size:14px; color:var(--ink);"><strong>Fixed</strong> — uses <code style="font-family:monospace; background:var(--sand); padding:1px 5px; border-radius:4px;">var(--accent)</code> (themes to gold)</span>
+      </div>
+    </div>
+    <p style="font-family:var(--font-body); font-size:13px; line-height:1.55; color:var(--text-muted); margin:24px 0 0; max-width:760px;">Note the one deliberate constant: the verified <span style="color:var(--verified); font-weight:700;">✓</span> stays moss in both — it's the brand trust mark, not a persona accent. Everything else should follow the lens.</p>
+  </div>
+</div>
+
+<!-- ============ FINDING 1 — HOST HOME ============ -->
+<div style="position:absolute; left:0px; top:600px; width:760px;">
+  <div data-drags-parent="1" style="font-family:var(--font-body); font-size:13px; color:var(--text-muted); margin-bottom:10px; letter-spacing:0.3px;">1 · HOST HOME — index.tsx (HostHome) + ListingCard.jsx</div>
+  <div style="background:#fff; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:32px;">
+    <h2 style="font-family:var(--font-heading); font-weight:700; font-size:24px; color:var(--moss-deep); margin:0 0 6px;">The host's own home is the most mixed screen</h2>
+    <p style="font-family:var(--font-body); font-size:15px; line-height:1.55; color:var(--ink); margin:0 0 26px; max-width:620px;">AppShell flips the background to honey, but the section pill is hardcoded <code style="font-family:monospace; background:var(--sand); padding:1px 5px; border-radius:4px;">colors.moss</code> and every card renders the host name + price in <code style="font-family:monospace; background:var(--sand); padding:1px 5px; border-radius:4px;">--moss-deep</code>. The Button themes (it's the one opted-in component) so the CTA is already gold — which makes the moss around it look like a mistake.</p>
+    <div style="display:flex; gap:32px; align-items:flex-start;">
+
+      <!-- AS BUILT -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--terracotta);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--terracotta); letter-spacing:0.4px;">AS BUILT</span>
+        </div>
+        <div data-persona="host" dir="rtl" style="border-radius:26px; overflow:hidden; box-shadow:var(--shadow-lift); border:1px solid var(--whisper); background:var(--surface-screen);">
+          <!-- header -->
+          <div style="display:flex; align-items:center; height:46px; padding:0 16px; background:var(--surface-screen); border-bottom:1px solid var(--border-hairline);">
+            <nav style="display:flex; gap:16px; flex:1;">
+              <span style="font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--moss);">إعلاناتي</span>
+              <span style="font-family:var(--font-body); font-size:13px; color:var(--text-muted);">حسابي</span>
+            </nav>
+            <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--moss);">EN</span>
+          </div>
+          <div style="padding:16px;">
+            <div style="font-family:var(--font-body); font-size:12px; color:var(--text-muted); margin-bottom:12px;">أهلاً، نورة</div>
+            <!-- create CTA (Button themes → gold) -->
+            <button style="width:100%; height:44px; border:none; border-radius:var(--radius-lg); background:var(--gold-deep); color:var(--cream); font-family:var(--font-body); font-weight:700; font-size:15px; margin-bottom:16px;">+ إنشاء إعلان جديد</button>
+            <!-- section pill: HARDCODED MOSS -->
+            <div style="display:inline-block; padding:4px 12px; border-radius:var(--radius-pill); background:var(--moss); color:var(--cream); font-family:var(--font-body); font-weight:700; font-size:10px; letter-spacing:0.5px; margin-bottom:12px;">منشور</div>
+            <!-- ListingCard (host name + price hardcoded moss) -->
+            <div style="background:var(--paper); border-radius:var(--radius-xl); box-shadow:var(--shadow-card); overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:12px; padding:14px;">
+                <div style="width:50px; height:50px; border-radius:25px; background:var(--whisper); display:flex; align-items:center; justify-content:center; font-family:var(--font-heading); font-weight:700; font-size:22px; color:var(--moss-deep);">ن</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <span style="flex:1; font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--moss-deep);">نورة العتيبي</span>
+                    <span style="color:var(--verified); font-weight:700; font-size:13px;">✓</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:7px; margin-top:5px;">
+                    <span style="padding:2px 9px; border-radius:var(--radius-pill); background:var(--tier-gold); color:var(--cream); font-family:var(--font-body); font-weight:700; font-size:9px; letter-spacing:0.5px;">ذهبي</span>
+                    <span style="font-family:var(--font-body); font-size:11px; color:var(--text-muted);">مضيفة • 📍 النرجس</span>
+                  </div>
+                </div>
+              </div>
+              <div style="height:88px; background:linear-gradient(135deg,#d9c7a8,#c9b48a); display:flex; align-items:center; justify-content:center; font-size:34px; opacity:.5;">🏠</div>
+              <div style="padding:14px;">
+                <div style="font-family:var(--font-body); font-weight:700; font-size:14px; color:var(--ink); margin-bottom:6px;">غرفة هادئة لقطتك</div>
+                <div style="display:flex; align-items:center;">
+                  <span style="flex:1; font-family:var(--font-body); font-weight:700; font-size:15px; color:var(--moss-deep);">450 ر.س <span style="font-weight:400; font-size:11px; color:var(--text-muted);">/ ليلة</span></span>
+                  <span style="font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--text-muted);">🐈 2</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p style="font-family:var(--font-body); font-size:12px; line-height:1.5; color:var(--text-muted); margin:14px 2px 0;">Moss name, moss price, moss pill — on honey. The gold CTA is the only themed element.</p>
+      </div>
+
+      <!-- FIXED -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--moss);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--moss); letter-spacing:0.4px;">FIXED</span>
+        </div>
+        <div data-persona="host" dir="rtl" style="border-radius:26px; overflow:hidden; box-shadow:var(--shadow-lift); border:1px solid var(--whisper); background:var(--surface-screen);">
+          <div style="display:flex; align-items:center; height:46px; padding:0 16px; background:var(--surface-screen); border-bottom:1px solid var(--border-hairline);">
+            <nav style="display:flex; gap:16px; flex:1;">
+              <span style="font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--accent);">إعلاناتي</span>
+              <span style="font-family:var(--font-body); font-size:13px; color:var(--text-muted);">حسابي</span>
+            </nav>
+            <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--accent);">EN</span>
+          </div>
+          <div style="padding:16px;">
+            <div style="font-family:var(--font-body); font-size:12px; color:var(--text-muted); margin-bottom:12px;">أهلاً، نورة</div>
+            <button style="width:100%; height:44px; border:none; border-radius:var(--radius-lg); background:var(--accent); color:var(--cream); font-family:var(--font-body); font-weight:700; font-size:15px; margin-bottom:16px;">+ إنشاء إعلان جديد</button>
+            <div style="display:inline-block; padding:4px 12px; border-radius:var(--radius-pill); background:var(--accent); color:var(--cream); font-family:var(--font-body); font-weight:700; font-size:10px; letter-spacing:0.5px; margin-bottom:12px;">منشور</div>
+            <div style="background:var(--paper); border-radius:var(--radius-xl); box-shadow:var(--shadow-card); overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:12px; padding:14px;">
+                <div style="width:50px; height:50px; border-radius:25px; background:var(--whisper); display:flex; align-items:center; justify-content:center; font-family:var(--font-heading); font-weight:700; font-size:22px; color:var(--accent-ink);">ن</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <span style="flex:1; font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--accent-ink);">نورة العتيبي</span>
+                    <span style="color:var(--verified); font-weight:700; font-size:13px;">✓</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:7px; margin-top:5px;">
+                    <span style="padding:2px 9px; border-radius:var(--radius-pill); background:var(--tier-gold); color:var(--gold-ink); font-family:var(--font-body); font-weight:700; font-size:9px; letter-spacing:0.5px;">ذهبي</span>
+                    <span style="font-family:var(--font-body); font-size:11px; color:var(--text-muted);">مضيفة • 📍 النرجس</span>
+                  </div>
+                </div>
+              </div>
+              <div style="height:88px; background:linear-gradient(135deg,#d9c7a8,#c9b48a); display:flex; align-items:center; justify-content:center; font-size:34px; opacity:.5;">🏠</div>
+              <div style="padding:14px;">
+                <div style="font-family:var(--font-body); font-weight:700; font-size:14px; color:var(--ink); margin-bottom:6px;">غرفة هادئة لقطتك</div>
+                <div style="display:flex; align-items:center;">
+                  <span style="flex:1; font-family:var(--font-body); font-weight:700; font-size:15px; color:var(--accent-ink);">450 ر.س <span style="font-weight:400; font-size:11px; color:var(--text-muted);">/ ليلة</span></span>
+                  <span style="font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--text-muted);">🐈 2</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p style="font-family:var(--font-body); font-size:12px; line-height:1.5; color:var(--text-muted); margin:14px 2px 0;">One coherent gold lens. ✓ stays moss — the deliberate trust constant.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ============ FINDING 2 — LISTING DETAIL (HOST VIEW) ============ -->
+<div style="position:absolute; left:820px; top:600px; width:760px;">
+  <div data-drags-parent="1" style="font-family:var(--font-body); font-size:13px; color:var(--text-muted); margin-bottom:10px; letter-spacing:0.3px;">2 · LISTING DETAIL — listings/[id]/index.tsx (host viewing her own)</div>
+  <div style="background:#fff; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:32px;">
+    <h2 style="font-family:var(--font-heading); font-weight:700; font-size:24px; color:var(--moss-deep); margin:0 0 6px;">Title, ✓ marks and amenities all stay moss</h2>
+    <p style="font-family:var(--font-body); font-size:15px; line-height:1.55; color:var(--ink); margin:0 0 26px; max-width:620px;">The file comment even notes the background themes to honey — yet the title, section headings and every amenity check are hardcoded moss. A host previewing her own live listing gets a half-owner, half-host screen.</p>
+    <div style="display:flex; gap:32px; align-items:flex-start;">
+
+      <!-- AS BUILT -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--terracotta);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--terracotta); letter-spacing:0.4px;">AS BUILT</span>
+        </div>
+        <div data-persona="host" dir="rtl" style="border-radius:26px; overflow:hidden; box-shadow:var(--shadow-lift); border:1px solid var(--whisper); background:var(--surface-screen);">
+          <div style="height:120px; background:linear-gradient(135deg,#d9c7a8,#c9b48a); display:flex; align-items:center; justify-content:center; font-size:40px; opacity:.5;">🏠</div>
+          <div style="padding:16px;">
+            <div style="font-family:var(--font-heading); font-weight:700; font-size:19px; color:var(--moss-deep); margin-bottom:4px;">بيت دافئ لقطتك في النرجس</div>
+            <div style="font-family:var(--font-body); font-weight:700; font-size:16px; color:var(--ink); margin-bottom:14px;">450 ر.س <span style="font-weight:400; font-size:12px; color:var(--text-muted);">/ ليلة</span></div>
+            <div style="height:1px; background:var(--whisper); margin-bottom:14px;"></div>
+            <div style="font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted); letter-spacing:0.5px; margin-bottom:8px;">المضيفة</div>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+              <div style="width:46px; height:46px; border-radius:23px; background:var(--whisper); display:flex; align-items:center; justify-content:center; font-family:var(--font-heading); font-weight:700; font-size:20px; color:var(--moss-deep);">ن</div>
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:5px;"><span style="font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--moss-deep);">نورة العتيبي</span><span style="color:var(--verified); font-weight:700; font-size:13px;">✓</span></div>
+                <div style="font-family:var(--font-body); font-size:11px; color:var(--text-muted); margin-top:2px;">مضيفة موثوقة</div>
+              </div>
+            </div>
+            <div style="font-family:var(--font-heading); font-weight:700; font-size:14px; color:var(--moss-deep); margin-bottom:8px;">المرافق</div>
+            <div style="display:flex; flex-direction:column; gap:7px;">
+              <div style="display:flex; gap:7px; font-family:var(--font-body); font-size:12px; color:var(--ink);"><span style="color:var(--moss); font-weight:700;">✓</span> تتسع حتى قطتين</div>
+              <div style="display:flex; gap:7px; font-family:var(--font-body); font-size:12px; color:var(--ink);"><span style="color:var(--moss); font-weight:700;">✓</span> بدون حيوانات مقيمة</div>
+              <div style="display:flex; gap:7px; font-family:var(--font-body); font-size:12px; color:var(--ink);"><span style="color:var(--moss); font-weight:700;">✓</span> خدمة العناية متاحة</div>
+            </div>
+          </div>
+        </div>
+        <p style="font-family:var(--font-body); font-size:12px; line-height:1.5; color:var(--text-muted); margin:14px 2px 0;">Moss title, moss section heads, moss amenity checks — on honey.</p>
+      </div>
+
+      <!-- FIXED -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--moss);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--moss); letter-spacing:0.4px;">FIXED</span>
+        </div>
+        <div data-persona="host" dir="rtl" style="border-radius:26px; overflow:hidden; box-shadow:var(--shadow-lift); border:1px solid var(--whisper); background:var(--surface-screen);">
+          <div style="height:120px; background:linear-gradient(135deg,#d9c7a8,#c9b48a); display:flex; align-items:center; justify-content:center; font-size:40px; opacity:.5;">🏠</div>
+          <div style="padding:16px;">
+            <div style="font-family:var(--font-heading); font-weight:700; font-size:19px; color:var(--accent-ink); margin-bottom:4px;">بيت دافئ لقطتك في النرجس</div>
+            <div style="font-family:var(--font-body); font-weight:700; font-size:16px; color:var(--ink); margin-bottom:14px;">450 ر.س <span style="font-weight:400; font-size:12px; color:var(--text-muted);">/ ليلة</span></div>
+            <div style="height:1px; background:var(--whisper); margin-bottom:14px;"></div>
+            <div style="font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted); letter-spacing:0.5px; margin-bottom:8px;">المضيفة</div>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+              <div style="width:46px; height:46px; border-radius:23px; background:var(--whisper); display:flex; align-items:center; justify-content:center; font-family:var(--font-heading); font-weight:700; font-size:20px; color:var(--accent-ink);">ن</div>
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:5px;"><span style="font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--accent-ink);">نورة العتيبي</span><span style="color:var(--verified); font-weight:700; font-size:13px;">✓</span></div>
+                <div style="font-family:var(--font-body); font-size:11px; color:var(--text-muted); margin-top:2px;">مضيفة موثوقة</div>
+              </div>
+            </div>
+            <div style="font-family:var(--font-heading); font-weight:700; font-size:14px; color:var(--accent-ink); margin-bottom:8px;">المرافق</div>
+            <div style="display:flex; flex-direction:column; gap:7px;">
+              <div style="display:flex; gap:7px; font-family:var(--font-body); font-size:12px; color:var(--ink);"><span style="color:var(--accent); font-weight:700;">✓</span> تتسع حتى قطتين</div>
+              <div style="display:flex; gap:7px; font-family:var(--font-body); font-size:12px; color:var(--ink);"><span style="color:var(--accent); font-weight:700;">✓</span> بدون حيوانات مقيمة</div>
+              <div style="display:flex; gap:7px; font-family:var(--font-body); font-size:12px; color:var(--ink);"><span style="color:var(--accent); font-weight:700;">✓</span> خدمة العناية متاحة</div>
+            </div>
+          </div>
+        </div>
+        <p style="font-family:var(--font-body); font-size:12px; line-height:1.5; color:var(--text-muted); margin:14px 2px 0;">Headings + amenity checks resolve through <code style="font-family:monospace;">--accent</code>.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ FINDING 3 — UNIFIED DATE PICKER ============ -->
+<div style="position:absolute; left:0px; top:1640px; width:760px;">
+  <div data-drags-parent="1" style="font-family:var(--font-body); font-size:13px; color:var(--text-muted); margin-bottom:10px; letter-spacing:0.3px;">3 · DATES — RangeCalendar vs AvailabilityCalendar vs DateField</div>
+  <div style="background:#fff; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:32px;">
+    <h2 style="font-family:var(--font-heading); font-weight:700; font-size:24px; color:var(--moss-deep); margin:0 0 6px;">Three calendars that disagree → one</h2>
+    <p style="font-family:var(--font-body); font-size:15px; line-height:1.55; color:var(--ink); margin:0 0 26px; max-width:620px;">Built days apart, they differ on week-start, blocked-day styling, digit system and nav-arrow direction. To a Saudi user the booking calendar starts the week on Saturday and the host's availability calendar on Sunday — same app.</p>
+    <div style="display:flex; gap:32px; align-items:stretch;">
+
+      <!-- TODAY: divergences -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--terracotta);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--terracotta); letter-spacing:0.4px;">TODAY · 3 IMPLEMENTATIONS</span>
+        </div>
+        <div style="background:var(--sand); border-radius:var(--radius-xl); padding:18px; display:flex; flex-direction:column; gap:14px;">
+          <div style="font-family:var(--font-body); font-size:13px; color:var(--ink); line-height:1.5;"><strong style="color:var(--terracotta);">Week start</strong><br>RangeCalendar → Saturday · AvailabilityCalendar → Sunday</div>
+          <div style="height:1px; background:var(--whisper);"></div>
+          <div style="font-family:var(--font-body); font-size:13px; color:var(--ink); line-height:1.5;"><strong style="color:var(--terracotta);">Blocked days</strong><br>rose @ 0.35 + strikethrough · vs rose @ 0.45, no strike</div>
+          <div style="height:1px; background:var(--whisper);"></div>
+          <div style="font-family:var(--font-body); font-size:13px; color:var(--ink); line-height:1.5;"><strong style="color:var(--terracotta);">Nav arrows</strong><br>flip by locale in one calendar, fixed in the other</div>
+          <div style="height:1px; background:var(--whisper);"></div>
+          <div style="font-family:var(--font-body); font-size:13px; color:var(--ink); line-height:1.5;"><strong style="color:var(--terracotta);">Plus</strong> a native <code style="font-family:monospace;">&lt;input type=date&gt;</code> still used for vaccination dates → leaks raw ISO <code style="font-family:monospace;">2026-07-01</code></div>
+        </div>
+      </div>
+
+      <!-- UNIFIED -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--moss);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--moss); letter-spacing:0.4px;">UNIFIED · one RangeCalendar</span>
+        </div>
+        <div dir="rtl" style="background:var(--paper); border-radius:var(--radius-xl); box-shadow:var(--shadow-card); padding:16px;">
+          <div style="display:flex; align-items:center; margin-bottom:14px;">
+            <span style="font-family:var(--font-body); font-weight:700; font-size:18px; color:var(--text-muted); cursor:pointer;">‹</span>
+            <span style="flex:1; text-align:center; font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--moss-deep);">يوليو 2025</span>
+            <span style="font-family:var(--font-body); font-weight:700; font-size:18px; color:var(--text-muted); cursor:pointer;">›</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:6px;">
+            <div style="text-align:center; font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted);">س</div>
+            <div style="text-align:center; font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted);">ح</div>
+            <div style="text-align:center; font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted);">ن</div>
+            <div style="text-align:center; font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted);">ث</div>
+            <div style="text-align:center; font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted);">ر</div>
+            <div style="text-align:center; font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted);">خ</div>
+            <div style="text-align:center; font-family:var(--font-body); font-weight:700; font-size:10px; color:var(--text-muted);">ج</div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; font-family:var(--font-body); font-size:12px;">
+            <span></span><span></span><span></span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">1</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">2</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">3</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">4</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">5</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">6</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">7</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">8</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">9</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--accent); color:var(--cream); font-weight:700;">10</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; background:var(--whisper); color:var(--ink);">11</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; background:var(--whisper); color:var(--ink);">12</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; background:var(--whisper); color:var(--ink);">13</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--accent); color:var(--cream); font-weight:700;">14</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">15</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">16</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">17</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">18</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">19</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">20</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">21</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:6px; background:color-mix(in srgb, var(--rose) 38%, transparent); color:var(--terracotta); text-decoration:line-through;">22</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:6px; background:color-mix(in srgb, var(--rose) 38%, transparent); color:var(--terracotta); text-decoration:line-through;">23</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:6px; background:color-mix(in srgb, var(--rose) 38%, transparent); color:var(--terracotta); text-decoration:line-through;">24</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">25</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">26</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">27</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">28</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">29</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">30</span>
+            <span style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; color:var(--ink);">31</span>
+          </div>
+          <div style="display:flex; gap:14px; margin-top:14px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:6px; font-family:var(--font-body); font-size:11px; color:var(--text-muted);"><span style="width:12px; height:12px; border-radius:50%; background:var(--accent);"></span> التواريخ المختارة</div>
+            <div style="display:flex; align-items:center; gap:6px; font-family:var(--font-body); font-size:11px; color:var(--text-muted);"><span style="width:12px; height:12px; border-radius:3px; background:color-mix(in srgb, var(--rose) 38%, transparent);"></span> غير متاح</div>
+          </div>
+        </div>
+        <p style="font-family:var(--font-body); font-size:12px; line-height:1.5; color:var(--text-muted); margin:14px 2px 0;">Saturday-start · Latin numerals (locked decision) · accent endpoints (themes per persona) · <code style="font-family:monospace;">mode="single"</code> covers vaccination dates too.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ FINDING 4 — BOOKING STICKY SUMMARY ============ -->
+<div style="position:absolute; left:820px; top:1640px; width:760px;">
+  <div data-drags-parent="1" style="font-family:var(--font-body); font-size:13px; color:var(--text-muted); margin-bottom:10px; letter-spacing:0.3px;">4 · BOOKING — listings/[id]/request.tsx</div>
+  <div style="background:#fff; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:32px;">
+    <h2 style="font-family:var(--font-heading); font-weight:700; font-size:24px; color:var(--moss-deep); margin:0 0 6px;">Keep the total &amp; CTA in reach</h2>
+    <p style="font-family:var(--font-body); font-size:15px; line-height:1.55; color:var(--ink); margin:0 0 26px; max-width:620px;">The request screen is one long scroll — dates, pets, per-pet services, breakdown, fees, two warnings — with the total and submit pinned to the very bottom, far from where the decisions are made. A sticky summary bar keeps the price visible and the CTA always reachable.</p>
+    <div style="display:flex; gap:32px; align-items:flex-start;">
+
+      <!-- AS BUILT -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--terracotta);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--terracotta); letter-spacing:0.4px;">AS BUILT</span>
+        </div>
+        <div dir="rtl" style="border-radius:26px; overflow:hidden; box-shadow:var(--shadow-lift); border:1px solid var(--whisper); background:var(--cream); height:430px; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; height:46px; padding:0 16px; background:var(--cream); border-bottom:1px solid var(--border-hairline);">
+            <span style="font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--moss-deep);">اطلبي الحجز</span>
+          </div>
+          <div style="flex:1; overflow:hidden; padding:16px; display:flex; flex-direction:column; gap:10px;">
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">التواريخ · 10–14 يوليو</div>
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">القطط · مشمش، لولو</div>
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">الخدمات الإضافية</div>
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">ملخص التكلفة</div>
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--text-muted); box-shadow:var(--shadow-raise);">الرسوم …</div>
+            <div style="text-align:center; font-family:var(--font-body); font-size:18px; color:var(--text-muted); opacity:.5;">⌄</div>
+          </div>
+          <!-- total + CTA buried at the very bottom -->
+          <div style="padding:12px 16px; background:var(--cream);">
+            <div style="display:flex; justify-content:space-between; font-family:var(--font-body); font-weight:700; font-size:14px; color:var(--ink); margin-bottom:10px;"><span>الإجمالي</span><span>1,350 ر.س</span></div>
+            <button style="width:100%; height:44px; border:none; border-radius:var(--radius-lg); background:var(--moss); color:var(--cream); font-family:var(--font-body); font-weight:700; font-size:15px;">اطلبي الحجز</button>
+          </div>
+        </div>
+        <p style="font-family:var(--font-body); font-size:12px; line-height:1.5; color:var(--text-muted); margin:14px 2px 0;">Total + CTA scroll off the bottom — invisible while the user makes choices above.</p>
+      </div>
+
+      <!-- FIXED -->
+      <div style="flex:1;">
+        <div style="display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;">
+          <span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:var(--moss);"></span>
+          <span style="font-family:var(--font-body); font-weight:700; font-size:12px; color:var(--moss); letter-spacing:0.4px;">FIXED</span>
+        </div>
+        <div dir="rtl" style="border-radius:26px; overflow:hidden; box-shadow:var(--shadow-lift); border:1px solid var(--whisper); background:var(--cream); height:430px; display:flex; flex-direction:column; position:relative;">
+          <div style="display:flex; align-items:center; height:46px; padding:0 16px; background:var(--cream); border-bottom:1px solid var(--border-hairline);">
+            <span style="font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--moss-deep);">اطلبي الحجز</span>
+          </div>
+          <div style="flex:1; overflow:hidden; padding:16px; display:flex; flex-direction:column; gap:10px;">
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">التواريخ · 10–14 يوليو</div>
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">القطط · مشمش، لولو</div>
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">الخدمات الإضافية</div>
+            <div style="background:var(--paper); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-body); font-size:12px; color:var(--ink); box-shadow:var(--shadow-raise);">ملخص التكلفة</div>
+          </div>
+          <!-- sticky summary bar -->
+          <div style="position:absolute; bottom:0; left:0; right:0; padding:12px 16px; background:var(--paper); border-top:1px solid var(--whisper); box-shadow:0 -6px 18px rgba(31,42,29,.10); display:flex; align-items:center; gap:12px;">
+            <div style="display:flex; flex-direction:column;">
+              <span style="font-family:var(--font-body); font-weight:700; font-size:16px; color:var(--moss-deep);">1,350 ر.س</span>
+              <span style="font-family:var(--font-body); font-size:11px; color:var(--text-muted);">3 ليالٍ · قطتان</span>
+            </div>
+            <button style="flex:1; height:44px; border:none; border-radius:var(--radius-lg); background:var(--moss); color:var(--cream); font-family:var(--font-body); font-weight:700; font-size:15px;">اطلبي الحجز</button>
+          </div>
+        </div>
+        <p style="font-family:var(--font-body); font-size:12px; line-height:1.5; color:var(--text-muted); margin:14px 2px 0;">Running total + submit pinned — visible the whole time, routed through the shared <code style="font-family:monospace;">Button</code>.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
