@@ -24,7 +24,7 @@ import {
 } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
-import { Button } from '@/components/Button';
+// 0043 — Button import dropped; was used only by the (now-removed) Close button.
 import { MessagesSection } from '@/components/bookings/MessagesSection';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/lib/auth';
@@ -32,7 +32,10 @@ import { confirmDialog } from '@/lib/confirm';
 import { pickLocalized } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import {
-  closeInquiry,
+  // 0043 (2026-06-28) — closeInquiry removed; archive is no longer
+  // a product affordance. Inquiry threads stay open forever; the
+  // only valid terminal status remains 'converted' (inquiry became
+  // a booking).
   containsContactInfo,
   getInquiry,
   listInquiryMessages,
@@ -57,7 +60,7 @@ export default function InquiryThreadScreen() {
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [closing, setClosing] = useState(false);
+  // 0043 — `closing` state + setter dropped along with the Close button.
 
   const loadInquiry = useCallback(async () => {
     if (!id) return;
@@ -233,35 +236,12 @@ export default function InquiryThreadScreen() {
           t={t}
         />
 
-        {/* Close (archive) — visible only on open threads, only to
-            the two participants (RLS blocks anyone else anyway). */}
-        {inquiry.status === 'open' ? (
-          <View style={styles.closeWrap}>
-            <Button
-              label={
-                closing
-                  ? t('inquiry.closing')
-                  : t('inquiry.close_button')
-              }
-              variant="secondary"
-              onPress={async () => {
-                if (closing) return;
-                const ok = await confirmDialog(t('inquiry.close_confirm'));
-                if (!ok) return;
-                setClosing(true);
-                try {
-                  await closeInquiry(inquiry.id);
-                  await loadInquiry();
-                } catch (e) {
-                  logWarn('[inquiry.close_failed]', e);
-                } finally {
-                  setClosing(false);
-                }
-              }}
-              fullWidth
-            />
-          </View>
-        ) : null}
+        {/* 0043 (2026-06-28) — Close (archive) affordance removed.
+            Inquiry threads stay open forever; the only terminal
+            status is 'converted' (inquiry became a booking). The
+            corresponding DB trigger in 0043 rejects any new
+            open → closed transition, so attempting to call
+            closeInquiry from anywhere would now raise. */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -346,7 +326,5 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: 'center',
   },
-  closeWrap: {
-    marginTop: spacing.md,
-  },
+  // 0043 — closeWrap style dropped along with the Close button.
 });

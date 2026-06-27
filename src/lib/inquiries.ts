@@ -312,22 +312,14 @@ export async function sendInquiryMessage(
 }
 
 // ---------------------------------------------------------------------------
-// Close (archive)
-// ---------------------------------------------------------------------------
-
-/** Close (archive) an inquiry thread. Relies on the 0040
- *  guard_inquiry_update trigger to enforce the transition:
- *  open → closed allowed; closed → anything else raises. The
- *  inquiries_update_participants policy gates WHO can close
- *  (either participant or admin). */
-export async function closeInquiry(inquiryId: string): Promise<void> {
-  if (!supabase) throw new Error('No Supabase client');
-  const { error } = await supabase
-    .from('inquiries')
-    .update({ status: 'closed' })
-    .eq('id', inquiryId);
-  if (error) throw error;
-}
+// 0043 (2026-06-28) — closeInquiry() removed. The archive/close
+// affordance is gone from the product (founder decision). Inquiry
+// threads stay open forever; the only valid terminal status is
+// 'converted' (inquiry became a booking). The 0043 trigger update
+// rejects any new open → closed transition at the DB layer, so any
+// caller attempting to set status = 'closed' would raise. UI
+// affordance removed in src/app/inquiries/[id].tsx in the same
+// commit.
 
 // ---------------------------------------------------------------------------
 // Re-export the anti-leakage check so call sites can import from
