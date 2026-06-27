@@ -531,6 +531,10 @@ export type Database = {
           payout_status: 'held' | 'released' | null;
           cancelled_at: string | null;
           refund_sar: number | null;
+          // 0044 — read tracking. NULL until the participant first
+          // opens the thread; updated via mark_thread_read RPC.
+          owner_last_opened_at: string | null;
+          host_last_opened_at: string | null;
         };
         Insert: {
           id?: string;
@@ -555,6 +559,8 @@ export type Database = {
           payout_status?: 'held' | 'released' | null;
           cancelled_at?: string | null;
           refund_sar?: number | null;
+          owner_last_opened_at?: string | null;
+          host_last_opened_at?: string | null;
         };
         Update: {
           id?: string;
@@ -579,6 +585,8 @@ export type Database = {
           payout_status?: 'held' | 'released' | null;
           cancelled_at?: string | null;
           refund_sar?: number | null;
+          owner_last_opened_at?: string | null;
+          host_last_opened_at?: string | null;
         };
         Relationships: [
           {
@@ -794,24 +802,41 @@ export type Database = {
           booking_id: string | null;
           inquiry_id: string | null;
           sender_id: string;
-          body: string;
+          // 0044 — body is nullable to support soft-delete (body
+          // gets nulled when deleted_at is set; the
+          // messages_body_present_unless_deleted CHECK enforces
+          // body is non-null + non-empty on live messages).
+          body: string | null;
           created_at: string;
+          // 0044 — soft-delete marker. NULL = live; non-null =
+          // deleted at that timestamp. Once set, the message is
+          // immutable (guard_message_update rejects all further
+          // updates).
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
           booking_id?: string | null;
           inquiry_id?: string | null;
           sender_id: string;
-          body: string;
+          body: string; // 0044 — insert MUST provide non-empty body
           created_at?: string;
+          deleted_at?: string | null; // 0044 — should always be null on insert
         };
         Update: {
+          // 0044 — only soft-delete is permitted. guard_message_update
+          // rejects updates that touch any column other than
+          // deleted_at + body, and requires deleted_at to move null →
+          // non-null while body moves non-null → null on the same call.
+          // Other columns kept in the Update type for shape parity with
+          // Row, but writes will raise at the trigger.
           id?: string;
           booking_id?: string | null;
           inquiry_id?: string | null;
           sender_id?: string;
-          body?: string;
+          body?: string | null;
           created_at?: string;
+          deleted_at?: string | null;
         };
         Relationships: [
           {
@@ -853,6 +878,10 @@ export type Database = {
           created_at: string;
           updated_at: string;
           last_message_at: string | null;
+          // 0044 — read tracking. NULL until the participant first
+          // opens the thread; updated via mark_thread_read RPC.
+          starter_last_opened_at: string | null;
+          host_last_opened_at: string | null;
         };
         Insert: {
           id?: string;
@@ -863,14 +892,20 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           last_message_at?: string | null;
+          starter_last_opened_at?: string | null;
+          host_last_opened_at?: string | null;
         };
         Update: {
           // id / listing_id / starter_id / host_id / created_at are
           // immutable per the guard_inquiry_update trigger; status
-          // transitions limited to open → converted | closed.
+          // transitions limited to open → converted (closing
+          // blocked since 0043). last_opened_at columns are
+          // forward-only per the 0044 trigger extension.
           status?: Database['public']['Enums']['inquiry_status'];
           updated_at?: string;
           last_message_at?: string | null;
+          starter_last_opened_at?: string | null;
+          host_last_opened_at?: string | null;
         };
         Relationships: [
           {
@@ -1044,6 +1079,17 @@ export type Database = {
       // under the unique(listing_id, sort_order) constraint.
       reorder_listing_photos: {
         Args: { p_listing_id: string; p_order: string[] };
+        Returns: void;
+      };
+      // 0044 — message read-tracking. Caller (authenticated) marks a
+      // thread as read at the current server now(); RPC validates
+      // participation (booking owner/host OR inquiry starter/host)
+      // and updates the caller's last_opened_at column on the parent
+      // row with GREATEST(existing, now()) to guarantee monotonicity.
+      // Raises 42501 if the caller isn't a participant, 22023 if
+      // p_thread_kind isn't 'booking' or 'inquiry'.
+      mark_thread_read: {
+        Args: { p_thread_kind: 'booking' | 'inquiry'; p_thread_id: string };
         Returns: void;
       };
       // Step 8f (migration 0023) — admin promotes drafts to live.

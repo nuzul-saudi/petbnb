@@ -1,0 +1,639 @@
+-- ============================================================
+-- 0044 — Message deletion + read tracking
+-- ============================================================
+--
+-- Founder decisions (locked 2026-06-28):
+--
+--   * "Read" = the OTHER participant OPENED the thread. WhatsApp
+--     blue-tick semantics: one open-event marks every prior message
+--     in that thread as read by that user. NOT per-message scrolled.
+--
+--   * A sender can soft-delete their OWN message ONLY until the
+--     other participant has read it (using the read-tracking
+--     above). After read → deletion blocked.
+--
+--   * Soft delete: body is NULLED (content truly gone). Row stays.
+--     UI renders "message deleted" placeholder. No one — including
+--     admin — can recover the body. Intentional.
+--
+--   * Admin: SELECT bypass on messages already exists (0040 line
+--     327 `public.is_admin() OR ...`). No new policy needed. Admin
+--     sees the same placeholder for deleted messages — never the
+--     pre-deletion body.
+--
+-- ============================================================
+-- DESIGN CHOICES
+-- ============================================================
+--
+-- READ TRACKING SHAPE: per-thread, per-participant timestamps on
+-- the parent table (bookings + inquiries) — NOT a side table.
+-- Rationale documented in docs/message-deletion-plan.md §4.1:
+--
+--   * 2-party chat (no group plans on the roadmap)
+--   * Write cost: 1 UPDATE per thread open (vs. 1 INSERT per
+--     message-read for a junction table)
+--   * Read cost: zero — the timestamp travels with the parent row
+--   * Cascade is automatic — no orphan rows if the parent is deleted
+--   * The "all prior messages read" semantics map directly: a
+--     single timestamp says "I've seen everything up to time X"
+--
+-- mark_thread_read MECHANISM: a SECURITY DEFINER RPC, not a direct
+-- UPDATE. Rationale:
+--
+--   * App-side: one obvious call site; no thinking about which
+--     column (starter_/owner_/host_) maps to the caller's role.
+--   * The RPC validates participation BEFORE writing — defense
+--     in depth vs. the inquiries_update_participants /
+--     bookings_update_owner_or_host policies that already gate WHO.
+--   * Forward-only invariant: GREATEST(existing, now()) guarantees
+--     a clock skew or replayed call never moves the timestamp
+--     backward. Direct UPDATE would not enforce this.
+--
+-- The trigger guards (extended below) ALSO permit forward-only
+-- changes to these columns via the existing UPDATE policy paths —
+-- the RPC is the convention, not the only door — so participants
+-- using direct supabase-js UPDATEs would still work but pass
+-- through the trigger's monotonicity check.
+--
+-- DELETE-UNTIL-READ PREDICATE: structured as IS NULL OR < to keep
+-- the JOIN compact and the planner happy. The "other party's
+-- last_opened_at" is selected via a CASE on sender_id matching the
+-- two participant role columns. Documented further at each branch.
+--
+-- ============================================================
+-- ORDERING / DEPENDENCY NOTES
+-- ============================================================
+--
+--   * 0043 must apply first (this migration's policy redefines
+--     messages_insert_participants, which 0043 also touched).
+--     Conflict avoidance: 0044 does NOT touch the INSERT policy;
+--     only adds the UPDATE policy. 0043's INSERT predicate
+--     survives unchanged.
+--
+--   * 0040's CHECK constraint messages_one_thread_check (exactly
+--     one of booking_id/inquiry_id non-null) survives the body-
+--     nullability change unchanged — the soft-delete mutation
+--     doesn't touch either FK.
+--
+--   * 0040's AFTER INSERT trigger touch_inquiry_last_message_at
+--     fires only on INSERT, not UPDATE, so the soft-delete UPDATE
+--     doesn't touch inquiries.last_message_at. Correct: a deleted
+--     message shouldn't move "last activity" backward.
+--
+-- ============================================================
+-- ANON CAVEAT
+-- ============================================================
+-- All new policies + RPCs are `to authenticated`. Anon never
+-- gains read/write to any of the new surfaces. The body
+-- nullability change does NOT widen anon's view of messages —
+-- anon already had no SELECT policy on public.messages.
+
+
+-- ============================================================
+-- 1. messages — deleted_at column + body CHECK relaxation
+-- ============================================================
+-- Adds the soft-delete marker. body becomes nullable so deleted
+-- rows can null their content. The 0001 CHECK
+-- `check (length(body) > 0)` is replaced with a conditional that
+-- enforces the same invariant for non-deleted rows AND allows
+-- body = NULL on deleted rows.
+
+alter table public.messages
+  add column deleted_at timestamptz;
+
+alter table public.messages
+  alter column body drop not null;
+
+-- Drop the original length(body) > 0 check. The constraint name
+-- is auto-generated by Postgres from the column + check ordinal;
+-- we can't rely on a literal name across environments. The
+-- defensive pattern: find by definition.
+do $$
+declare
+  v_constraint_name text;
+begin
+  select c.conname into v_constraint_name
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+   where n.nspname = 'public'
+     and t.relname = 'messages'
+     and c.contype = 'c'
+     and pg_get_constraintdef(c.oid) ilike '%length(body) > 0%'
+     and pg_get_constraintdef(c.oid) not ilike '%deleted_at%'
+   limit 1;
+
+  if v_constraint_name is not null then
+    execute format(
+      'alter table public.messages drop constraint %I',
+      v_constraint_name
+    );
+  end if;
+end;
+$$;
+
+-- Add the replacement check: live messages must have non-empty
+-- body; deleted messages may have null body.
+alter table public.messages
+  add constraint messages_body_present_unless_deleted check (
+    deleted_at is not null
+    or (body is not null and length(body) > 0)
+  );
+
+
+-- ============================================================
+-- 2. Read tracking — columns on bookings + inquiries
+-- ============================================================
+-- Two timestamptz columns per parent table, one per participant
+-- role. NULL = the participant has never opened the thread.
+-- Non-null = the timestamp at which they last opened it.
+
+alter table public.bookings
+  add column owner_last_opened_at timestamptz,
+  add column host_last_opened_at  timestamptz;
+
+alter table public.inquiries
+  add column starter_last_opened_at timestamptz,
+  add column host_last_opened_at    timestamptz;
+
+
+-- ============================================================
+-- 3. mark_thread_read RPC — SECURITY DEFINER
+-- ============================================================
+-- Single entry point the app calls when a user opens a thread.
+-- Validates the caller is a participant on the named thread;
+-- updates the caller's column to GREATEST(existing, now()) to
+-- guarantee forward-only progression.
+--
+-- Returns void. The caller doesn't need the new timestamp; the
+-- next read of the parent row will pick it up.
+--
+-- SECURITY DEFINER + pinned search_path = public — same hardening
+-- pattern as is_admin/is_active_user (0038) and the inquiry
+-- trigger touch_inquiry_last_message_at (0040).
+--
+-- Why not allow direct UPDATE: callers would need to know which
+-- column maps to their role. The RPC abstracts that. (Direct
+-- UPDATE is also possible via the existing participants policies
+-- — see trigger updates below for the monotonicity guard that
+-- catches direct-UPDATE bypass attempts.)
+
+create or replace function public.mark_thread_read(
+  p_thread_kind text,
+  p_thread_id   uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_caller uuid := (select auth.uid());
+begin
+  if v_caller is null then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+
+  if p_thread_kind = 'booking' then
+    -- Caller must be the booking's owner or the listing's host.
+    update public.bookings b
+       set owner_last_opened_at =
+             case when b.owner_id = v_caller
+                  then greatest(coalesce(b.owner_last_opened_at, '-infinity'::timestamptz), now())
+                  else b.owner_last_opened_at
+             end,
+           host_last_opened_at =
+             case when exists (
+                    select 1 from public.listings l
+                     where l.id = b.listing_id and l.host_id = v_caller
+                  )
+                  then greatest(coalesce(b.host_last_opened_at, '-infinity'::timestamptz), now())
+                  else b.host_last_opened_at
+             end
+     where b.id = p_thread_id
+       and (
+         b.owner_id = v_caller
+         or exists (
+           select 1 from public.listings l
+            where l.id = b.listing_id and l.host_id = v_caller
+         )
+       );
+
+    if not found then
+      raise exception 'not a participant on this booking' using errcode = '42501';
+    end if;
+
+  elsif p_thread_kind = 'inquiry' then
+    -- Caller must be the inquiry's starter or host.
+    update public.inquiries i
+       set starter_last_opened_at =
+             case when i.starter_id = v_caller
+                  then greatest(coalesce(i.starter_last_opened_at, '-infinity'::timestamptz), now())
+                  else i.starter_last_opened_at
+             end,
+           host_last_opened_at =
+             case when i.host_id = v_caller
+                  then greatest(coalesce(i.host_last_opened_at, '-infinity'::timestamptz), now())
+                  else i.host_last_opened_at
+             end
+     where i.id = p_thread_id
+       and (i.starter_id = v_caller or i.host_id = v_caller);
+
+    if not found then
+      raise exception 'not a participant on this inquiry' using errcode = '42501';
+    end if;
+
+  else
+    raise exception 'invalid thread_kind: %', p_thread_kind
+      using errcode = '22023';  -- invalid_parameter_value
+  end if;
+end;
+$$;
+
+-- GRANTs — match the convention from 0023 and other RPCs.
+revoke execute on function public.mark_thread_read(text, uuid) from public;
+revoke execute on function public.mark_thread_read(text, uuid) from anon;
+revoke execute on function public.mark_thread_read(text, uuid) from service_role;
+grant  execute on function public.mark_thread_read(text, uuid) to   authenticated;
+
+
+-- ============================================================
+-- 4. guard_inquiry_update — allow monotonic last_opened_at writes
+-- ============================================================
+-- 0043 added the 'closing blocked' rule. 0044 extends to permit
+-- forward-only changes to the two new last_opened_at columns
+-- (whether via the RPC above or via a direct UPDATE through the
+-- existing inquiries_update_participants policy). Monotonicity
+-- prevents a participant from rewinding their own read timestamp
+-- to re-enable deletion of a message they've already read.
+--
+-- Preserved BYTE-IDENTICAL from 0043 except for the two new
+-- monotonicity checks appended.
+
+create or replace function public.guard_inquiry_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.id is distinct from old.id then
+    raise exception 'inquiries.id is immutable';
+  end if;
+  if new.listing_id is distinct from old.listing_id then
+    raise exception 'inquiries.listing_id is immutable';
+  end if;
+  if new.starter_id is distinct from old.starter_id then
+    raise exception 'inquiries.starter_id is immutable';
+  end if;
+  if new.host_id is distinct from old.host_id then
+    raise exception 'inquiries.host_id is immutable';
+  end if;
+  if new.created_at is distinct from old.created_at then
+    raise exception 'inquiries.created_at is immutable';
+  end if;
+
+  if old.status = 'converted' and new.status <> 'converted' then
+    raise exception 'inquiry status cannot leave converted';
+  end if;
+  if old.status = 'closed' and new.status <> 'closed' then
+    raise exception 'inquiry status cannot leave closed';
+  end if;
+
+  -- 0043 — block fresh closes (archive removed).
+  if old.status <> 'closed' and new.status = 'closed' then
+    raise exception 'closing inquiries is no longer permitted (archive removed)';
+  end if;
+
+  -- 0044 — last_opened_at columns are forward-only. NULL → non-null
+  -- allowed; non-null → larger value allowed; smaller or back-to-null
+  -- rejected.
+  if old.starter_last_opened_at is not null
+     and (new.starter_last_opened_at is null
+          or new.starter_last_opened_at < old.starter_last_opened_at) then
+    raise exception 'inquiries.starter_last_opened_at is monotonic forward-only';
+  end if;
+  if old.host_last_opened_at is not null
+     and (new.host_last_opened_at is null
+          or new.host_last_opened_at < old.host_last_opened_at) then
+    raise exception 'inquiries.host_last_opened_at is monotonic forward-only';
+  end if;
+
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+
+-- ============================================================
+-- 5. guard_booking_update — NEW. Read-column monotonicity only.
+-- ============================================================
+-- bookings has no pre-existing column-immutability trigger; the
+-- 0027 guard_booking_capacity is a different concern (overlap
+-- check at insert time). 0044 adds a minimal trigger that does
+-- ONLY the forward-only check on the two new read columns —
+-- nothing else. Status transitions, owner/host changes, etc. are
+-- left to app-layer enforcement (status validation lives in
+-- src/lib/bookings.ts).
+
+create or replace function public.guard_booking_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- 0044 — last_opened_at columns are forward-only on bookings,
+  -- same rule as on inquiries.
+  if old.owner_last_opened_at is not null
+     and (new.owner_last_opened_at is null
+          or new.owner_last_opened_at < old.owner_last_opened_at) then
+    raise exception 'bookings.owner_last_opened_at is monotonic forward-only';
+  end if;
+  if old.host_last_opened_at is not null
+     and (new.host_last_opened_at is null
+          or new.host_last_opened_at < old.host_last_opened_at) then
+    raise exception 'bookings.host_last_opened_at is monotonic forward-only';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger guard_booking_update
+  before update on public.bookings
+  for each row
+  execute function public.guard_booking_update();
+
+
+-- ============================================================
+-- 6. messages UPDATE policy — delete-own-until-read
+-- ============================================================
+-- The ONE new policy on messages. Sender can UPDATE their own
+-- message only if:
+--   - is_active_user() — suspended accounts can't retract
+--   - sender_id matches caller
+--   - the row isn't already deleted (defense-in-depth — the
+--     trigger also blocks this)
+--   - the OTHER participant has NOT yet read it (the new
+--     read-tracking predicate)
+--
+-- WITH CHECK forces the post-update row to be a deletion. The
+-- trigger then enforces the WHAT-can-change rule: only
+-- deleted_at + body, body must be nulled when deleted_at is set,
+-- everything else immutable.
+--
+-- "OTHER participant has not read it" is expressed as:
+--   their_last_opened_at IS NULL  OR  their_last_opened_at < messages.created_at
+--
+-- The CASE expression picks the right "other party" column based
+-- on which side the sender is on. For booking-scoped: sender is
+-- either booking owner or listing host; the OTHER is the opposite
+-- one. For inquiry-scoped: sender is either starter or host; the
+-- OTHER is the opposite one.
+--
+-- Admin is NOT in this policy. Admin moderation deletion is a
+-- separate concern; if needed pre-launch it lands as a SECURITY
+-- DEFINER admin RPC, not as a quiet override of the user's
+-- intent here. Mirrors 0040's "no admin DELETE policy on
+-- inquiries" stance.
+
+create policy "messages_update_own_until_read"
+  on public.messages for update
+  to authenticated
+  using (
+    public.is_active_user()
+    and sender_id = (select auth.uid())
+    and deleted_at is null
+    and (
+      (
+        -- BOOKING-SCOPED branch.
+        booking_id is not null
+        and exists (
+          select 1 from public.bookings b
+          left join public.listings l on l.id = b.listing_id
+          where b.id = messages.booking_id
+            and (b.owner_id = (select auth.uid()) or l.host_id = (select auth.uid()))
+            and (
+              -- The OTHER participant's last_opened_at must be
+              -- null (never opened) or < this message's created_at
+              -- (last opened before this message landed).
+              case
+                when messages.sender_id = b.owner_id
+                  then b.host_last_opened_at
+                else b.owner_last_opened_at
+              end is null
+              or case
+                when messages.sender_id = b.owner_id
+                  then b.host_last_opened_at
+                else b.owner_last_opened_at
+              end < messages.created_at
+            )
+        )
+      )
+      or
+      (
+        -- INQUIRY-SCOPED branch.
+        inquiry_id is not null
+        and exists (
+          select 1 from public.inquiries i
+          where i.id = messages.inquiry_id
+            and (i.starter_id = (select auth.uid()) or i.host_id = (select auth.uid()))
+            and (
+              case
+                when messages.sender_id = i.starter_id
+                  then i.host_last_opened_at
+                else i.starter_last_opened_at
+              end is null
+              or case
+                when messages.sender_id = i.starter_id
+                  then i.host_last_opened_at
+                else i.starter_last_opened_at
+              end < messages.created_at
+            )
+        )
+      )
+    )
+  )
+  with check (
+    sender_id = (select auth.uid())
+    and deleted_at is not null
+  );
+
+
+-- ============================================================
+-- 7. guard_message_update — column + transition guard
+-- ============================================================
+-- The WHAT-gate. The UPDATE policy above gates WHO + WHEN; this
+-- trigger gates WHAT can change.
+--
+-- Allowed changes on a single UPDATE:
+--   - deleted_at: null → non-null exactly once. Already-deleted
+--     rows are rejected (the policy also filters them out via
+--     `deleted_at is null` in USING).
+--   - body: non-null → null on the SAME update that sets
+--     deleted_at. Any other body change rejected.
+--
+-- Everything else (id, booking_id, inquiry_id, sender_id,
+-- created_at) is immutable on UPDATE — would defeat the
+-- soft-delete posture if changeable.
+
+create or replace function public.guard_message_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- Column immutability.
+  if new.id is distinct from old.id then
+    raise exception 'messages.id is immutable';
+  end if;
+  if new.booking_id is distinct from old.booking_id then
+    raise exception 'messages.booking_id is immutable';
+  end if;
+  if new.inquiry_id is distinct from old.inquiry_id then
+    raise exception 'messages.inquiry_id is immutable';
+  end if;
+  if new.sender_id is distinct from old.sender_id then
+    raise exception 'messages.sender_id is immutable';
+  end if;
+  if new.created_at is distinct from old.created_at then
+    raise exception 'messages.created_at is immutable';
+  end if;
+
+  -- Transition rules.
+  --
+  --   - Already-deleted rows can't be touched. The UPDATE policy
+  --     also filters these out via USING; the trigger is
+  --     defense-in-depth in case a future policy edit loosens
+  --     that clause.
+  if old.deleted_at is not null then
+    raise exception 'messages cannot be updated once deleted';
+  end if;
+
+  --   - deleted_at must move null → non-null. Setting back to
+  --     null (un-delete) would defeat the soft-delete posture.
+  if new.deleted_at is null then
+    raise exception 'messages update must set deleted_at (only soft-delete is permitted)';
+  end if;
+
+  --   - body must be nulled on the same update. Keeping body
+  --     after setting deleted_at would leave the original content
+  --     in the row contrary to the founder's null-content
+  --     decision. Setting body to a new string would let a sender
+  --     edit the message under the guise of deletion.
+  if new.body is not null then
+    raise exception 'messages update must null body on delete (content removal is intentional)';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger guard_message_update
+  before update on public.messages
+  for each row
+  execute function public.guard_message_update();
+
+
+-- ============================================================
+-- Verification queries — run after applying.
+-- ============================================================
+--
+-- 1. messages schema: deleted_at present, body nullable, new
+--    CHECK constraint installed.
+--
+--   select column_name, data_type, is_nullable
+--     from information_schema.columns
+--    where table_schema = 'public' and table_name = 'messages'
+--      and column_name in ('deleted_at', 'body')
+--    order by column_name;
+--   expect: 2 rows. deleted_at timestamptz, nullable=YES.
+--           body text, nullable=YES.
+--
+--   select pg_get_constraintdef(c.oid)
+--     from pg_constraint c
+--     join pg_class t on t.oid = c.conrelid
+--    where t.relname = 'messages' and c.contype = 'c';
+--   expect: includes 'messages_body_present_unless_deleted' with
+--           the new conditional definition.
+--
+-- 2. Read tracking columns on parent tables.
+--
+--   select table_name, column_name, data_type
+--     from information_schema.columns
+--    where table_schema = 'public'
+--      and column_name in (
+--        'owner_last_opened_at', 'host_last_opened_at',
+--        'starter_last_opened_at'
+--      )
+--    order by table_name, column_name;
+--   expect: 4 rows.
+--     bookings.host_last_opened_at  timestamptz
+--     bookings.owner_last_opened_at timestamptz
+--     inquiries.host_last_opened_at timestamptz
+--     inquiries.starter_last_opened_at timestamptz
+--
+-- 3. mark_thread_read RPC present, SECURITY DEFINER, authenticated-only.
+--
+--   select prosecdef, proconfig
+--     from pg_proc p
+--     join pg_namespace n on n.oid = p.pronamespace
+--    where n.nspname = 'public' and p.proname = 'mark_thread_read';
+--   expect: 1 row, prosecdef = t (SECURITY DEFINER), proconfig
+--           contains 'search_path=public'.
+--
+--   Behavioral: as participant on an open inquiry,
+--     select public.mark_thread_read('inquiry', '<id>');
+--   then re-select the inquiry row; the caller's last_opened_at
+--   column should equal a fresh now(). Re-call → unchanged or
+--   bumped to a later now(); never moves backward.
+--
+--   As a non-participant:
+--     select public.mark_thread_read('inquiry', '<id>');
+--   expect: SQLSTATE '42501' 'not a participant on this inquiry'.
+--
+-- 4. messages UPDATE policy exists with the expected predicate.
+--
+--   select policyname, cmd, qual, with_check
+--     from pg_policies
+--    where schemaname = 'public' and tablename = 'messages'
+--      and policyname = 'messages_update_own_until_read';
+--   expect: 1 row. qual mentions both branches + last_opened_at.
+--           with_check requires sender_id + deleted_at not null.
+--
+-- 5. guard_message_update trigger fires + blocks bad updates.
+--
+--   Behavioral as the sender of an un-read message:
+--     update public.messages set body = 'new content' where id = '<id>';
+--   expect: SQLSTATE 'P0001' 'messages update must set deleted_at...'
+--
+--     update public.messages set deleted_at = now(), body = 'still here'
+--       where id = '<id>';
+--   expect: SQLSTATE 'P0001' 'messages update must null body on delete...'
+--
+--     update public.messages set deleted_at = now(), body = null
+--       where id = '<id>';
+--   expect: success.
+--
+--     -- after success, try to un-delete:
+--     update public.messages set deleted_at = null where id = '<id>';
+--   expect: SQLSTATE 'P0001' 'messages cannot be updated once deleted'.
+--
+-- 6. Delete-until-read RLS: send a message, have the OTHER party
+--    call mark_thread_read, then sender attempts soft-delete.
+--    expect: 0 rows affected (policy USING filters the row out).
+--    Sender's own UPDATE as if it would succeed silently —
+--    standard PostgreSQL RLS behavior. App code should re-read
+--    and confirm deleted_at IS NULL after the call to detect this.
+--
+-- 7. Admin SELECT still reads everything (NO RLS change required).
+--
+--   As an admin:
+--     select id, body, deleted_at from public.messages limit 10;
+--   expect: rows including any deleted ones, with body = NULL on
+--           deleted rows. The admin sees the placeholder shape,
+--           not the pre-deletion content (which is unrecoverable
+--           by design).
+--
+-- 8. Anon surface unchanged. Anon has no SELECT/INSERT/UPDATE on
+--    messages and gains none here.
+--
+--   set role anon;
+--   select count(*) from public.messages;
+--   reset role;
+--   expect: 0 rows visible (no policy permits anon).
