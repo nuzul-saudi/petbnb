@@ -162,6 +162,19 @@ export default function AdminHome() {
           <Text style={styles.navArrow}>‹</Text>
         </Pressable>
 
+        {/* 0044 (2026-06-28) — admin conversation browse. Read-only.
+            Lists every messaging thread (booking + inquiry) sorted
+            by recent activity; tap to read in full. */}
+        <Pressable
+          onPress={() => router.push('/admin/conversations' as never)}
+          style={styles.navRow}
+        >
+          <Text style={styles.navText}>
+            {t('admin.nav_all_conversations')}
+          </Text>
+          <Text style={styles.navArrow}>‹</Text>
+        </Pressable>
+
         <Pressable
           onPress={() => setShowAddHostModal(true)}
           style={styles.addHostButton}

@@ -546,3 +546,190 @@ export async function adminRestoreListing(id: string): Promise<void> {
 // Re-export ListingStatus for admin UI imports that already pull from
 // '@/lib/admin'. Saves one import line at the call site.
 export type { ListingStatus };
+
+
+// ---------------------------------------------------------------------------
+// 0044 — admin conversation browse (read-only)
+// ---------------------------------------------------------------------------
+// Admin can SELECT all rows on inquiries (0040 inquiries_select_participants
+// includes is_admin() bypass) and on messages (0040 messages_select_participants
+// includes is_admin() bypass too). No new policy needed for browsing — the
+// helpers below just compose normal supabase-js reads under an admin session.
+//
+// Deleted messages: body is NULL once 0044's soft-delete fires. The UI
+// renders 'message deleted' placeholder when body is null OR deleted_at is
+// set. Admin sees the same placeholder \xe2\x80\x94 the body is unrecoverable from
+// the row (founder decision).
+//
+// Two thread kinds:
+//   - inquiry  \xe2\x80\x94 query inquiries directly; last_message_at is denormalized
+//   - booking  \xe2\x80\x94 query bookings; the 'has messages' filter is best-effort
+//     (admin can browse all bookings; empty threads are visually obvious)
+// ---------------------------------------------------------------------------
+
+export type AdminThreadKind = 'inquiry' | 'booking';
+
+export type AdminConversationSummary = {
+  kind: AdminThreadKind;
+  thread_id: string;
+  listing_id: string;
+  listing_title: string | null;
+  participant_a_name: string | null;
+  participant_b_name: string | null;
+  last_activity_at: string | null;
+};
+
+export async function listAdminInquiryThreads(): Promise<AdminConversationSummary[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('inquiries')
+    .select(
+      `
+      id, listing_id, last_message_at, created_at,
+      listing:listings(id, title_ar),
+      starter:profiles!inquiries_starter_id_fkey(id, full_name),
+      host:profiles!inquiries_host_id_fkey(id, full_name)
+    `,
+    )
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const r = row as unknown as {
+      id: string;
+      listing_id: string;
+      last_message_at: string | null;
+      created_at: string;
+      listing: { title_ar: string | null } | null;
+      starter: { full_name: string | null } | null;
+      host: { full_name: string | null } | null;
+    };
+    return {
+      kind: 'inquiry' as AdminThreadKind,
+      thread_id: r.id,
+      listing_id: r.listing_id,
+      listing_title: r.listing?.title_ar ?? null,
+      participant_a_name: r.starter?.full_name ?? null,
+      participant_b_name: r.host?.full_name ?? null,
+      last_activity_at: r.last_message_at ?? r.created_at,
+    };
+  });
+}
+
+export async function listAdminBookingThreads(): Promise<AdminConversationSummary[]> {
+  if (!supabase) return [];
+  // Bookings don't have a denormalized last_message_at, so we order by
+  // created_at as a coarse 'recent activity' proxy. The detail screen
+  // shows messages in their actual order so this only affects list
+  // ordering. Sufficient for an admin browse surface.
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(
+      `
+      id, listing_id, created_at,
+      listing:listings(id, title_ar),
+      owner:profiles!bookings_owner_id_fkey(id, full_name),
+      host_listing:listings!bookings_listing_id_fkey(
+        host:profiles!listings_host_id_fkey(id, full_name)
+      )
+    `,
+    )
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const r = row as unknown as {
+      id: string;
+      listing_id: string;
+      created_at: string;
+      listing: { title_ar: string | null } | null;
+      owner: { full_name: string | null } | null;
+      host_listing: {
+        host: { full_name: string | null } | null;
+      } | null;
+    };
+    return {
+      kind: 'booking' as AdminThreadKind,
+      thread_id: r.id,
+      listing_id: r.listing_id,
+      listing_title: r.listing?.title_ar ?? null,
+      participant_a_name: r.owner?.full_name ?? null,
+      participant_b_name: r.host_listing?.host?.full_name ?? null,
+      last_activity_at: r.created_at,
+    };
+  });
+}
+
+export type AdminConversationMessage = {
+  id: string;
+  sender_id: string;
+  sender_name: string | null;
+  body: string | null;        // null when deleted_at is set (0044)
+  deleted_at: string | null;  // 0044 soft-delete marker
+  created_at: string;
+};
+
+export type AdminConversationDetail = {
+  kind: AdminThreadKind;
+  thread_id: string;
+  listing_id: string;
+  listing_title: string | null;
+  participant_a_name: string | null;
+  participant_b_name: string | null;
+  messages: AdminConversationMessage[];
+};
+
+export async function getAdminConversation(
+  kind: AdminThreadKind,
+  threadId: string,
+): Promise<AdminConversationDetail | null> {
+  if (!supabase) return null;
+
+  const summaries =
+    kind === 'inquiry'
+      ? await listAdminInquiryThreads()
+      : await listAdminBookingThreads();
+  const summary = summaries.find((s) => s.thread_id === threadId);
+  if (!summary) return null;
+
+  const { data: msgData, error: msgErr } = await supabase
+    .from('messages')
+    .select(
+      `
+      id, sender_id, body, deleted_at, created_at,
+      sender:profiles!messages_sender_id_fkey(id, full_name)
+    `,
+    )
+    .eq(kind === 'inquiry' ? 'inquiry_id' : 'booking_id', threadId)
+    .order('created_at', { ascending: true });
+  if (msgErr) throw msgErr;
+
+  const messages: AdminConversationMessage[] = (msgData ?? []).map((row) => {
+    const r = row as unknown as {
+      id: string;
+      sender_id: string;
+      body: string | null;
+      deleted_at: string | null;
+      created_at: string;
+      sender: { full_name: string | null } | null;
+    };
+    return {
+      id: r.id,
+      sender_id: r.sender_id,
+      sender_name: r.sender?.full_name ?? null,
+      body: r.body,
+      deleted_at: r.deleted_at,
+      created_at: r.created_at,
+    };
+  });
+
+  return {
+    kind,
+    thread_id: threadId,
+    listing_id: summary.listing_id,
+    listing_title: summary.listing_title,
+    participant_a_name: summary.participant_a_name,
+    participant_b_name: summary.participant_b_name,
+    messages,
+  };
+}
