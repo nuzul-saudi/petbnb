@@ -879,7 +879,11 @@
     "empty": "💬 Start the conversation with the other party",
     "send_failed": "Failed to send message, please try again",
     "contact_warning": "Your message appears to contain contact info (phone or handle). For your protection, we recommend keeping all conversations and bookings on the platform. Send anyway?",
-    "compose_hidden_hint": "Conversation closed for this booking"
+    "compose_hidden_hint": "Conversation closed for this booking",
+    "deleted": "Message deleted",
+    "delete": "Delete",
+    "delete_confirm": "Delete this message? This can't be undone.",
+    "delete_blocked": "This message has already been read and can no longer be deleted."
   },
   "nav": {
     "home": "Home",

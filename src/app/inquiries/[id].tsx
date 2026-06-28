@@ -43,7 +43,7 @@ import {
   type InquiryDetail,
 } from '@/lib/inquiries';
 import { logWarn } from '@/lib/log';
-import type { Message } from '@/lib/messages';
+import { deleteMessage, markThreadRead, type Message } from '@/lib/messages';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function InquiryThreadScreen() {
@@ -105,7 +105,11 @@ export default function InquiryThreadScreen() {
   useFocusEffect(
     useCallback(() => {
       void refetchMessages();
-    }, [refetchMessages]),
+      // Phase 1 (2026-06-28) — mark the inquiry thread read on
+      // every screen focus. Same pattern as bookings/[id].tsx.
+      // markThreadRead swallows errors internally.
+      if (id) void markThreadRead('inquiry', id);
+    }, [refetchMessages, id]),
   );
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
@@ -232,6 +236,25 @@ export default function InquiryThreadScreen() {
             }
             await sendInquiryMessage(inquiry.id, body);
             await refetchMessages();
+          }}
+          // Phase 1 (2026-06-28) — same pattern as bookings/[id].tsx.
+          // Starter is one participant; host is the other. The 0044
+          // read-tracking columns on inquiries split by role.
+          otherLastOpenedAt={
+            inquiry.starter_id === user.id
+              ? inquiry.host_last_opened_at
+              : inquiry.starter_last_opened_at
+          }
+          onDelete={async (messageId) => {
+            const ok = await confirmDialog(t('messages.delete_confirm'));
+            if (!ok) return;
+            const deleted = await deleteMessage(messageId);
+            await refetchMessages();
+            if (!deleted) {
+              // Inherent read/delete race ack \xe2\x80\x94 see the parallel
+              // comment in bookings/[id].tsx for the rationale.
+              await confirmDialog(t('messages.delete_blocked'));
+            }
           }}
           t={t}
         />

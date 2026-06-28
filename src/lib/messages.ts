@@ -143,3 +143,62 @@ export function containsContactInfo(body: string): boolean {
 export function logMessageSendFailure(e: unknown): void {
   logWarn('[messages.send_failed]', e);
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1 (2026-06-28) — message deletion + thread read marking.
+//
+// All gating lives in the DB (0044):
+//   * messages_update_own_until_read RLS policy
+//   * guard_message_update trigger (column immutability + transitions)
+//   * mark_thread_read SECURITY DEFINER RPC
+// The helpers below are thin wrappers; no app-side validation.
+// ---------------------------------------------------------------------------
+
+/**
+ * Soft-delete an own message. RLS + the guard trigger enforce ALL of:
+ *   - sender_id = auth.uid()  (other party's messages can't be deleted)
+ *   - is_active_user()        (suspended accounts can't retract)
+ *   - deleted_at is null      (already-deleted rows filtered out)
+ *   - other party has NOT read the message yet (per-thread last_opened_at
+ *     check; see messages_update_own_until_read in 0044)
+ *
+ * Inherent read/delete race (security review accepted): if the other party
+ * reads the message between this client's last refetch and this UPDATE,
+ * RLS filters the row out and supabase-js returns success with 0 rows —
+ * NOT an error. We surface that as `false` so the UI can show the
+ * "already read, can't delete" ack.
+ */
+export async function deleteMessage(messageId: string): Promise<boolean> {
+  if (!supabase) throw new Error('No Supabase client');
+  const { data, error } = await supabase
+    .from('messages')
+    .update({ deleted_at: new Date().toISOString(), body: null })
+    .eq('id', messageId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error; // unexpected (trigger violation)
+  return data != null; // false = RLS filtered → BLOCKED (already read / not own)
+}
+
+/**
+ * Mark the current authenticated user's last_opened_at on the named
+ * thread to now(). Backs the WhatsApp blue-tick semantics: one open-event
+ * marks every prior message in the thread as read by this user.
+ *
+ * Errors are swallowed (logged only) — failing to mark-read should never
+ * block the screen render. The next thread open will try again.
+ *
+ * The RPC is SECURITY DEFINER with pinned search_path; participation is
+ * validated server-side (raises 42501 if the caller isn't a participant).
+ */
+export async function markThreadRead(
+  kind: 'booking' | 'inquiry',
+  threadId: string,
+): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.rpc('mark_thread_read', {
+    p_thread_kind: kind,
+    p_thread_id: threadId,
+  });
+  if (error) logWarn('[messages.mark_read_failed]', error);
+}

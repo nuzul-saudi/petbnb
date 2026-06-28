@@ -41,6 +41,26 @@ export type MessagesSectionProps = {
    *  Throwing causes the inline error to surface; otherwise the input
    *  is cleared on resolution. */
   onSend: (body: string) => Promise<void>;
+  /**
+   * Phase 1 (2026-06-28) — the OTHER participant's last_opened_at for
+   * this thread. Drives the "delete only until read" affordance: a
+   * message is deletable iff this stamp is null (they've never opened
+   * the thread) OR strictly earlier than the message's created_at.
+   * Mirrors the 0044 messages_update_own_until_read RLS predicate.
+   * Parent computes the right side: bookings.host_last_opened_at when
+   * the user is the owner, bookings.owner_last_opened_at when the user
+   * is the host (and starter_/host_ symmetrically on inquiries).
+   */
+  otherLastOpenedAt: string | null;
+  /**
+   * Phase 1 (2026-06-28) — soft-delete handler. The component renders
+   * a delete affordance on own-bubbles that are still deletable; on
+   * press the parent owns the confirm dialog + the deleteMessage call
+   * + the refetch + the "already read" ack (same shape as onSend
+   * today). Component stays presentational. Omit the prop to disable
+   * the affordance entirely.
+   */
+  onDelete?: (messageId: string) => Promise<void>;
   t: (key: string) => string;
 };
 
@@ -51,6 +71,8 @@ export function MessagesSection({
   locale,
   canSend,
   onSend,
+  otherLastOpenedAt,
+  onDelete,
   t,
 }: MessagesSectionProps) {
   const [draft, setDraft] = useState('');
@@ -92,6 +114,27 @@ export function MessagesSection({
                   locale,
                 )
               : '—';
+            // Phase 1 (2026-06-28) — soft-delete state. 0044's
+            // guard_message_update nulls body on the same UPDATE that
+            // sets deleted_at, so EITHER signal alone is sufficient —
+            // checking both is defense-in-depth for any future surface
+            // (e.g. a debug client) that might leave one set without
+            // the other.
+            const isDeleted = m.deleted_at != null || m.body == null;
+            // Phase 1 (2026-06-28) — deletable predicate mirrors the
+            // 0044 messages_update_own_until_read RLS USING clause:
+            // own message + not already deleted + parent supplied an
+            // onDelete handler + (other party never opened the thread
+            // OR opened it before this message landed).
+            // Date-object comparison per spec — string compare on ISO
+            // timestamps would technically work for same-zone values
+            // but the explicit Date conversion documents intent.
+            const deletable =
+              own &&
+              m.deleted_at == null &&
+              onDelete != null &&
+              (otherLastOpenedAt == null ||
+                new Date(otherLastOpenedAt) < new Date(m.created_at));
             return (
               <View
                 key={m.id}
@@ -118,20 +161,56 @@ export function MessagesSection({
                       own ? styles.bubbleOwn : styles.bubbleOther,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.bubbleText,
-                        own
-                          ? styles.bubbleTextOwn
-                          : styles.bubbleTextOther,
-                      ]}
-                    >
-                      {m.body}
-                    </Text>
+                    {isDeleted ? (
+                      /* Phase 1 (2026-06-28) — deleted placeholder.
+                         Mirrors the admin browse's italic + muted
+                         treatment. Applies to BOTH own and other
+                         bubbles \xe2\x80\x94 once deleted, the body is gone
+                         for everyone. */
+                      <Text
+                        style={[
+                          styles.bubbleText,
+                          styles.bubbleTextDeleted,
+                        ]}
+                      >
+                        {t('messages.deleted')}
+                      </Text>
+                    ) : (
+                      <Text
+                        style={[
+                          styles.bubbleText,
+                          own
+                            ? styles.bubbleTextOwn
+                            : styles.bubbleTextOther,
+                        ]}
+                      >
+                        {m.body}
+                      </Text>
+                    )}
                   </View>
-                  <Text style={styles.stamp}>
-                    {formatRiyadhStamp(m.created_at, locale)}
-                  </Text>
+                  <View style={styles.bubbleFooter}>
+                    <Text style={styles.stamp}>
+                      {formatRiyadhStamp(m.created_at, locale)}
+                    </Text>
+                    {/* Phase 1 (2026-06-28) \xe2\x80\x94 delete affordance. Text
+                        link (NOT emoji), matches the design system per
+                        the L3 emoji-removal precedent. Parent owns the
+                        confirm + RLS-result handling. */}
+                    {deletable ? (
+                      <Pressable
+                        onPress={() => {
+                          void onDelete!(m.id);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('messages.delete')}
+                        style={styles.deleteLink}
+                      >
+                        <Text style={styles.deleteLinkText}>
+                          {t('messages.delete')}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 </View>
               </View>
             );
@@ -245,6 +324,34 @@ const styles = StyleSheet.create({
   },
   bubbleTextOther: {
     color: colors.ink,
+  },
+  // Phase 1 (2026-06-28) — deleted-message placeholder styling.
+  // Italic + muted. Same intent as the admin browse's deleted
+  // bubble treatment so the visual language is consistent.
+  bubbleTextDeleted: {
+    color: colors.inkSoft,
+    fontStyle: 'italic',
+  },
+  // Phase 1 (2026-06-28) — bubble footer holds the timestamp AND
+  // (conditionally) the delete link, on the same row, separated by
+  // a flex spacer so the timestamp stays leading-aligned and the
+  // delete link sits at the trailing edge of the bubble column.
+  bubbleFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: 2,
+  },
+  deleteLink: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+  },
+  deleteLinkText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    color: colors.inkSoft,
+    textDecorationLine: 'underline',
   },
   stamp: {
     fontFamily: fonts.body,

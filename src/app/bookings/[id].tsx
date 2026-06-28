@@ -34,7 +34,12 @@ import { useMessages } from "@/hooks/useMessages";
 import { useSignedPetPhotoUrls } from "@/hooks/useSignedPetPhotoUrls";
 import { useAuth } from "@/lib/auth";
 import { confirmDialog } from "@/lib/confirm";
-import { sendMessage, containsContactInfo } from "@/lib/messages";
+import {
+  containsContactInfo,
+  deleteMessage,
+  markThreadRead,
+  sendMessage,
+} from "@/lib/messages";
 import { markSeen } from "@/lib/last-seen-storage";
 import { useHostNotifications } from "@/lib/host-notifications";
 import { findMyReview, type Review } from "@/lib/reviews";
@@ -175,7 +180,13 @@ export default function BookingDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       void refetchMessages();
-    }, [refetchMessages]),
+      // Phase 1 (2026-06-28) — mark the booking thread read on
+      // every screen focus. Drives the 0044 read-tracking timestamps
+      // that gate message deletion. Errors are swallowed inside the
+      // helper (logged only); a failed mark-read shouldn't block
+      // the screen.
+      void markThreadRead("booking", id);
+    }, [refetchMessages, id]),
   );
 
   // Round 6 — batch-sign pet photos for OwnerPetsSection. Booking
@@ -1264,6 +1275,39 @@ export default function BookingDetailScreen() {
               }
               await sendMessage(booking.id, body);
               await refetchMessages();
+            }}
+            // Phase 1 (2026-06-28) — feed the OTHER participant's
+            // last_opened_at into MessagesSection so its delete
+            // affordance can be conditionally rendered. Mirrors the
+            // 0044 messages_update_own_until_read RLS predicate:
+            // owner sees host_last_opened_at as 'other,' host sees
+            // owner_last_opened_at as 'other.'
+            otherLastOpenedAt={
+              booking.owner_id === user.id
+                ? booking.host_last_opened_at
+                : booking.owner_last_opened_at
+            }
+            onDelete={async (messageId) => {
+              const ok = await confirmDialog(t('messages.delete_confirm'));
+              if (!ok) return;
+              const deleted = await deleteMessage(messageId);
+              // Refetch regardless \xe2\x80\x94 if the delete succeeded the
+              // body becomes null + deleted_at populated; if RLS
+              // filtered the row (already read), refetching still
+              // surfaces the latest other-party last_opened_at so
+              // the delete affordance disappears on the next render.
+              await refetchMessages();
+              if (!deleted) {
+                // Info-only acknowledgment of the inherent
+                // read/delete race (security review accepted). The
+                // user tapped delete on a message the other party
+                // had just opened the thread on; RLS filtered the
+                // row to 0; UPDATE succeeded with no effect. Use
+                // confirmDialog purely as a 'tap OK to dismiss'
+                // affordance \xe2\x80\x94 it's the alert util the screen
+                // already imports.
+                await confirmDialog(t('messages.delete_blocked'));
+              }
             }}
             t={t}
           />
