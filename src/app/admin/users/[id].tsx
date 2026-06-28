@@ -148,6 +148,13 @@ export default function AdminUserDetailScreen() {
             onChangeText={setNameDraft}
             style={styles.input}
           />
+          {/* #4 (2026-06-28) — outlined-when-disabled. The save
+              button's disabled state used to be opacity 0.4 on a
+              moss background, which read as 'muted but tappable.'
+              Now: enabled = moss + cream text (primary action);
+              disabled = whisper + inkSoft text + outlined border
+              (clearly inactive). Pressable's disabled prop still
+              blocks the press. */}
           <Pressable
             onPress={() =>
               withBusy('name', () => setUserName(data.id, nameDraft))
@@ -155,10 +162,17 @@ export default function AdminUserDetailScreen() {
             disabled={!nameChanged || busyAction === 'name'}
             style={[
               styles.saveButton,
-              (!nameChanged || busyAction === 'name') && styles.buttonDisabled,
+              (!nameChanged || busyAction === 'name') &&
+                styles.saveButtonDisabled,
             ]}
           >
-            <Text style={styles.saveButtonText}>
+            <Text
+              style={[
+                styles.saveButtonText,
+                (!nameChanged || busyAction === 'name') &&
+                  styles.saveButtonTextDisabled,
+              ]}
+            >
               {busyAction === 'name' ? t('admin.saving') : t('admin.save')}
             </Text>
           </Pressable>
@@ -198,36 +212,45 @@ export default function AdminUserDetailScreen() {
           </View>
         </View>
 
-        {/* Verified */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            {t('admin.user_verified_label')}: {data.is_verified ? '✓' : '✗'}
-          </Text>
-          <Pressable
-            onPress={() =>
-              withBusy('verify', () =>
-                setUserVerified(data.id, !data.is_verified),
-              )
-            }
-            disabled={busyAction === 'verify'}
-            style={[
-              data.is_verified ? styles.dangerButton : styles.primaryButton,
-              busyAction === 'verify' && styles.buttonDisabled,
-            ]}
-          >
-            <Text
-              style={
-                data.is_verified ? styles.dangerButtonText : styles.primaryButtonText
-              }
-            >
-              {busyAction === 'verify'
-                ? t('admin.saving')
-                : data.is_verified
-                  ? t('admin.user_revoke_verification')
-                  : t('admin.user_approve_verification')}
+        {/* #6 (2026-06-28) — verification section gated to
+            role === 'host'. The is_verified column + the
+            'Approve as host' / 'Revoke verification' button only
+            make sense for hosts (verification is the host trust
+            badge per CLAUDE.md §12). Owners + admins never see
+            this section. If a role change later flips the user
+            to host, the role-picker above re-fetches the row and
+            this section appears. */}
+        {data.role === 'host' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>
+              {t('admin.user_verified_label')}: {data.is_verified ? '✓' : '✗'}
             </Text>
-          </Pressable>
-        </View>
+            <Pressable
+              onPress={() =>
+                withBusy('verify', () =>
+                  setUserVerified(data.id, !data.is_verified),
+                )
+              }
+              disabled={busyAction === 'verify'}
+              style={[
+                data.is_verified ? styles.dangerButton : styles.primaryButton,
+                busyAction === 'verify' && styles.buttonDisabled,
+              ]}
+            >
+              <Text
+                style={
+                  data.is_verified ? styles.dangerButtonText : styles.primaryButtonText
+                }
+              >
+                {busyAction === 'verify'
+                  ? t('admin.saving')
+                  : data.is_verified
+                    ? t('admin.user_revoke_verification')
+                    : t('admin.user_approve_verification')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Suspended */}
         <View style={styles.section}>
@@ -452,11 +475,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.moss,
     borderRadius: radii.pill,
     alignSelf: 'flex-end',
+    borderWidth: 1,
+    borderColor: colors.moss,
+  },
+  // #4 (2026-06-28) — outlined-when-disabled visual. Replaces the
+  // old generic buttonDisabled (opacity 0.4) which read as 'muted
+  // but tappable.' Now an unmistakable not-currently-tappable look.
+  saveButtonDisabled: {
+    backgroundColor: colors.whisper,
+    borderColor: colors.whisper,
   },
   saveButtonText: {
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     color: colors.cream,
+  },
+  saveButtonTextDisabled: {
+    color: colors.inkSoft,
   },
   buttonDisabled: {
     opacity: 0.4,
