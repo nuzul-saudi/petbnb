@@ -20,7 +20,9 @@ import {
   useRouter,
 } from 'expo-router';
 
-import { AppHeader } from '@/components/AppHeader';
+// #7 (2026-06-28) — dropped AppHeader. See conversations.tsx for
+// the full rationale (admin section now uniformly uses an inline
+// header, no user-side hamburger anywhere in /admin/*).
 import { useAuth } from '@/lib/auth';
 import {
   getAdminConversation,
@@ -32,9 +34,8 @@ import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function AdminConversationDetailScreen() {
   const router = useRouter();
-  const { t, locale, setLocale } = useTranslation();
+  const { t } = useTranslation();
   const { profile } = useAuth();
-  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const params = useLocalSearchParams<{ kind?: string; id?: string }>();
   const kind =
@@ -77,7 +78,6 @@ export default function AdminConversationDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <View style={styles.header}>
         <Pressable
           onPress={() => router.replace('/admin/conversations' as never)}

@@ -15,7 +15,11 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { AppHeader } from '@/components/AppHeader';
+// #7 (2026-06-28) — dropped AppHeader. The user-side hamburger
+// it carries pulls in items (My Bookings / My Pets / Favorites /
+// etc.) that route admin OUT of the admin section. All other
+// /admin/* screens use the inline header pattern below; this
+// screen now matches.
 import { useAuth } from '@/lib/auth';
 import {
   listAdminBookingThreads,
@@ -27,9 +31,8 @@ import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function AdminConversationsScreen() {
   const router = useRouter();
-  const { t, locale, setLocale } = useTranslation();
+  const { t } = useTranslation();
   const { profile } = useAuth();
-  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [items, setItems] = useState<AdminConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +73,6 @@ export default function AdminConversationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <View style={styles.header}>
         <Pressable onPress={() => router.replace('/admin')} style={styles.backLink}>
           <Text style={styles.backText}>{t('admin.conversations.back')}</Text>
