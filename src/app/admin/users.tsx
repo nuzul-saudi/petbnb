@@ -112,6 +112,11 @@ export default function AdminUsersScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        // #5 (2026-06-28) — same iOS Safari compression-pin used on
+        // the home page round (commits bdf611b + 8660501). Prevents
+        // the flex column from collapsing this row to a sliver when
+        // the address bar settles. See styles.filterScrollContainer.
+        style={styles.filterScrollContainer}
         contentContainerStyle={styles.filterRow}
       >
         {FILTERS.map((f) => (
@@ -221,9 +226,24 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     gap: spacing.xs,
   },
+  // #5 (2026-06-28) — outer pin for the horizontal ScrollView.
+  // flexShrink:0 keeps the flex column from compressing this row
+  // when iOS Safari's address bar shrinks the viewport; minHeight
+  // 52 is sized to one chip row (chip paddingV 8\xc3\x972 + border 2 +
+  // text fontSize 12 / lineHeight 18 = 36, plus row paddingV 12 =
+  // 48; round up to 52 for safety). Same numbers as the home
+  // page's filterRowScrollContainer (commit 8660501).
+  filterScrollContainer: {
+    flexShrink: 0,
+    minHeight: 52,
+  },
   filterChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    // #5 (2026-06-28) \xe2\x80\x94 bumped from xs (4) to sm (8). The xs
+    // value clipped Arabic descenders (\xd8\xac, \xd8\xb9, \xd9\x8a) on iOS Safari
+    // because the glyph metrics push below a 4px-padded chip
+    // border. Same fix as the home page filter chips.
+    paddingVertical: spacing.sm,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.whisper,
@@ -237,6 +257,10 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontFamily: fonts.body,
     fontSize: 12,
+    // #5 (2026-06-28) \xe2\x80\x94 explicit lineHeight. Without it, RN-Web's
+    // default line-height on iOS Safari was too tight for Arabic
+    // glyphs in this fontSize.
+    lineHeight: 18,
     color: colors.inkSoft,
   },
   filterChipTextActive: {
