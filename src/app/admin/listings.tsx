@@ -204,29 +204,42 @@ export default function AdminListingsScreen() {
   );
 }
 
+// #3 (2026-06-28) — extended from 2 variants to 5. The 'All
+// listings' tab now shows a status-accurate badge for every row.
+// Color choices: moss=action-needed (new), gold=in-flight edit,
+// whisper=published/neutral, inkSoft=paused/muted,
+// terracotta=admin-disabled (warning). Text colors picked for
+// contrast against each background.
 function ReviewTypePill({
   type,
 }: {
   type: AdminReview['reviewType'];
 }) {
   const { t } = useTranslation();
+  const bg =
+    type === 'new_listing'
+      ? colors.moss
+      : type === 'pending_edit'
+        ? colors.gold
+        : type === 'paused'
+          ? colors.inkSoft
+          : type === 'admin_disabled'
+            ? colors.terracotta
+            : colors.whisper; // 'live'
+  const fg = type === 'live' ? colors.inkSoft : colors.cream;
+  const key =
+    type === 'new_listing'
+      ? 'admin.review_type_new_listing'
+      : type === 'pending_edit'
+        ? 'admin.review_type_pending_edit'
+        : type === 'live'
+          ? 'admin.review_type_live'
+          : type === 'paused'
+            ? 'admin.review_type_paused'
+            : 'admin.review_type_admin_disabled';
   return (
-    <View
-      style={[
-        styles.pill,
-        {
-          backgroundColor:
-            type === 'new_listing' ? colors.moss : colors.gold,
-        },
-      ]}
-    >
-      <Text style={styles.pillText}>
-        {t(
-          type === 'new_listing'
-            ? 'admin.review_type_new_listing'
-            : 'admin.review_type_pending_edit',
-        )}
-      </Text>
+    <View style={[styles.pill, { backgroundColor: bg }]}>
+      <Text style={[styles.pillText, { color: fg }]}>{t(key)}</Text>
     </View>
   );
 }

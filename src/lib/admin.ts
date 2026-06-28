@@ -127,7 +127,24 @@ export async function setUserName(id: string, full_name: string): Promise<void> 
 // 8g — review queue + draft promote/reject + admin override actions.
 // ---------------------------------------------------------------------------
 
-export type AdminReviewType = 'new_listing' | 'pending_edit';
+// #3 (2026-06-28) — extended from 2 values to 5 so the 'All
+// listings' admin tab can show a status-accurate badge for every
+// row, not just review-queue rows. Pre-fix, the fallback
+// classified a live published listing as 'new_listing' \xe2\x80\x94 same
+// moss 'New' badge as a brand-new pending one. Misleading.
+//
+// Mapping (see listAllListings + listPendingReviews classifiers):
+//   new_listing     \xe2\x86\x92 status='pending' AND no drafts (badge moss)
+//   pending_edit    \xe2\x86\x92 any status WITH drafts            (badge gold)
+//   live            \xe2\x86\x92 status='approved' AND no drafts   (badge neutral)
+//   paused          \xe2\x86\x92 status='paused'   AND no drafts   (badge muted)
+//   admin_disabled  \xe2\x86\x92 status='admin_disabled' AND no drafts (badge terracotta)
+export type AdminReviewType =
+  | 'new_listing'
+  | 'pending_edit'
+  | 'live'
+  | 'paused'
+  | 'admin_disabled';
 
 export type AdminReview = AdminListing & {
   reviewType: AdminReviewType;
@@ -295,24 +312,28 @@ export async function listAllListings(): Promise<AdminReview[]> {
     const hasFieldDraft = fieldDraft !== null;
     const hasPhotoDraft = photoDrafts.length > 0;
 
-    // Classify same as listPendingReviews but DON'T skip non-queue
-    // rows — every listing belongs in the All view.
+    // #3 (2026-06-28) — 5-way classifier. Each non-draft status
+    // gets its own badge variant so the 'All' tab tells the truth.
     let reviewType: AdminReviewType;
-    if (row.status === 'pending' && !hasFieldDraft && !hasPhotoDraft) {
-      reviewType = 'new_listing';
-    } else if (
-      (row.status === 'approved' ||
-        row.status === 'paused' ||
-        row.status === 'admin_disabled') &&
-      (hasFieldDraft || hasPhotoDraft)
-    ) {
+    if (hasFieldDraft || hasPhotoDraft) {
+      // Drafts trump status \xe2\x80\x94 the thing the admin needs to know is
+      // 'there's an edit waiting,' regardless of what state the
+      // live copy is in.
       reviewType = 'pending_edit';
-    } else {
-      // Live / inactive with no drafts — use new_listing as a
-      // fallback classification (it just controls the badge color
-      // in the UI). A more elaborate 'live' variant is overkill
-      // for the row renderer.
+    } else if (row.status === 'pending') {
       reviewType = 'new_listing';
+    } else if (row.status === 'approved') {
+      reviewType = 'live';
+    } else if (row.status === 'paused') {
+      reviewType = 'paused';
+    } else if (row.status === 'admin_disabled') {
+      reviewType = 'admin_disabled';
+    } else {
+      // Should be unreachable given the four-value status enum
+      // (pending / approved / paused / admin_disabled). Default to
+      // 'live' so a future enum addition surfaces visibly rather
+      // than crashing the UI.
+      reviewType = 'live';
     }
 
     // Sort key: prefer review draft activity, fall back to

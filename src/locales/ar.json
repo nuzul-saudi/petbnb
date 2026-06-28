@@ -605,6 +605,9 @@
     "filter_review": "للمراجعة",
     "review_type_new_listing": "إعلان جديد",
     "review_type_pending_edit": "تعديل قيد المراجعة",
+    "review_type_live": "منشور",
+    "review_type_paused": "متوقف",
+    "review_type_admin_disabled": "معطّل",
     "listings_empty": "لا يوجد إعلانات مطابقة",
 
     "listing_detail_title": "تفاصيل الإعلان",
