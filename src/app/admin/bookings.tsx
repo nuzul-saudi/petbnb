@@ -63,7 +63,21 @@ export default function AdminBookingsScreen() {
           keyExtractor={(b) => b.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <View style={styles.row}>
+            // #2 (2026-06-28) — booking rows now navigate to the
+            // dedicated /admin/bookings/[id] read-only detail. Was
+            // a plain <View> with no tap action; admin had no way
+            // to drill into a booking from this list. Casting the
+            // route as never because Expo Router's typed-route
+            // union hasn't picked up the new file yet (same
+            // pattern used by other admin routes in this file).
+            <Pressable
+              onPress={() =>
+                router.push(
+                  `/admin/bookings/${item.id}` as never,
+                )
+              }
+              style={styles.row}
+            >
               <View style={styles.rowHeader}>
                 <Text style={styles.listingTitle} numberOfLines={1}>
                   {item.listing?.title_ar ?? '—'}
@@ -84,7 +98,7 @@ export default function AdminBookingsScreen() {
               <Text style={styles.rowTotal}>
                 {t('admin.booking_total')}: {formatSAR(item.total_sar)}
               </Text>
-            </View>
+            </Pressable>
           )}
         />
       )}

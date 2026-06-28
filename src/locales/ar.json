@@ -664,7 +664,18 @@
     "booking_listing": "الإعلان",
     "booking_dates": "التواريخ",
     "booking_status": "الحالة",
-    "booking_total": "المجموع"
+    "booking_total": "المجموع",
+    "bookings_detail_read_only_banner": "عرض المسؤول للقراءة فقط — لا يمكن التعديل أو الإلغاء",
+    "bookings_detail_host": "المضيف",
+    "bookings_detail_pets": "الحيوانات الأليفة",
+    "bookings_detail_price_breakdown": "تفاصيل السعر",
+    "bookings_detail_base_price": "السعر الأساسي",
+    "bookings_detail_addons": "إضافات",
+    "bookings_detail_addons_total": "مجموع الإضافات",
+    "bookings_detail_condition_reports": "تقارير الحالة",
+    "bookings_detail_no_reports": "لا توجد تقارير بعد",
+    "bookings_detail_check_in": "تقرير الاستلام",
+    "bookings_detail_check_out": "تقرير التسليم"
   },
   "suspended": {
     "title": "حسابك معلّق",

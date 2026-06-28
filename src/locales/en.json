@@ -653,7 +653,18 @@
     "booking_listing": "Listing",
     "booking_dates": "Dates",
     "booking_status": "Status",
-    "booking_total": "Total"
+    "booking_total": "Total",
+    "bookings_detail_read_only_banner": "Admin read-only view — edits and cancellations not available",
+    "bookings_detail_host": "Host",
+    "bookings_detail_pets": "Pets",
+    "bookings_detail_price_breakdown": "Price breakdown",
+    "bookings_detail_base_price": "Base price",
+    "bookings_detail_addons": "Add-ons",
+    "bookings_detail_addons_total": "Add-ons total",
+    "bookings_detail_condition_reports": "Condition reports",
+    "bookings_detail_no_reports": "No reports filed yet",
+    "bookings_detail_check_in": "Check-in report",
+    "bookings_detail_check_out": "Check-out report"
   },
   "suspended": {
     "title": "Your account is suspended",
