@@ -581,6 +581,11 @@ export type AdminConversationSummary = {
 
 export async function listAdminInquiryThreads(): Promise<AdminConversationSummary[]> {
   if (!supabase) return [];
+  // #1 (2026-06-28) — filter to inquiries that have at least one
+  // message. last_message_at is denormalized by the 0040 AFTER
+  // INSERT trigger on messages, so this filter is free (indexed
+  // column comparison; no JOIN). Pre-fix, every inquiry row showed
+  // up here even ones with no chat ever sent.
   const { data, error } = await supabase
     .from('inquiries')
     .select(
@@ -591,6 +596,7 @@ export async function listAdminInquiryThreads(): Promise<AdminConversationSummar
       host:profiles!inquiries_host_id_fkey(id, full_name)
     `,
     )
+    .not('last_message_at', 'is', null)
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -618,10 +624,22 @@ export async function listAdminInquiryThreads(): Promise<AdminConversationSummar
 
 export async function listAdminBookingThreads(): Promise<AdminConversationSummary[]> {
   if (!supabase) return [];
-  // Bookings don't have a denormalized last_message_at, so we order by
-  // created_at as a coarse 'recent activity' proxy. The detail screen
-  // shows messages in their actual order so this only affects list
-  // ordering. Sufficient for an admin browse surface.
+  // #1 (2026-06-28) — filter to bookings that have at least one
+  // message. `messages!inner(created_at)` is PostgREST's inner-join
+  // syntax: rows without any matching messages are dropped from
+  // the result. Each surviving row gets every matching message
+  // embedded as the `messages` array; we take the max created_at
+  // per row for the list-ordering 'recency' value, then dedup
+  // (a booking with N messages would otherwise come back N times
+  // \xe2\x80\x94 PostgREST returns the cartesian product of the joins).
+  //
+  // Strategy spec: 'EXISTS approach, NOT denormalization. If
+  // cheap, also order booking threads by max(message.created_at)
+  // for correct recency.' Done both.
+  //
+  // RLS: admin has is_admin() bypass on bookings.SELECT (0004),
+  // listings.SELECT (0024), messages.SELECT (0040), profiles
+  // (authenticated reads all). The inner join composes cleanly.
   const { data, error } = await supabase
     .from('bookings')
     .select(
@@ -631,13 +649,19 @@ export async function listAdminBookingThreads(): Promise<AdminConversationSummar
       owner:profiles!bookings_owner_id_fkey(id, full_name),
       host_listing:listings!bookings_listing_id_fkey(
         host:profiles!listings_host_id_fkey(id, full_name)
-      )
+      ),
+      messages!inner(created_at)
     `,
     )
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(500);
   if (error) throw error;
-  return (data ?? []).map((row) => {
+
+  // Dedup + reduce-to-summary. Same booking appears once per matching
+  // message row in the embed; reduce to one entry per booking with the
+  // max(messages.created_at) as last_activity_at.
+  const byBookingId = new Map<string, AdminConversationSummary>();
+  for (const row of data ?? []) {
     const r = row as unknown as {
       id: string;
       listing_id: string;
@@ -647,16 +671,41 @@ export async function listAdminBookingThreads(): Promise<AdminConversationSummar
       host_listing: {
         host: { full_name: string | null } | null;
       } | null;
+      messages: { created_at: string }[];
     };
-    return {
+    const latestMsgAt =
+      r.messages.length > 0
+        ? r.messages
+            .map((m) => m.created_at)
+            .reduce((a, b) => (a > b ? a : b))
+        : r.created_at;
+    const prior = byBookingId.get(r.id);
+    if (prior) {
+      // Same booking from a duplicate inner-join row \xe2\x80\x94 keep the
+      // later last_activity_at.
+      if ((latestMsgAt ?? '') > (prior.last_activity_at ?? '')) {
+        prior.last_activity_at = latestMsgAt;
+      }
+      continue;
+    }
+    byBookingId.set(r.id, {
       kind: 'booking' as AdminThreadKind,
       thread_id: r.id,
       listing_id: r.listing_id,
       listing_title: r.listing?.title_ar ?? null,
       participant_a_name: r.owner?.full_name ?? null,
       participant_b_name: r.host_listing?.host?.full_name ?? null,
-      last_activity_at: r.created_at,
-    };
+      last_activity_at: latestMsgAt,
+    });
+  }
+  // Sort by recency descending. The list screen also sorts the
+  // merged inquiries + bookings, but doing the booking-side sort
+  // here keeps the array consistent for any caller that uses it
+  // directly.
+  return Array.from(byBookingId.values()).sort((a, b) => {
+    const aT = a.last_activity_at ?? '';
+    const bT = b.last_activity_at ?? '';
+    return bT.localeCompare(aT);
   });
 }
 
