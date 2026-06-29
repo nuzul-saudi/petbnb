@@ -12,6 +12,7 @@ import {
   computeCancellationRefund,
   snapshotFees,
 } from '@/lib/payments-policy';
+import type { MessagePreview } from '@/lib/messages';
 import { supabase } from '@/lib/supabase';
 import type { Enums, Tables } from '@/types/database';
 
@@ -532,6 +533,14 @@ export type MyBookingListItem = Tables<'bookings'> & {
    * .in() over the loaded booking ids).
    */
   latest_update_at?: string | null;
+  /**
+   * 2026-06-29 — slim preview of the most recent message on this
+   * booking thread, used by the inbox row to render
+   * "(Message deleted)" / "(No messages yet)" / first-line of body.
+   * Populated by a PostgREST nested embed with limit 1, order
+   * created_at desc. null when the booking has no messages.
+   */
+  latest_message?: MessagePreview | null;
 };
 
 export async function listBookingsForOwner(
@@ -544,21 +553,36 @@ export async function listBookingsForOwner(
       `
       *,
       listing:listings(id, title_ar, title_en, neighborhood),
-      booking_pets(pet:pets(*))
+      booking_pets(pet:pets(*)),
+      latest_message:messages(id, body, deleted_at, created_at)
     `,
     )
     .eq('owner_id', ownerId)
+    // 2026-06-29 — limit nested latest_message embed to one row,
+    // newest first per booking. Without these foreignTable
+    // ordering hints PostgREST returns ALL messages embedded under
+    // each booking. RLS scopes messages to participants so the
+    // embed only surfaces messages this owner can read.
+    .order('created_at', { ascending: false, foreignTable: 'latest_message' })
+    .limit(1, { foreignTable: 'latest_message' })
     .order('created_at', { ascending: false });
   if (error) throw error;
   const items: MyBookingListItem[] = (data ?? []).map((row) => {
-    const { booking_pets: bp, ...rest } = row as typeof row & {
+    const { booking_pets: bp, latest_message: lm, ...rest } = row as typeof row & {
       booking_pets?: { pet: Tables<'pets'> }[];
+      latest_message?: MessagePreview | MessagePreview[] | null;
     };
+    // PostgREST returns one-to-many embeds as arrays. Collapse to a
+    // single MessagePreview | null for the row renderer.
+    const latest_message: MessagePreview | null = Array.isArray(lm)
+      ? (lm[0] ?? null)
+      : (lm ?? null);
     return {
       ...(rest as Tables<'bookings'>),
       listing: (row.listing ?? null) as MyBookingListItem['listing'],
       pets: (bp ?? []).map((b) => b.pet),
       latest_update_at: null,
+      latest_message,
     };
   });
 
@@ -620,23 +644,33 @@ export async function listBookingsForHost(
       `
       *,
       listing:listings(id, title_ar, title_en, neighborhood),
-      booking_pets(pet:pets(*))
+      booking_pets(pet:pets(*)),
+      latest_message:messages(id, body, deleted_at, created_at)
     `,
     )
     .in(
       'listing_id',
       hostListings.map((l) => l.id),
     )
+    // 2026-06-29 — same one-row latest_message limit as the
+    // owner-side helper above.
+    .order('created_at', { ascending: false, foreignTable: 'latest_message' })
+    .limit(1, { foreignTable: 'latest_message' })
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map((row) => {
-    const { booking_pets: bp, ...rest } = row as typeof row & {
+    const { booking_pets: bp, latest_message: lm, ...rest } = row as typeof row & {
       booking_pets?: { pet: Tables<'pets'> }[];
+      latest_message?: MessagePreview | MessagePreview[] | null;
     };
+    const latest_message: MessagePreview | null = Array.isArray(lm)
+      ? (lm[0] ?? null)
+      : (lm ?? null);
     return {
       ...(rest as Tables<'bookings'>),
       listing: (row.listing ?? null) as MyBookingListItem['listing'],
       pets: (bp ?? []).map((b) => b.pet),
+      latest_message,
     };
   });
 }

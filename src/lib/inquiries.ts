@@ -36,7 +36,7 @@
 
 import { logWarn } from '@/lib/log';
 import { containsContactInfo } from '@/lib/messages';
-import type { Message } from '@/lib/messages';
+import type { Message, MessagePreview } from '@/lib/messages';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
 
@@ -60,11 +60,18 @@ export type Inquiry = Tables<'inquiries'>;
 /** Inbox row — inquiry + the OTHER participant + the listing.
  *  Caller picks which side they are; we always embed both so the
  *  same shape works for owner-side (looking at hosts) and host-
- *  side (looking at starters) lists. */
+ *  side (looking at starters) lists.
+ *
+ *  2026-06-29 — `latest_message` added for the inbox-preview line.
+ *  PostgREST nested embed; null when the thread has no messages,
+ *  otherwise the most recent one (limit 1, order created_at desc).
+ *  Renderer branches on body / deleted_at to pick the preview
+ *  string. */
 export type InquiryListItem = Inquiry & {
   starter: InquiryParticipant | null;
   host: InquiryParticipant | null;
   listing: InquiryListingSummary | null;
+  latest_message: MessagePreview | null;
 };
 
 /** Detail row — same embed shape as InquiryListItem. The detail
@@ -76,7 +83,8 @@ const INQUIRY_SELECT = `
   *,
   starter:profiles!inquiries_starter_id_fkey(id, full_name, full_name_en, avatar_url),
   host:profiles!inquiries_host_id_fkey(id, full_name, full_name_en, avatar_url),
-  listing:listings!inquiries_listing_id_fkey(id, title_ar, title_en, city, neighborhood)
+  listing:listings!inquiries_listing_id_fkey(id, title_ar, title_en, city, neighborhood),
+  latest_message:messages(id, body, deleted_at, created_at)
 `;
 
 // ---------------------------------------------------------------------------
@@ -185,6 +193,13 @@ export async function listMyInquiriesAsStarter(
     .from('inquiries')
     .select(INQUIRY_SELECT)
     .eq('starter_id', userId)
+    // 2026-06-29 — limit the nested latest_message embed to one
+    // row, newest first, per inquiry. Without these foreignTable
+    // ordering hints PostgREST returns ALL messages embedded under
+    // each inquiry. RLS already scopes messages to participants so
+    // the embed only surfaces messages this user can read.
+    .order('created_at', { ascending: false, foreignTable: 'latest_message' })
+    .limit(1, { foreignTable: 'latest_message' })
     .order('last_message_at', { ascending: false, nullsFirst: false });
   if (error) throw error;
   return ((data ?? []) as unknown as InquiryListItem[]).map(normalizeListItem);
@@ -201,17 +216,32 @@ export async function listMyInquiriesAsHost(
     .from('inquiries')
     .select(INQUIRY_SELECT)
     .eq('host_id', userId)
+    .order('created_at', { ascending: false, foreignTable: 'latest_message' })
+    .limit(1, { foreignTable: 'latest_message' })
     .order('last_message_at', { ascending: false, nullsFirst: false });
   if (error) throw error;
   return ((data ?? []) as unknown as InquiryListItem[]).map(normalizeListItem);
 }
 
 function normalizeListItem(row: InquiryListItem): InquiryListItem {
+  // 2026-06-29 — PostgREST returns the nested embed as an array
+  // (because the FK is messages.inquiry_id, a one-to-many). We
+  // capped it at limit:1 so the array is at most one element.
+  // Collapse to a single MessagePreview | null for the renderer's
+  // benefit so the row code is `item.latest_message?.deleted_at`
+  // not `item.latest_message[0]?.deleted_at`.
+  const rawLatest = (row as InquiryListItem & {
+    latest_message?: MessagePreview | MessagePreview[] | null;
+  }).latest_message;
+  const latest_message: MessagePreview | null = Array.isArray(rawLatest)
+    ? (rawLatest[0] ?? null)
+    : (rawLatest ?? null);
   return {
     ...row,
     starter: row.starter ?? null,
     host: row.host ?? null,
     listing: row.listing ?? null,
+    latest_message,
   };
 }
 
@@ -229,6 +259,12 @@ export async function getInquiry(
   const { data, error } = await supabase
     .from('inquiries')
     .select(INQUIRY_SELECT)
+    // 2026-06-29 — same limit:1 on the nested latest_message embed
+    // as the list helpers. Detail screen doesn't render the preview
+    // line but normalizeListItem still consumes the field, so the
+    // shape stays consistent for any caller.
+    .order('created_at', { ascending: false, foreignTable: 'latest_message' })
+    .limit(1, { foreignTable: 'latest_message' })
     .eq('id', inquiryId)
     .maybeSingle();
   if (error) throw error;

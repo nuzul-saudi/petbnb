@@ -883,7 +883,9 @@
     "deleted": "Message deleted",
     "delete": "Delete",
     "delete_confirm": "Delete this message? This can't be undone.",
-    "delete_blocked": "This message has already been read and can no longer be deleted."
+    "delete_blocked": "This message has already been read and can no longer be deleted.",
+    "preview_deleted": "(Message deleted)",
+    "preview_empty": "(No messages yet)"
   },
   "nav": {
     "home": "Home",

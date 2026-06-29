@@ -30,6 +30,18 @@ export type Message = Tables<'messages'> & {
   sender: MessageSender | null;
 };
 
+/**
+ * 2026-06-29 — slim shape for inbox-row "(last message)" previews.
+ * Just enough columns to render the preview line + decide between
+ * the body / "(deleted)" / "(no messages)" branches. Used by the
+ * /bookings and /inquiries inbox list helpers via a PostgREST
+ * nested embed with limit 1, order created_at desc.
+ */
+export type MessagePreview = Pick<
+  Tables<'messages'>,
+  'id' | 'body' | 'deleted_at' | 'created_at'
+>;
+
 export async function listMessages(bookingId: string): Promise<Message[]> {
   if (!supabase) return [];
   const { data, error } = await supabase

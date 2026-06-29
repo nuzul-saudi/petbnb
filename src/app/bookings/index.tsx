@@ -164,6 +164,36 @@ export default function MyBookingsScreen() {
                 {formatDateRange(item.start_date, item.end_date, locale)} ·{' '}
                 {t('booking.nights_count', { nights: toArabicDigits(item.nights) })}
               </Text>
+              {/* 2026-06-29 — preview line, same shape as the
+                  /inquiries inbox. */}
+              {(() => {
+                const lm = item.latest_message;
+                if (lm && lm.deleted_at != null) {
+                  return (
+                    <Text
+                      style={[styles.rowPreview, styles.rowPreviewMuted]}
+                      numberOfLines={1}
+                    >
+                      {t('messages.preview_deleted')}
+                    </Text>
+                  );
+                }
+                if (lm && lm.body != null) {
+                  return (
+                    <Text style={styles.rowPreview} numberOfLines={1}>
+                      {lm.body}
+                    </Text>
+                  );
+                }
+                return (
+                  <Text
+                    style={[styles.rowPreview, styles.rowPreviewMuted]}
+                    numberOfLines={1}
+                  >
+                    {t('messages.preview_empty')}
+                  </Text>
+                );
+              })()}
               <Text style={styles.rowTotal}>{formatSAR(item.total_sar)}</Text>
             </Pressable>
           );
@@ -279,6 +309,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
+  },
+  // 2026-06-29 — inbox preview line (same as /inquiries inbox).
+  // Live body in normal ink; "(Message deleted)" / "(No messages
+  // yet)" in italic muted.
+  rowPreview: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  rowPreviewMuted: {
+    color: colors.inkSoft,
+    fontStyle: 'italic',
   },
   rowTotal: {
     fontFamily: fonts.bodyBold,

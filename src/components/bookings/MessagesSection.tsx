@@ -159,6 +159,14 @@ export function MessagesSection({
                     style={[
                       styles.bubble,
                       own ? styles.bubbleOwn : styles.bubbleOther,
+                      // 2026-06-29 — deleted bubbles read neutral
+                      // regardless of sender. Without this override
+                      // an own-deleted bubble kept the bright moss
+                      // background while only the text went italic-
+                      // muted, reading as "half-deleted." Last entry
+                      // in the array so it wins on bg + corner
+                      // conflicts.
+                      isDeleted && styles.bubbleDeleted,
                     ]}
                   >
                     {isDeleted ? (
@@ -313,6 +321,17 @@ const styles = StyleSheet.create({
   bubbleOther: {
     backgroundColor: colors.whisper,
     borderTopStartRadius: radii.sm,
+  },
+  // 2026-06-29 — neutral container for deleted messages. Matches
+  // the admin browse's deleted-message rendering. Whisper bg +
+  // symmetric corners (resets the asymmetric speech-bubble corners
+  // on bubbleOwn / bubbleOther) so the bubble reads as "retracted"
+  // not "still a message bubble." Pairs with bubbleTextDeleted on
+  // the inner Text.
+  bubbleDeleted: {
+    backgroundColor: colors.whisper,
+    borderTopEndRadius: radii.lg,
+    borderTopStartRadius: radii.lg,
   },
   bubbleText: {
     fontFamily: fonts.body,

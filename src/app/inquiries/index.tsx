@@ -158,6 +158,43 @@ export default function MyInquiriesScreen() {
                       {listingTitle}
                     </Text>
                   ) : null}
+                  {/* 2026-06-29 — preview line. Branches off the
+                      one-row latest_message embed on the inquiry:
+                        deleted_at !== null \xe2\x86\x92 italic muted "(Message
+                                                  deleted)"
+                        body !== null      \xe2\x86\x92 first line of body
+                        no message at all  \xe2\x86\x92 italic muted "(No
+                                                  messages yet)"
+                      Single-line truncated. Status pill above is
+                      unchanged (Open/Converted, separate concern). */}
+                  {(() => {
+                    const lm = item.latest_message;
+                    if (lm && lm.deleted_at != null) {
+                      return (
+                        <Text
+                          style={[styles.rowPreview, styles.rowPreviewMuted]}
+                          numberOfLines={1}
+                        >
+                          {t('messages.preview_deleted')}
+                        </Text>
+                      );
+                    }
+                    if (lm && lm.body != null) {
+                      return (
+                        <Text style={styles.rowPreview} numberOfLines={1}>
+                          {lm.body}
+                        </Text>
+                      );
+                    }
+                    return (
+                      <Text
+                        style={[styles.rowPreview, styles.rowPreviewMuted]}
+                        numberOfLines={1}
+                      >
+                        {t('messages.preview_empty')}
+                      </Text>
+                    );
+                  })()}
                   <Text style={styles.rowMeta}>
                     {item.last_message_at
                       ? formatRelativeStamp(item.last_message_at, locale, t)
@@ -309,6 +346,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
+  },
+  // 2026-06-29 — inbox preview line. Shows the latest message body,
+  // or italic-muted "(Message deleted)" / "(No messages yet)" when
+  // the thread has no live content. Sits between listing title and
+  // the relative-time meta line; truncated to single line.
+  rowPreview: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  rowPreviewMuted: {
+    color: colors.inkSoft,
+    fontStyle: 'italic',
   },
   pill: {
     paddingHorizontal: spacing.sm,
