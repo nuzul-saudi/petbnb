@@ -58,7 +58,7 @@ import { colors, fonts, radii, spacing } from '@/theme/tokens';
 export default function EditListingScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { initializing, session, user } = useAuth();
+  const { initializing, session, user, profile } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const params = useLocalSearchParams<{ id?: string }>();
@@ -151,6 +151,32 @@ export default function EditListingScreen() {
         <View style={styles.centered}>
           <Text style={styles.errorText}>
             {loadError ?? t('listings.edit.not_available')}
+          </Text>
+          <Button
+            label={t('listings.edit.back')}
+            onPress={() => router.replace('/')}
+            variant="secondary"
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // §g (2026-06-29) — role gate. SEPARATE from the ownership gate
+  // below: on admin demotion (host → owner), host_id is unchanged,
+  // so the former host still passes the ownership check. Without
+  // this role check the user would see the edit form render and
+  // then hit a 0045 RLS rejection on save. Ordering: auth (above)
+  // → role (here) → ownership (below). Uses the same blocked-state
+  // markup pattern as the ownership gate so URL probing doesn't
+  // leak any timing/structure difference.
+  if (profile?.role !== 'host') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>
+            {t('listings.role_gate_not_host')}
           </Text>
           <Button
             label={t('listings.edit.back')}

@@ -73,7 +73,7 @@ function previewUriFor(source: PetPhotoSource): string {
 export default function ListingPhotosScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
-  const { initializing, session, user } = useAuth();
+  const { initializing, session, user, profile } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const params = useLocalSearchParams<{ id?: string }>();
@@ -197,6 +197,31 @@ export default function ListingPhotosScreen() {
         <View style={styles.centered}>
           <Text style={styles.errorText}>
             {loadError ?? t('listings.photos.not_available')}
+          </Text>
+          <Button
+            label={t('listings.photos.back')}
+            onPress={() => router.replace('/')}
+            variant="secondary"
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // §g (2026-06-29) — role gate. SEPARATE from the ownership gate
+  // below: on admin demotion (host → owner), host_id is unchanged
+  // so the former host still passes the ownership check. Without
+  // this role check the user would see the photo manager render
+  // and then hit a 0045 RLS rejection on any mutation. Ordering:
+  // auth (above) → role (here) → ownership (below). Same
+  // blocked-state markup as the ownership gate.
+  if (profile?.role !== 'host') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>
+            {t('listings.role_gate_not_host')}
           </Text>
           <Button
             label={t('listings.photos.back')}

@@ -80,6 +80,8 @@
     "location_privacy_note": "Showing the district only — the exact location is shared after a booking is accepted."
   },
   "listings": {
+    "role_gate_not_host": "This listing can't be edited — your account is no longer a host.",
+    "role_gate_new_not_host": "Only hosts can create listings.",
     "form": {
       "new_title": "Create a listing",
       "back": "← Back",

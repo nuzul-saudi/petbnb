@@ -25,6 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { Button } from '@/components/Button';
 import { ListingForm, type ListingFormValues } from '@/components/ListingForm';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
@@ -42,11 +43,36 @@ export default function NewListingScreen() {
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
-  // 0039 — listing INSERT RLS requires role='host' AND
-  // host_application_status='approved' AND host_profile_complete.
-  // Send pre-approval users to the application form, approved-but-
-  // incomplete users to the completion screen, owners back home.
-  if (profile && profile.role !== 'host') return <Redirect href="/" />;
+  // §g (2026-06-29) — role gate. Pre-§g this branch was a silent
+  // `<Redirect href="/" />` that bounced non-hosts home with no
+  // explanation. After the role-aware listings sweep in 0045, a
+  // demoted host (host_application_status still 'approved' +
+  // host_profile_complete still true, but role flipped to
+  // 'owner') would otherwise hit the redirect with no idea why
+  // they can't create. Replace the silent redirect with an
+  // explicit blocked-state panel matching the edit/photos/
+  // availability gates' pattern.
+  //
+  // The other redirects below are intentional in-flight routing
+  // for users mid-host-application (no application yet, pending
+  // review, or approved-but-profile-incomplete) and stay as-is.
+  if (profile && profile.role !== 'host') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>
+            {t('listings.role_gate_new_not_host')}
+          </Text>
+          <Button
+            label={t('listings.form.back')}
+            onPress={() => router.replace('/')}
+            variant="secondary"
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
   if (profile && !profile.host_application_status) {
     return <Redirect href="/become-host/application" />;
   }
@@ -135,5 +161,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     fontSize: 22,
     color: colors.mossDeep,
+  },
+  // §g (2026-06-29) — role-gate blocked-state panel. Mirrors the
+  // pattern used by edit/photos/availability so a non-host (admin
+  // demotion or never-applied) sees a clear message + a back-home
+  // button instead of being silently redirected.
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+  },
+  errorText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.terracotta,
+    textAlign: 'center',
   },
 });
