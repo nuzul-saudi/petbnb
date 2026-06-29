@@ -712,8 +712,18 @@ create policy "listing_blocked_dates_delete_host"
 --
 -- 2. All 6 visibility sites now reference host.role / role check.
 --
+--    NOTE on query shape: pg_policies is a VIEW that already
+--    exposes `qual` and `with_check` as textified strings (it
+--    runs pg_get_expr internally). Do NOT wrap them in
+--    pg_get_expr again — that errors with 'column polrelid does
+--    not exist' because the view doesn't expose polrelid (only
+--    the underlying pg_policy system catalog does). Use
+--    `qual ilike ...` / `with_check ilike ...` directly.
+--    The RPC check (2b) DOES use pg_get_functiondef(p.oid)
+--    because that operates on pg_proc — different catalog.
+--
 --   -- 2a. listings_select_active_verified_or_own
---   select pg_get_expr(qual, polrelid) ilike '%host.role = ''host''%'
+--   select qual ilike '%host.role = ''host''%'
 --     from pg_policies
 --    where schemaname = 'public'
 --      and tablename = 'listings'
@@ -729,7 +739,7 @@ create policy "listing_blocked_dates_delete_host"
 --
 --   -- 2c. profiles_select_public_host_anon \xe2\x80\x94 top-level USING
 --   --     references the OWN role column (not the joined alias).
---   select pg_get_expr(qual, polrelid) ilike '%role = ''host''%'
+--   select qual ilike '%role = ''host''%'
 --     from pg_policies
 --    where schemaname = 'public'
 --      and tablename = 'profiles'
@@ -737,7 +747,7 @@ create policy "listing_blocked_dates_delete_host"
 --   expect: t.
 --
 --   -- 2d. inquiries_insert_starter \xe2\x80\x94 the EXISTS body.
---   select pg_get_expr(with_check, polrelid) ilike '%host.role = ''host''%'
+--   select with_check ilike '%host.role = ''host''%'
 --     from pg_policies
 --    where schemaname = 'public'
 --      and tablename = 'inquiries'
@@ -745,7 +755,7 @@ create policy "listing_blocked_dates_delete_host"
 --   expect: t.
 --
 --   -- 2e. listing_photos_select_public_or_host
---   select pg_get_expr(qual, polrelid) ilike '%host.role = ''host''%'
+--   select qual ilike '%host.role = ''host''%'
 --     from pg_policies
 --    where schemaname = 'public'
 --      and tablename = 'listing_photos'
@@ -754,7 +764,7 @@ create policy "listing_blocked_dates_delete_host"
 --
 --   -- 2f. listing_photos_storage_select_public_or_host
 --   --     (storage.objects, not public.*)
---   select pg_get_expr(qual, polrelid) ilike '%host.role = ''host''%'
+--   select qual ilike '%host.role = ''host''%'
 --     from pg_policies
 --    where schemaname = 'storage'
 --      and tablename = 'objects'
@@ -765,8 +775,8 @@ create policy "listing_blocked_dates_delete_host"
 --    references is_host().
 --
 --   select schemaname, tablename, policyname,
---          (pg_get_expr(qual, polrelid) ilike '%is_host()%'
---           or pg_get_expr(with_check, polrelid) ilike '%is_host()%') as has_is_host
+--          (qual ilike '%is_host()%'
+--           or with_check ilike '%is_host()%') as has_is_host
 --     from pg_policies
 --    where schemaname = 'public'
 --      and policyname in (
@@ -790,7 +800,7 @@ create policy "listing_blocked_dates_delete_host"
 --
 -- 4. listings_insert_host (0039) is UNCHANGED.
 --
---   select pg_get_expr(with_check, polrelid)
+--   select with_check
 --     from pg_policies
 --    where schemaname = 'public'
 --      and tablename = 'listings'
