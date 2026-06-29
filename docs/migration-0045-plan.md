@@ -351,3 +351,72 @@ After 0045 lands and is applied:
 Strategy: review this plan, decide on the open question in
 §c-note + risk (3) (draft-SELECT gating), then I write the SQL
 in a separate round.
+
+---
+
+## Addendum (Strategy review, 2026-06-29) — 4 visibility sites added + open questions answered
+
+Strategy review surfaced that the original sweep was
+listings-table-scoped but the **`is_verified` / `is_suspended`
+predicate is duplicated in 6 places across the schema, not 2**.
+The plan gated 2 (listings SELECT + the RPC); the other 4 are
+added below. Without these the demotion is UI-blocked but
+RLS-half-open — direct API calls (e.g.
+`profiles?is_verified=eq.true`) would still leak the demoted
+host's data and let guests start fresh inquiries against them,
+defeating the defense-in-depth purpose of choosing the RLS path
+over auto-pause.
+
+All 4 use the SAME inline `host.role = 'host'` pattern as §a/§b
+(the SUBJECT is the listing's host, not the caller — so the
+inline pattern fits, not the `is_host()` helper).
+
+### Added visibility sites
+
+| # | Policy | Defined in | What it gates | 0045 change |
+|---|---|---|---|---|
+| §a-2 | `profiles_select_public_host_anon` | `0037_anon_profiles_visibility.sql:52-58` | Anon row visibility on `public.profiles`. Pre-0045: `is_verified=true AND is_suspended=false`. Without role gating, anon pulls a demoted host's `full_name` / `phone` etc. via a direct PostgREST query. | Add `and role = 'host'` to the top-level USING. (This is the profile's OWN role, not a JOIN — same pattern.) |
+| §a-3 | `inquiries_insert_starter` | `0040_inquiry_threads.sql:175` | WITH CHECK on inquiry creation. Pre-0045: EXISTS body checks `host.is_verified` + `host.is_suspended`. Without role gating, a guest POSTs a new inquiry to a demoted host who can't respond as a host. | Add `and host.role = 'host'` to the EXISTS body. |
+| §a-4 | `listing_photos_select_public_or_host` | `0024_drop_is_active.sql:52` | DB-row visibility on listing photos. Pre-0045: EXISTS body checks `host.is_verified` + `host.is_suspended`. Without role gating, anon pulls a demoted host's photo URLs directly. | Add `and host.role = 'host'` to the EXISTS body. Note: this is the photo-ROW policy, **distinct** from the photo-MUTATION policies already in §c. |
+| §a-5 | `listing_photos_storage_select_public_or_host` | `0024_drop_is_active.sql:76` | **Storage bucket** visibility — gates the actual image *files* on `storage.objects`, not the DB rows. Pre-0045: EXISTS body checks `host.is_verified` + `host.is_suspended`. Without role gating, the photo files themselves remain publicly reachable by URL even after demotion. | Add `and host.role = 'host'` to the EXISTS body. **Confirmed: this is the storage.objects policy from line 76, distinct from the DB-row policy at line 52.** The earlier §c note about "leave storage alone" was specifically about the storage MUTATION policies (insert/update/delete) under `storage.objects` from `0003_storage_buckets.sql` — those stay untouched. The READ policy (this one) is part of the 0045 sweep. |
+
+### Net total — 6 visibility sites + ~12 editability sites
+
+- **Visibility (listing's-host's current role):** §a (listings SELECT) + §b (available_listings RPC) + §a-2 (profiles anon) + §a-3 (inquiries INSERT EXISTS) + §a-4 (listing_photos SELECT) + §a-5 (storage.objects SELECT) = **6 sites**.
+- **Editability (caller's current role via `is_host()`):** the §c table = ~12 mutation policies + the 2 `_select_host_or_admin` draft policies (now confirmed; see below).
+
+The legitimate case stays safe — a real host has `role='host'`
+and passes every check; no regression on hosts who weren't
+demoted.
+
+### Open questions — ANSWERED
+
+**§c-note (draft-SELECT gating):** Strategy says **YES** — gate
+the two `_select_host_or_admin` policies on caller role via
+`is_host()`. Consistent with the edit-block; low-risk;
+reversible on re-promotion. A demoted user reading drafts of
+edits they can no longer publish is incoherent. Folded into the
+§c sweep.
+
+**Risk 3 (draft-SELECT side-effect):** acceptable per the above
+answer. Documented as part of the demotion semantics, not a bug.
+
+### What stays UNCHANGED from the original plan
+
+- (d) `listings_insert_host` (0039:117-134) — already requires
+  `role='host'`; not touched by 0045.
+- (e) `is_host()` helper — SECURITY DEFINER, pinned
+  `search_path = public`, mirrors `is_active_user` from 0038.
+- (f) Pure reversible role flip — do NOT mutate `is_verified` /
+  `host_application_status` / `host_profile_complete`. Admin
+  re-promotion restores everything with zero re-vetting.
+- (g) App follow-up: `listings/[id]/edit.tsx`, `photos.tsx`,
+  `availability.tsx`, `new.tsx` need a `profile?.role !== 'host'`
+  UX gate. Separate PR after 0045 lands.
+
+### Next step
+
+Write the 0045 SQL with the full sweep (6 visibility + ~12
+editability + the `is_host()` helper + the
+`available_listings` RPC redefinition + the verification block).
+Strategy reviews the SQL before any apply.
