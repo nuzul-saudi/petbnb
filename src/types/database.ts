@@ -535,6 +535,18 @@ export type Database = {
           // opens the thread; updated via mark_thread_read RPC.
           owner_last_opened_at: string | null;
           host_last_opened_at: string | null;
+          // 0046 — β thread continuity. Link a booking back to the
+          // inquiry it originated from (nullable; ON DELETE SET NULL).
+          inquiry_id: string | null;
+          // 0046 — status-transition timestamps stamped by the
+          // guard_booking_status_stamp BEFORE UPDATE trigger.
+          // cancelled_at is NOT here (already declared above, owned
+          // by the 0028 cancel-path).
+          accepted_at: string | null;
+          declined_at: string | null;
+          active_at: string | null;
+          completed_at: string | null;
+          disputed_at: string | null;
         };
         Insert: {
           id?: string;
@@ -561,6 +573,18 @@ export type Database = {
           refund_sar?: number | null;
           owner_last_opened_at?: string | null;
           host_last_opened_at?: string | null;
+          // 0046 — set at insert when the booking originates from an
+          // inquiry; left null when booked directly from a listing.
+          inquiry_id?: string | null;
+          // 0046 — stamped by the BEFORE UPDATE trigger, not by app
+          // code (the helpers below don't set these); declared
+          // optional so the insert shape is liberal for any future
+          // caller that wants to backfill.
+          accepted_at?: string | null;
+          declined_at?: string | null;
+          active_at?: string | null;
+          completed_at?: string | null;
+          disputed_at?: string | null;
         };
         Update: {
           id?: string;
@@ -587,6 +611,15 @@ export type Database = {
           refund_sar?: number | null;
           owner_last_opened_at?: string | null;
           host_last_opened_at?: string | null;
+          // 0046 — typically not touched by UPDATE callers; the
+          // BEFORE UPDATE trigger stamps the _at columns on status
+          // transitions. Declared optional for permissiveness.
+          inquiry_id?: string | null;
+          accepted_at?: string | null;
+          declined_at?: string | null;
+          active_at?: string | null;
+          completed_at?: string | null;
+          disputed_at?: string | null;
         };
         Relationships: [
           {
@@ -608,6 +641,15 @@ export type Database = {
             columns: ['pet_id'];
             isOneToOne: false;
             referencedRelation: 'pets';
+            referencedColumns: ['id'];
+          },
+          // 0046 — link back to the originating inquiry. ON DELETE
+          // SET NULL at the DB layer (verified migration apply log).
+          {
+            foreignKeyName: 'bookings_inquiry_id_fkey';
+            columns: ['inquiry_id'];
+            isOneToOne: false;
+            referencedRelation: 'inquiries';
             referencedColumns: ['id'];
           },
         ];

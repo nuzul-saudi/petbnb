@@ -46,6 +46,15 @@ export type CreateBookingInput = {
    */
   petId?: string;
   addons?: AddonInput[];
+  /**
+   * 0046 (β thread continuity) — optional id of the inquiry this
+   * booking originated from. When set, persisted as bookings.inquiry_id
+   * so the comprehensive inquiry timeline can link the booking back
+   * into the pre-booking conversation. Omit when the booking was
+   * placed directly from a listing page with no preceding inquiry —
+   * the timeline falls back to no-inquiry-context for that booking.
+   */
+  inquiryId?: string;
 };
 
 export async function createBookingRequest(
@@ -105,6 +114,10 @@ export async function createBookingRequest(
       total_sar: input.totalSAR,
       addons_total_sar: addons.reduce((sum, a) => sum + a.priceSAR, 0),
       status: 'requested',
+      // 0046 — optional inquiry link. Omitted from the row when
+      // the caller didn't pass inquiryId (most legitimate paths
+      // today: direct-from-listing CTAs).
+      inquiry_id: input.inquiryId ?? null,
     })
     .select()
     .single();

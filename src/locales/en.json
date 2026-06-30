@@ -846,6 +846,7 @@
     "load_failed": "Couldn't load the conversation",
     "not_found": "Conversation not found",
     "back_to_inbox": "← Back to inbox",
+    "request_booking_cta": "Request booking",
     "status_converted": "This conversation became a booking.",
     "status_closed": "This conversation is archived. No new messages can be sent.",
     "status_open_pill": "Open",

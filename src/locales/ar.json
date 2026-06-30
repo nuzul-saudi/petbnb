@@ -859,6 +859,7 @@
     "load_failed": "تعذّر تحميل المحادثة",
     "not_found": "المحادثة غير موجودة",
     "back_to_inbox": "← العودة إلى المحادثات",
+    "request_booking_cta": "طلب حجز",
     "status_converted": "تم تحويل هذه المحادثة إلى حجز.",
     "status_closed": "المحادثة مؤرشفة. لن تستقبل رسائل جديدة.",
     "status_open_pill": "مفتوحة",

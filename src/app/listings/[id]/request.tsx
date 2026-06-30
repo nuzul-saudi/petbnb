@@ -92,6 +92,17 @@ export default function BookingRequestScreen() {
     petId?: string;
     /** Fix 4 (2026-06-13). Comma-joined pet ids for multi-pet search. */
     petIds?: string;
+    /**
+     * 0046 (β thread continuity) — when the booking-request flow is
+     * entered from an inquiry's "Request booking" CTA, this carries
+     * the inquiry id forward so the created booking row's inquiry_id
+     * column is populated. The comprehensive timeline on the
+     * inquiry detail screen then links the new booking into the
+     * pre-booking conversation as a booking-block. Absent for
+     * direct-from-listing bookings; createBookingRequest leaves
+     * inquiry_id null in that case.
+     */
+    inquiryId?: string;
   }>();
   const listingId = typeof params.id === 'string' ? params.id : '';
   const editBookingId =
@@ -621,6 +632,13 @@ export default function BookingRequestScreen() {
           listingId: listing.id,
           ownerId: user.id,
           ...sharedPayload,
+          // 0046 — thread the inquiry id forward when present so the
+          // created booking row's inquiry_id column is set. Omitted
+          // gracefully when the user reached this screen directly
+          // from a listing page (no inquiry context).
+          ...(typeof params.inquiryId === 'string' && params.inquiryId
+            ? { inquiryId: params.inquiryId }
+            : {}),
         });
         bookingId = booking.id;
       }

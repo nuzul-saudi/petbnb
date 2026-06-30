@@ -24,7 +24,9 @@ import {
 } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
-// 0043 — Button import dropped; was used only by the (now-removed) Close button.
+// 0043 dropped Button (Close button removed). 0046 (Part A) re-added
+// for the Request booking CTA.
+import { Button } from '@/components/Button';
 import { MessagesSection } from '@/components/bookings/MessagesSection';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/lib/auth';
@@ -215,6 +217,28 @@ export default function InquiryThreadScreen() {
               </Text>
             </View>
           ) : null}
+
+          {/* 0046 (Part A) — Request booking CTA. Only the starter
+              (the owner-side participant who opened the inquiry) can
+              book; the host can't book their own listing. Routes to
+              the request flow with ?inquiryId threaded so
+              createBookingRequest persists bookings.inquiry_id and
+              the comprehensive timeline (Part B) can link the
+              new booking back into this inquiry's history. */}
+          {inquiry.listing && inquiry.starter_id === user.id ? (
+            <View style={styles.requestCtaWrap}>
+              <Button
+                label={t('inquiry.request_booking_cta')}
+                onPress={() => {
+                  router.push(
+                    `/listings/${inquiry.listing!.id}/request?inquiryId=${inquiry.id}` as never,
+                  );
+                }}
+                variant="primary"
+                fullWidth
+              />
+            </View>
+          ) : null}
         </View>
 
         {/* Messages thread + compose. Reused presentational component
@@ -348,6 +372,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.ink,
     textAlign: 'center',
+  },
+  // 0046 (Part A) — Request booking CTA wrapper. Sits between the
+  // status banner and the messages list; vertical spacing matches
+  // the rest of the headerCard's gap.
+  requestCtaWrap: {
+    marginTop: spacing.md,
   },
   // 0043 — closeWrap style dropped along with the Close button.
 });
