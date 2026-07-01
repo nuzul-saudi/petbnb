@@ -23,8 +23,13 @@ import {
   View,
 } from 'react-native';
 
-import { UserAvatar } from '@/components/UserAvatar';
-import { pickLocalized, formatRiyadhStamp } from '@/lib/format';
+// 0046 Part B (2026-07-01) — bubble rendering extracted to
+// src/components/messaging/MessageBubble so the inquiry-timeline
+// screen can reuse it. This file keeps its external API unchanged;
+// the internal .map now delegates the per-row JSX to the bubble
+// component. UserAvatar / formatRiyadhStamp / pickLocalized moved
+// into the bubble file.
+import { MessageBubble } from '@/components/messaging/MessageBubble';
 import type { Locale } from '@/lib/i18n';
 import type { Message } from '@/lib/messages';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
@@ -107,28 +112,16 @@ export function MessagesSection({
         <View style={styles.thread}>
           {messages.map((m) => {
             const own = m.sender_id === currentUserId;
-            const senderName = m.sender
-              ? pickLocalized(
-                  m.sender.full_name ?? '',
-                  m.sender.full_name_en,
-                  locale,
-                )
-              : '—';
-            // Phase 1 (2026-06-28) — soft-delete state. 0044's
-            // guard_message_update nulls body on the same UPDATE that
-            // sets deleted_at, so EITHER signal alone is sufficient —
-            // checking both is defense-in-depth for any future surface
-            // (e.g. a debug client) that might leave one set without
-            // the other.
+            // Phase 1 (2026-06-28) - soft-delete state. 0044 nulls
+            // body on the same UPDATE that sets deleted_at, so
+            // either signal alone is sufficient.
             const isDeleted = m.deleted_at != null || m.body == null;
-            // Phase 1 (2026-06-28) — deletable predicate mirrors the
-            // 0044 messages_update_own_until_read RLS USING clause:
-            // own message + not already deleted + parent supplied an
-            // onDelete handler + (other party never opened the thread
-            // OR opened it before this message landed).
-            // Date-object comparison per spec — string compare on ISO
-            // timestamps would technically work for same-zone values
-            // but the explicit Date conversion documents intent.
+            // Phase 1 (2026-06-28) - deletable predicate mirrors
+            // 0044 messages_update_own_until_read. Single-thread
+            // otherLastOpenedAt shape (this component API); the
+            // 0046 inquiry timeline resolves per-message upstream
+            // and passes its own bubbles in directly, bypassing
+            // this codepath.
             const deletable =
               own &&
               m.deleted_at == null &&
@@ -136,91 +129,16 @@ export function MessagesSection({
               (otherLastOpenedAt == null ||
                 new Date(otherLastOpenedAt) < new Date(m.created_at));
             return (
-              <View
+              <MessageBubble
                 key={m.id}
-                style={[styles.row, own ? styles.rowOwn : styles.rowOther]}
-              >
-                {/* Other party gets an avatar + name above the bubble.
-                    Own messages are anchored to the trailing edge. */}
-                {!own ? (
-                  <UserAvatar
-                    avatarUrl={m.sender?.avatar_url}
-                    displayName={senderName}
-                    size={32}
-                  />
-                ) : null}
-                <View style={styles.bubbleColumn}>
-                  {!own ? (
-                    <Text style={styles.senderName} numberOfLines={1}>
-                      {senderName}
-                    </Text>
-                  ) : null}
-                  <View
-                    style={[
-                      styles.bubble,
-                      own ? styles.bubbleOwn : styles.bubbleOther,
-                      // 2026-06-29 — deleted bubbles read neutral
-                      // regardless of sender. Without this override
-                      // an own-deleted bubble kept the bright moss
-                      // background while only the text went italic-
-                      // muted, reading as "half-deleted." Last entry
-                      // in the array so it wins on bg + corner
-                      // conflicts.
-                      isDeleted && styles.bubbleDeleted,
-                    ]}
-                  >
-                    {isDeleted ? (
-                      /* Phase 1 (2026-06-28) — deleted placeholder.
-                         Mirrors the admin browse's italic + muted
-                         treatment. Applies to BOTH own and other
-                         bubbles \xe2\x80\x94 once deleted, the body is gone
-                         for everyone. */
-                      <Text
-                        style={[
-                          styles.bubbleText,
-                          styles.bubbleTextDeleted,
-                        ]}
-                      >
-                        {t('messages.deleted')}
-                      </Text>
-                    ) : (
-                      <Text
-                        style={[
-                          styles.bubbleText,
-                          own
-                            ? styles.bubbleTextOwn
-                            : styles.bubbleTextOther,
-                        ]}
-                      >
-                        {m.body}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={styles.bubbleFooter}>
-                    <Text style={styles.stamp}>
-                      {formatRiyadhStamp(m.created_at, locale)}
-                    </Text>
-                    {/* Phase 1 (2026-06-28) \xe2\x80\x94 delete affordance. Text
-                        link (NOT emoji), matches the design system per
-                        the L3 emoji-removal precedent. Parent owns the
-                        confirm + RLS-result handling. */}
-                    {deletable ? (
-                      <Pressable
-                        onPress={() => {
-                          void onDelete!(m.id);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('messages.delete')}
-                        style={styles.deleteLink}
-                      >
-                        <Text style={styles.deleteLinkText}>
-                          {t('messages.delete')}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                </View>
-              </View>
+                message={m}
+                own={own}
+                isDeleted={isDeleted}
+                deletable={deletable}
+                locale={locale}
+                onDelete={onDelete}
+                t={t}
+              />
             );
           })}
         </View>
@@ -289,95 +207,10 @@ const styles = StyleSheet.create({
   thread: {
     gap: spacing.md,
   },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-end',
-  },
-  rowOwn: {
-    justifyContent: 'flex-end',
-  },
-  rowOther: {
-    justifyContent: 'flex-start',
-  },
-  bubbleColumn: {
-    maxWidth: '78%',
-    gap: 2,
-  },
-  senderName: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 11,
-    color: colors.inkSoft,
-  },
-  bubble: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.lg,
-  },
-  bubbleOwn: {
-    backgroundColor: colors.moss,
-    borderTopEndRadius: radii.sm,
-  },
-  bubbleOther: {
-    backgroundColor: colors.whisper,
-    borderTopStartRadius: radii.sm,
-  },
-  // 2026-06-29 — neutral container for deleted messages. Matches
-  // the admin browse's deleted-message rendering. Whisper bg +
-  // symmetric corners (resets the asymmetric speech-bubble corners
-  // on bubbleOwn / bubbleOther) so the bubble reads as "retracted"
-  // not "still a message bubble." Pairs with bubbleTextDeleted on
-  // the inner Text.
-  bubbleDeleted: {
-    backgroundColor: colors.whisper,
-    borderTopEndRadius: radii.lg,
-    borderTopStartRadius: radii.lg,
-  },
-  bubbleText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  bubbleTextOwn: {
-    color: colors.cream,
-  },
-  bubbleTextOther: {
-    color: colors.ink,
-  },
-  // Phase 1 (2026-06-28) — deleted-message placeholder styling.
-  // Italic + muted. Same intent as the admin browse's deleted
-  // bubble treatment so the visual language is consistent.
-  bubbleTextDeleted: {
-    color: colors.inkSoft,
-    fontStyle: 'italic',
-  },
-  // Phase 1 (2026-06-28) — bubble footer holds the timestamp AND
-  // (conditionally) the delete link, on the same row, separated by
-  // a flex spacer so the timestamp stays leading-aligned and the
-  // delete link sits at the trailing edge of the bubble column.
-  bubbleFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    marginTop: 2,
-  },
-  deleteLink: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.xs,
-  },
-  deleteLinkText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 11,
-    color: colors.inkSoft,
-    textDecorationLine: 'underline',
-  },
-  stamp: {
-    fontFamily: fonts.body,
-    fontSize: 10,
-    color: colors.inkSoft,
-    marginTop: 2,
-  },
+  // 0046 Part B (2026-07-01) — the row/bubble/deleteLink/stamp
+  // styles moved into src/components/messaging/MessageBubble.tsx
+  // when the bubble was extracted. This component only styles the
+  // section chrome (heading, muted empty state, compose bar).
   composeRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

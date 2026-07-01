@@ -1,20 +1,33 @@
-// Pre-booking inquiry compose route (Round 5b / Step 9.5, commit 2).
+// Comprehensive host↔owner conversation timeline
+// (0046 Part B, 2026-07-01).
 //
-// Dedicated route choice (over a modal) — better deep-link UX,
-// refresh-safe, browser history works. The plan's §5b recommendation.
+// This screen now merges the inquiry's pre-booking messages with
+// every booking that originated from it into ONE chronological
+// timeline. Messages stay physically in their own threads (0040
+// XOR); the merge is query + display only. See
+// docs/migration-0046-beta-thread-continuity-plan.md.
 //
-// Layout: a thin header (other party's avatar + name + the listing
-// title as context) then the existing MessagesSection from the
-// booking-thread world, wired against the inquiry's messages.
-//
-// Anti-leakage discipline (CLAUDE.md §11): every send — including
-// the very first opening message — runs containsContactInfo() and
-// surfaces the soft-nudge confirm dialog. Pre-booking is the
-// highest-risk commission-leak surface, so the regex MUST run
-// before the first message reaches the host.
+// Round 5b history: this route was originally an inquiry-only
+// compose. Part B keeps the anti-leakage discipline
+// (containsContactInfo on every send, per CLAUDE.md §11) and adds:
+//   * block-grouped timeline (conversation blocks + booking blocks)
+//   * smart compose router (open booking → booking; else inquiry)
+//   * per-message delete-until-read resolved against THIS message's
+//     own thread's other-party stamp (inquiry vs booking)
+//   * mark_thread_read on focus for the inquiry AND every linked
+//     booking, so 0044 read-tracking stays correct across the merge
 
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Redirect,
@@ -24,28 +37,38 @@ import {
 } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
-// 0043 dropped Button (Close button removed). 0046 (Part A) re-added
-// for the Request booking CTA.
 import { Button } from '@/components/Button';
-import { MessagesSection } from '@/components/bookings/MessagesSection';
+import { MessageBubble } from '@/components/messaging/MessageBubble';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/lib/auth';
 import { confirmDialog } from '@/lib/confirm';
-import { pickLocalized } from '@/lib/format';
-import { useTranslation } from '@/lib/i18n';
+import { formatDateRange, formatDate } from '@/lib/date';
+import { formatRiyadhStamp, formatSAR, pickLocalized } from '@/lib/format';
+import { useTranslation, type Locale } from '@/lib/i18n';
 import {
-  // 0043 (2026-06-28) — closeInquiry removed; archive is no longer
-  // a product affordance. Inquiry threads stay open forever; the
-  // only valid terminal status remains 'converted' (inquiry became
-  // a booking).
   containsContactInfo,
   getInquiry,
-  listInquiryMessages,
   sendInquiryMessage,
   type InquiryDetail,
 } from '@/lib/inquiries';
+import {
+  buildTimelineBlocks,
+  fetchInquiryTimelineRaw,
+  pickComposeTarget,
+  resolveOtherLastOpenedAt,
+  type InquiryTimelineRaw,
+  type LifecycleEvent,
+  type TimelineBlock,
+  type TimelineBooking,
+  type TimelineItem,
+} from '@/lib/inquiry-timeline';
 import { logWarn } from '@/lib/log';
-import { deleteMessage, markThreadRead, type Message } from '@/lib/messages';
+import {
+  deleteMessage,
+  markThreadRead,
+  sendMessage,
+  type Message,
+} from '@/lib/messages';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function InquiryThreadScreen() {
@@ -58,11 +81,25 @@ export default function InquiryThreadScreen() {
   const id = typeof params.id === 'string' ? params.id : '';
 
   const [inquiry, setInquiry] = useState<InquiryDetail | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // 0046 Part B — the merged timeline state. rawTimeline is what
+  // fetchInquiryTimelineRaw returns (inquiry msgs + linked bookings +
+  // booking msgs); blocks is the result of the pure buildTimelineBlocks
+  // walk on that raw. Kept as separate state so effects can react to
+  // raw (for smart-routing / delete-resolver), the render iterates over
+  // blocks.
+  const [rawTimeline, setRawTimeline] = useState<InquiryTimelineRaw>({
+    inquiryMessages: [],
+    bookings: [],
+    bookingMessages: [],
+  });
+  const [blocks, setBlocks] = useState<TimelineBlock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(true);
+  const [timelineLoading, setTimelineLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // 0043 — `closing` state + setter dropped along with the Close button.
+  // Compose state — moved out of the (now-removed) MessagesSection.
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const loadInquiry = useCallback(async () => {
     if (!id) return;
@@ -84,16 +121,25 @@ export default function InquiryThreadScreen() {
     }
   }, [id, t]);
 
-  const refetchMessages = useCallback(async () => {
+  const refetchTimeline = useCallback(async () => {
     if (!id) return;
-    setMessagesLoading(true);
+    setTimelineLoading(true);
     try {
-      const rows = await listInquiryMessages(id);
-      setMessages(rows);
+      const raw = await fetchInquiryTimelineRaw(id);
+      setRawTimeline(raw);
+      setBlocks(buildTimelineBlocks(raw, id));
+      // 0046 Part B — mark every visible thread read on load. The
+      // inquiry itself + one call per linked booking. Fire-and-forget;
+      // markThreadRead swallows errors internally so a failed RPC
+      // never blocks the render.
+      void markThreadRead('inquiry', id);
+      for (const b of raw.bookings) {
+        void markThreadRead('booking', b.id);
+      }
     } catch (e) {
-      logWarn('[inquiry.messages_load_failed]', e);
+      logWarn('[inquiry.timeline_load_failed]', e);
     } finally {
-      setMessagesLoading(false);
+      setTimelineLoading(false);
     }
   }, [id]);
 
@@ -101,17 +147,10 @@ export default function InquiryThreadScreen() {
     void loadInquiry();
   }, [loadInquiry]);
 
-  // useFocusEffect refetch mirrors the booking-thread MVP behavior
-  // (Round 5). Realtime subscriptions on inquiry messages are
-  // documented as out-of-scope for Round 5b in the plan doc.
   useFocusEffect(
     useCallback(() => {
-      void refetchMessages();
-      // Phase 1 (2026-06-28) — mark the inquiry thread read on
-      // every screen focus. Same pattern as bookings/[id].tsx.
-      // markThreadRead swallows errors internally.
-      if (id) void markThreadRead('inquiry', id);
-    }, [refetchMessages, id]),
+      void refetchTimeline();
+    }, [refetchTimeline]),
   );
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
@@ -241,56 +280,300 @@ export default function InquiryThreadScreen() {
           ) : null}
         </View>
 
-        {/* Messages thread + compose. Reused presentational component
-            from the booking-thread world; only the onSend handler
-            differs (writes inquiry_id instead of booking_id). */}
-        <MessagesSection
-          messages={messages}
-          loading={messagesLoading}
-          currentUserId={user.id}
-          locale={locale}
-          canSend={canSend}
-          onSend={async (body) => {
-            // Anti-leakage soft nudge — runs on EVERY send including
-            // the first/opening message. CLAUDE.md §11 flags pre-
-            // booking as the highest-risk commission-leak surface.
-            if (containsContactInfo(body)) {
-              const ok = await confirmDialog(t('messages.contact_warning'));
-              if (!ok) return;
-            }
-            await sendInquiryMessage(inquiry.id, body);
-            await refetchMessages();
-          }}
-          // Phase 1 (2026-06-28) — same pattern as bookings/[id].tsx.
-          // Starter is one participant; host is the other. The 0044
-          // read-tracking columns on inquiries split by role.
-          otherLastOpenedAt={
-            inquiry.starter_id === user.id
-              ? inquiry.host_last_opened_at
-              : inquiry.starter_last_opened_at
-          }
-          onDelete={async (messageId) => {
-            const ok = await confirmDialog(t('messages.delete_confirm'));
-            if (!ok) return;
-            const deleted = await deleteMessage(messageId);
-            await refetchMessages();
-            if (!deleted) {
-              // Inherent read/delete race ack \xe2\x80\x94 see the parallel
-              // comment in bookings/[id].tsx for the rationale.
-              await confirmDialog(t('messages.delete_blocked'));
-            }
-          }}
-          t={t}
-        />
-
-        {/* 0043 (2026-06-28) — Close (archive) affordance removed.
-            Inquiry threads stay open forever; the only terminal
-            status is 'converted' (inquiry became a booking). The
-            corresponding DB trigger in 0043 rejects any new
-            open → closed transition, so attempting to call
-            closeInquiry from anywhere would now raise. */}
+        {/* 0046 Part B — comprehensive timeline: block-grouped
+            merge of the inquiry's messages with every linked
+            booking's messages + lifecycle events. Each block is
+            self-contained; per-message delete-until-read resolves
+            against ITS own thread's other-party stamp (not one
+            stamp for the whole merged list). */}
+        <View style={styles.timelineSection}>
+          <Text style={styles.timelineHeading}>
+            {t('messages.section_title')}
+          </Text>
+          {timelineLoading && blocks.length === 0 ? (
+            <Text style={styles.muted}>{t('common.loading')}</Text>
+          ) : blocks.length === 0 ? (
+            <Text style={styles.muted}>{t('messages.empty')}</Text>
+          ) : (
+            <View style={styles.timelineList}>
+              {blocks.map((block) => (
+                <TimelineBlockView
+                  key={block.key}
+                  block={block}
+                  viewerId={user.id}
+                  inquiry={inquiry}
+                  bookings={rawTimeline.bookings}
+                  locale={locale}
+                  t={t}
+                  onListingPress={
+                    inquiry.listing
+                      ? (listingId) => router.push(`/listings/${listingId}`)
+                      : undefined
+                  }
+                  onDelete={async (messageId) => {
+                    const ok = await confirmDialog(
+                      t('messages.delete_confirm'),
+                    );
+                    if (!ok) return;
+                    const deleted = await deleteMessage(messageId);
+                    await refetchTimeline();
+                    if (!deleted) {
+                      // Inherent read/delete race ack — see the
+                      // parallel comment in bookings/[id].tsx.
+                      await confirmDialog(t('messages.delete_blocked'));
+                    }
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
+
+      {/* Compose bar — smart routing. Single input; on send the
+          target is picked at that instant via pickComposeTarget:
+          most-recent OPEN booking (requested/accepted/active/disputed)
+          if any exist, else the inquiry. Message physically lands in
+          whichever thread it's routed to (booking_id XOR inquiry_id
+          per 0040), so the block walker will place it correctly on
+          the next refetch. */}
+      {canSend ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.composeBar}>
+            {sendError ? (
+              <Text style={styles.sendError}>{sendError}</Text>
+            ) : null}
+            <View style={styles.composeRow}>
+              <TextInput
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={t('messages.placeholder')}
+                placeholderTextColor={colors.inkSoft}
+                style={styles.composeInput}
+                multiline
+                editable={!sending}
+              />
+              <Pressable
+                onPress={async () => {
+                  const body = draft.trim();
+                  if (!body || sending) return;
+                  setSendError(null);
+                  setSending(true);
+                  try {
+                    if (containsContactInfo(body)) {
+                      const ok = await confirmDialog(
+                        t('messages.contact_warning'),
+                      );
+                      if (!ok) {
+                        setSending(false);
+                        return;
+                      }
+                    }
+                    const target = pickComposeTarget(
+                      rawTimeline.bookings,
+                      inquiry.id,
+                    );
+                    if (target.kind === 'inquiry') {
+                      await sendInquiryMessage(target.id, body);
+                    } else {
+                      await sendMessage(target.id, body);
+                    }
+                    setDraft('');
+                    await refetchTimeline();
+                  } catch (e) {
+                    logWarn('[inquiry.timeline_send_failed]', e);
+                    setSendError(t('messages.send_failed'));
+                  } finally {
+                    setSending(false);
+                  }
+                }}
+                disabled={!draft.trim() || sending}
+                style={[
+                  styles.sendButton,
+                  (!draft.trim() || sending) && styles.sendButtonDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('messages.send')}
+              >
+                <Text style={styles.sendButtonText}>
+                  {t('messages.send')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      ) : null}
     </SafeAreaView>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Timeline renderers (inline — reused only by this screen; no new
+// public component per the "no new component unless needed" spec).
+// -----------------------------------------------------------------------------
+
+type TimelineBlockViewProps = {
+  block: TimelineBlock;
+  viewerId: string;
+  inquiry: InquiryDetail;
+  bookings: TimelineBooking[];
+  locale: Locale;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  onListingPress?: (listingId: string) => void;
+  onDelete: (messageId: string) => Promise<void>;
+};
+
+function TimelineBlockView(props: TimelineBlockViewProps) {
+  const { block, locale, t } = props;
+  if (block.kind === 'conversation') {
+    return (
+      <View style={styles.conversationBlock}>
+        {block.items.map((it) => (
+          <TimelineItemView key={itemKey(it)} item={it} {...props} />
+        ))}
+      </View>
+    );
+  }
+  // booking block
+  return (
+    <View style={styles.bookingBlock}>
+      <RichBookingPlacedDivider booking={block.booking} locale={locale} t={t} />
+      {block.items
+        // The placed event is already rendered as the rich header
+        // above; skip it in the interleaved items.
+        .filter(
+          (it) => !(it.kind === 'event' && it.event.type === 'placed'),
+        )
+        .map((it) => (
+          <TimelineItemView key={itemKey(it)} item={it} {...props} />
+        ))}
+    </View>
+  );
+}
+
+function itemKey(it: TimelineItem): string {
+  return it.kind === 'message'
+    ? `msg-${it.message.id}`
+    : `evt-${it.event.type}-${it.event.bookingId}-${it.event.at}`;
+}
+
+type TimelineItemViewProps = Omit<TimelineBlockViewProps, 'block'> & {
+  item: TimelineItem;
+};
+
+function TimelineItemView(props: TimelineItemViewProps) {
+  const { item, viewerId, inquiry, bookings, locale, t, onDelete } = props;
+  if (item.kind === 'event') {
+    return <SlimEventDivider event={item.event} locale={locale} t={t} />;
+  }
+  // Message row — compute deletability against ITS own thread.
+  const m = item.message;
+  const own = m.sender_id === viewerId;
+  const isDeleted = m.deleted_at != null || m.body == null;
+  const otherStamp = resolveOtherLastOpenedAt(
+    m,
+    viewerId,
+    inquiry,
+    bookings,
+  );
+  const deletable =
+    own &&
+    m.deleted_at == null &&
+    (otherStamp == null || new Date(otherStamp) < new Date(m.created_at));
+  return (
+    <MessageBubble
+      message={m}
+      own={own}
+      isDeleted={isDeleted}
+      deletable={deletable}
+      locale={locale}
+      onDelete={onDelete}
+      t={t}
+    />
+  );
+}
+
+function RichBookingPlacedDivider({
+  booking,
+  locale,
+  t,
+}: {
+  booking: TimelineBooking;
+  locale: Locale;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  const dates = formatDateRange(booking.start_date, booking.end_date, locale);
+  const petCount = booking.pets.length;
+  const petsLabel =
+    petCount === 1
+      ? booking.pets[0].name
+      : petCount === 2
+        ? t('inquiry.timeline_placed_pets_count_two')
+        : t('inquiry.timeline_placed_pets_count_many', { count: petCount });
+  return (
+    <View style={styles.dividerRich}>
+      <View style={styles.dividerLine} />
+      <View style={styles.dividerRichContent}>
+        <Text style={styles.dividerRichTitle}>
+          {t('inquiry.timeline_event_placed')}
+        </Text>
+        <Text style={styles.dividerRichMeta}>
+          {dates}
+          {petsLabel ? ` · ${petsLabel}` : ''}
+          {' · '}
+          {formatSAR(booking.total_sar)}
+        </Text>
+        <Text style={styles.dividerRichSubmeta}>
+          {formatRiyadhStamp(booking.created_at, locale)}
+        </Text>
+      </View>
+      <View style={styles.dividerLine} />
+    </View>
+  );
+}
+
+function SlimEventDivider({
+  event,
+  locale,
+  t,
+}: {
+  event: LifecycleEvent;
+  locale: Locale;
+  t: (key: string) => string;
+}) {
+  // Terminal-negative events (declined, cancelled, disputed) get a
+  // terracotta tint to differentiate from neutral-positive ones
+  // (accepted, active, completed).
+  const isNegative =
+    event.type === 'declined' ||
+    event.type === 'cancelled' ||
+    event.type === 'disputed';
+  const label = t(`inquiry.timeline_event_${event.type}`);
+  return (
+    <View style={styles.dividerSlim}>
+      <View
+        style={[
+          styles.dividerLine,
+          isNegative && styles.dividerLineNegative,
+        ]}
+      />
+      <Text
+        style={[
+          styles.dividerSlimText,
+          isNegative && styles.dividerSlimTextNegative,
+        ]}
+      >
+        {label} · {formatDate(event.at.slice(0, 10), locale, 'short')}
+      </Text>
+      <View
+        style={[
+          styles.dividerLine,
+          isNegative && styles.dividerLineNegative,
+        ]}
+      />
+    </View>
   );
 }
 
@@ -379,5 +662,144 @@ const styles = StyleSheet.create({
   requestCtaWrap: {
     marginTop: spacing.md,
   },
-  // 0043 — closeWrap style dropped along with the Close button.
+
+  // 0046 Part B — timeline section (block-grouped merge).
+  timelineSection: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  timelineHeading: {
+    fontFamily: fonts.headingBold,
+    fontSize: 20,
+    color: colors.mossDeep,
+  },
+  timelineList: {
+    gap: spacing.lg,
+  },
+
+  // Conversation block — inquiry-scoped messages, tight vertical
+  // stack. No card chrome; the block just holds bubbles.
+  conversationBlock: {
+    gap: spacing.md,
+  },
+
+  // Booking block — visually grouped run for one linked booking.
+  // Subtle whisper border + tinted background so it reads as a
+  // bounded region distinct from surrounding conversation blocks.
+  bookingBlock: {
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    backgroundColor: colors.cream,
+  },
+
+  // Dividers.
+  dividerRich: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.xs,
+  },
+  dividerRichContent: {
+    flexShrink: 1,
+    gap: 2,
+    alignItems: 'center',
+  },
+  dividerRichTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.mossDeep,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  dividerRichMeta: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  dividerRichSubmeta: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.inkSoft,
+  },
+  dividerSlim: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: 2,
+  },
+  dividerSlimText: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.inkSoft,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  dividerSlimTextNegative: {
+    color: colors.terracotta,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.whisper,
+  },
+  dividerLineNegative: {
+    backgroundColor: colors.rose,
+  },
+
+  // Compose bar — pinned outside the ScrollView so the timeline
+  // scrolls independently.
+  composeBar: {
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.whisper,
+    backgroundColor: colors.paper,
+    gap: spacing.xs,
+  },
+  composeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
+  composeInput: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.cream,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  sendButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.moss,
+    borderRadius: radii.lg,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.4,
+  },
+  sendButtonText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.cream,
+  },
+  sendError: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.terracotta,
+    paddingHorizontal: spacing.xs,
+  },
 });
