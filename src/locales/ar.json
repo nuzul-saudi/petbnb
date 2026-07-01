@@ -358,7 +358,8 @@
     "submit_button": "إرسال التقييم",
     "submitting": "جاري الإرسال…",
     "submit_failed": "تعذّر إرسال التقييم، حاولي مرة أخرى.",
-    "already_rated_hint": "شكراً — لقد أرسلت تقييمك لهذه الإقامة."
+    "already_rated_hint": "شكراً — لقد أرسلت تقييمك لهذه الإقامة.",
+    "anon_rater": "مستخدم"
   },
   "daily_updates": {
     "section_title": "تحديثات يومية",

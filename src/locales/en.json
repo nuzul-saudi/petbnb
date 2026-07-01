@@ -356,7 +356,8 @@
     "submit_button": "Submit review",
     "submitting": "Submitting…",
     "submit_failed": "Couldn't submit the review — please try again.",
-    "already_rated_hint": "Thanks — your review for this stay has been sent."
+    "already_rated_hint": "Thanks — your review for this stay has been sent.",
+    "anon_rater": "User"
   },
   "daily_updates": {
     "section_title": "Daily updates",

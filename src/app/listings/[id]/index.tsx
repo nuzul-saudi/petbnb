@@ -11,6 +11,7 @@ import { PhotoLightbox } from '@/components/PhotoLightbox';
 import { PhotoMosaic } from '@/components/PhotoMosaic';
 import { SearchWhenModal } from '@/components/SearchWhenModal';
 import { findCity, findDistrict } from '@/lib/cities';
+import { formatDate } from '@/lib/date';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { openInquiry } from '@/lib/inquiries';
@@ -415,46 +416,54 @@ export default function ListingDetailScreen() {
             ) : null}
           </View>
 
-          {/* Section 6: reviews. */}
-          <View style={styles.sectionDivider} />
-          <View style={styles.sectionHeadingRow}>
-            <Text style={[styles.sectionHeading, { color: theme.accent }]}>
-              {t('listing.section.reviews')}
-            </Text>
-            {reviews.length > 0 ? (
-              <Text style={styles.sectionHeadingMeta}>
-                ★{' '}
-                {(
-                  reviews.reduce((s, r) => s + r.stars, 0) / reviews.length
-                ).toFixed(1)}{' '}
-                · {toArabicDigits(reviews.length)}
-              </Text>
-            ) : null}
-          </View>
-          {reviews.length === 0 ? (
-            <Text style={styles.muted}>{t('listing.reviews_empty')}</Text>
-          ) : (
-            <View style={styles.reviewsList}>
-              {reviews.map((rv) => (
-                <View key={rv.id} style={styles.reviewItem}>
-                  <View style={styles.reviewHeader}>
-                    <Text style={styles.reviewerName}>
-                      {rv.rater_name ?? '—'}
-                    </Text>
-                    <Text style={styles.reviewStars}>
-                      {'★'.repeat(rv.stars)}
-                      <Text style={styles.reviewStarsDim}>
-                        {'★'.repeat(5 - rv.stars)}
+          {/* Section 6: reviews — the written trust payload. Rendered
+              only when the host has ≥1 review; the "new host" badge in
+              the host card already covers the empty case, so there's no
+              redundant empty state here. Newest-first is guaranteed by
+              the listReviewsForHost fetch (order created_at desc). */}
+          {reviews.length > 0 ? (
+            <>
+              <View style={styles.sectionDivider} />
+              <View style={styles.sectionHeadingRow}>
+                <Text style={[styles.sectionHeading, { color: theme.accent }]}>
+                  {t('listing.section.reviews')}
+                </Text>
+                <Text style={styles.sectionHeadingMeta}>
+                  ★{' '}
+                  {(
+                    reviews.reduce((s, r) => s + r.stars, 0) / reviews.length
+                  ).toFixed(1)}{' '}
+                  · {toArabicDigits(reviews.length)}
+                </Text>
+              </View>
+              <View style={styles.reviewsList}>
+                {reviews.map((rv) => (
+                  <View key={rv.id} style={styles.reviewItem}>
+                    <View style={styles.reviewHeader}>
+                      <Text style={styles.reviewerName}>
+                        {rv.rater_name ?? t('reviews.anon_rater')}
                       </Text>
+                      <Text style={styles.reviewStars}>
+                        {'★'.repeat(rv.stars)}
+                        <Text style={styles.reviewStarsDim}>
+                          {'★'.repeat(5 - rv.stars)}
+                        </Text>
+                      </Text>
+                    </View>
+                    {/* text_ar is optional — many reviews are stars-only.
+                        Render the text block only when present so a
+                        stars-only row stays clean. */}
+                    {rv.text_ar ? (
+                      <Text style={styles.reviewText}>{rv.text_ar}</Text>
+                    ) : null}
+                    <Text style={styles.reviewDate}>
+                      {formatDate(rv.created_at.slice(0, 10), locale, 'medium')}
                     </Text>
                   </View>
-                  {rv.text_ar ? (
-                    <Text style={styles.reviewText}>{rv.text_ar}</Text>
-                  ) : null}
-                </View>
-              ))}
-            </View>
-          )}
+                ))}
+              </View>
+            </>
+          ) : null}
 
           {/* Section 7: location — DISTRICT + city only, NO exact
               address, NO precise pin. A female host's exact home
@@ -847,6 +856,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
     lineHeight: 20,
+  },
+  reviewDate: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    marginTop: spacing.xs,
   },
   locationText: {
     fontFamily: fonts.bodyBold,
