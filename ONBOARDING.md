@@ -7,9 +7,11 @@
 > "why didn't they just…" questions get answered. Round-by-round decision
 > trails live in [`docs/batch-decisions.md`](./docs/batch-decisions.md).
 
-Last refresh: **2026-06-17** (immediately after the host-signup funnel
-landed — migration 0039 + the persona-separation refactor — see
-§7 "Step 4.6 — host signup funnel" and CLAUDE.md §12).
+Last refresh: **2026-07-02** (after surfacing written host reviews on the
+listing-detail screen — app-only, no schema/RLS/lib changes — see the
+"Review surfacing" entry in CLAUDE.md §13). Prior major landmark: the
+host-signup funnel — migration 0039 + the persona-separation refactor —
+see §7 "Step 4.6 — host signup funnel" and CLAUDE.md §12.
 
 ---
 
@@ -310,7 +312,7 @@ Petbnb/
 │   │   ├── listings/
 │   │   │   ├── new.tsx         ← Host: create a listing. Pre-condition redirects (0039): non-host → /, no application → /become-host/application, pending → /profile, approved+incomplete → /become-host/complete-profile.
 │   │   │   └── [id]/
-│   │   │       ├── index.tsx     ← Public listing detail. Guest mode + self-listing edit-CTA (R2C1+R2C3).
+│   │   │       ├── index.tsx     ← Public listing detail. Guest mode + self-listing edit-CTA (R2C1+R2C3). Reviews section (2026-07-02): renders the written reviews (stars + text_ar + rater name + date) below the aggregate, only when reviews.length > 0.
 │   │   │       ├── request.tsx   ← Booking request flow
 │   │   │       ├── edit.tsx      ← Host: edit listing. 8d two-copy model — pending → in-place, approved/paused → draft.
 │   │   │       ├── photos.tsx    ← Host: manage photos. Draft-aware (8e).
@@ -368,7 +370,7 @@ Petbnb/
 │   │   ├── availability.ts         ← BlockedRange CRUD + range overlap predicates (Milestone B)
 │   │   ├── range-overlap.ts        ← Pure rangesOverlap helper — the math is unit-tested in availability.test.ts (R1C6)
 │   │   ├── vaccination.ts          ← classifyVaccinationDate + worstVaccinationStatus. 365-day boundary (R1C2).
-│   │   ├── reviews.ts              ← createReview + findMyReview (R2C6)
+│   │   ├── reviews.ts              ← createReview + findMyReview (R2C6) + listReviewsForHost (host's reviews, newest-first, limit 10; anon-readable via reviews_select_public). NOTE: the listReviewsForHost JSDoc's "guests cannot read" line is STALE — 0030 kept anon read.
 │   │   ├── last-seen-storage.ts    ← AsyncStorage per-user-per-booking last-seen stamps (R2C7 unread dot)
 │   │   └── admin.ts                ← Admin queries: getAdminListingReview, promoteListingDraft, etc.
 │   │

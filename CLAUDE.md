@@ -665,3 +665,56 @@ chain assumes a static viewport), shipped:
 replacement, KeyboardAvoidingView around the booking sticky bar,
 scroll-to-field + red-ring on blocked-date overlap. None block
 function; all are pre-launch polish.
+
+### Review surfacing on listing detail — 2026-07-02 (app-only)
+
+The listing-detail screen (`src/app/listings/[id]/index.tsx`) already
+fetched host reviews via `listReviewsForHost(hostId)` into a `reviews`
+state, but only rendered the **numeric aggregate pill** (★ avg · count)
+in the host card. The written content — star rating + `text_ar` + rater
+name + date — was fetched and discarded at the display layer. That
+written content is the whole trust payload, so this pass surfaces it.
+
+**Scope was deliberately narrow — app-only. NO schema, NO RLS, NO
+migration, NO lib changes.** `createReview` / `listReviewsForHost` /
+`findMyReview`, the reviews RLS, and `get_host_ratings` were all left
+untouched (they already existed and are verified).
+
+**What shipped:**
+
+- A **Reviews section** on the listing detail (after the amenities
+  block), rendered **only when `reviews.length > 0`**. The empty case is
+  already covered by the "new host" (`جديد`) badge in the host card, so
+  there's no redundant empty state.
+- Each review row renders: the star rating (inline filled/empty to 5),
+  `text_ar` **only when non-null and non-empty** (many reviews are
+  stars-only — those rows render cleanly with no empty text block), the
+  rater name, and `created_at` formatted via `formatDate()` from
+  `src/lib/date.ts` (`rv.created_at.slice(0, 10)` → medium style, Latin
+  digits per the locked decision).
+- Newest-first ordering is guaranteed by the existing fetch
+  (`order created_at desc, limit 10`); no "show more" for v1.
+- New i18n key **`reviews.anon_rater`** (`ar` "مستخدم" / `en` "User",
+  masculine register) as the graceful fallback for a null rater name,
+  replacing a hardcoded `—`. The section heading keeps the existing
+  `listing.section.reviews` key (no redundant duplicate). The now-unused
+  `listing.reviews_empty` key was left in place (parity check tolerates
+  unreferenced keys).
+
+**Anon-read finding (confirmed, per §5):** guests **DO** see the full
+written review list. The authoritative RLS state is `reviews_select_public`
+(anon + authenticated, `using(true)`), restored by migration `0030`
+under the founder's Option A decision. Note: the JSDoc on
+`listReviewsForHost` in `src/lib/reviews.ts` still claims *"Guests (anon)
+cannot [read]"* — that comment is **stale/wrong** (predates 0030); left
+in place under the no-lib-changes constraint, worth a one-line doc fix
+later.
+
+**CI note:** this review-surfacing change adds zero new tsc errors;
+i18n parity + all 55 vitest cases pass. It landed on top of the
+`fix(ci)` commit that immediately precedes it — that fix removed two
+unrelated `TS2578: Unused '@ts-expect-error' directive` errors in
+`src/app/inquiries/[id].tsx` (from the prior 0046 messaging work) which
+had been failing CI because the workflow runs `tsc` without generating
+Expo Router typed-route definitions. With that fix in place, the GitHub
+Actions run on the pushed commit is green.
