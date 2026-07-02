@@ -79,9 +79,14 @@ STOP after each numbered item. Run it. Show the founder. Wait for "continue."
 
 ## 4. Scope discipline (do NOT build these in MVP)
 
-Even if useful: real payments, real insurance, Nafath, push notifications, merchandise cart/checkout, multi-city, dogs, ratings algorithm (simple 1–5 stars + text only), subscriptions/wellness plans. If you think something out of scope is needed, ASK first.
+Even if useful: real payments, real insurance, Nafath, push notifications, merchandise cart/checkout, multi-city, dogs, ratings algorithm (auto-scoring/weighting), subscriptions/wellness plans. If you think something out of scope is needed, ASK first.
 
 (Admin dashboard was previously out of scope but moved IN-scope by Step 4.5 — see Scope clarification above. Founder personally vets early hosts; this is the female-trust wedge.)
+
+**Since-built / since-decided (no longer "do NOT build" — see §11 + §13):**
+- **Reviews are SHIPPED** — simple 1–5 stars + `text_ar`, two-way, immutable (R2C6), including written-review surfacing on the listing detail (2026-07-02). What stays out is any *ratings algorithm* (auto weighting/promotion), not reviews themselves.
+- **Cancellation-policy math is BUILT** (full/50%/none tiers, Riyadh-midnight anchored) in `src/lib/payments-policy.ts`. **Commission split is DECIDED + BUILT** (15% host + 5% owner) in the same file. Only *real charging* stays out — the mock `PaymentProvider` moves no money until the merchant account lands.
+- **Dogs:** the founder DECIDED to launch cats + dogs (Step 5.7) but it is not built yet — **decided, pending** (schema-ready via `pets.species` + `listings.accepts_species`, gated behind `SPECIES_ENABLED=false`).
 
 ---
 
@@ -92,13 +97,32 @@ Even if useful: real payments, real insurance, Nafath, push notifications, merch
 - **pets**: id, owner_id, name, species (default 'cat'), breed, age_months, vaccination_doc_url, behavioral_notes, photo_url
 - **listings**: id, host_id, title_ar, description_ar, neighborhood, nightly_price_sar, max_concurrent_pets, has_resident_pets (bool), resident_pets_note, status (`pending`|`approved`|`paused`|`admin_disabled` — replaced `is_active` in migration 0021/0024), tier (`bronze`|`silver`|`gold` default bronze), offers_grooming (bool default false), host_gender (`female`|`male`)
 - **listing_photos**: id, listing_id, photo_url, sort_order  (THE AIRBNB-STYLE HOME GALLERY)
-- **bookings**: id, listing_id, owner_id, pet_id, start_date, end_date, nights, base_price_sar, addons_total_sar, total_sar, status (`requested`|`accepted`|`declined`|`active`|`completed`|`cancelled`|`disputed`), created_at
+- **bookings**: id, listing_id, owner_id, pet_id, start_date, end_date, nights, base_price_sar, addons_total_sar, total_sar, status (`requested`|`accepted`|`declined`|`active`|`completed`|`cancelled`|`disputed`), created_at. **Payment snapshot (0028):** owner_fee_sar, host_fee_sar, total_charged_sar, payout_sar, payout_status (`held`|`released`|null), paid_at, cancelled_at, refund_sar (all nullable; set at host-accept / completion / cancel). **Read tracking (0044):** owner_last_opened_at, host_last_opened_at (nullable; forward-only via `mark_thread_read` RPC). **β thread continuity (0046):** inquiry_id (nullable fk inquiries, ON DELETE SET NULL — links a booking back to the inquiry it grew from) + status-transition timestamps accepted_at / declined_at / active_at / completed_at / disputed_at, stamped by the `guard_booking_status_stamp` BEFORE UPDATE trigger (first-time-wins; `cancelled_at` deliberately excluded — owned by the 0028 cancel path).
 - **booking_addons**: id, booking_id, type (`grooming`|`vet`|`transport`|`insurance`), provider_label, price_sar
 - **condition_reports**: id, booking_id, phase (`check_in`|`check_out`), reporter_id, weight_note, health_notes, behavior_notes, photos (jsonb url array), created_at  (Section 6)
 - **daily_updates**: id, booking_id, host_id, photos (jsonb array), video_url (nullable), note_ar, created_at
-- **messages**: id, booking_id, sender_id, body, created_at
+- **messages**: id, booking_id (nullable), inquiry_id (nullable, 0040), sender_id, body (nullable since 0044 — nulled on soft-delete; a CHECK requires non-null non-empty body while `deleted_at IS NULL`), created_at, deleted_at (nullable, 0044 soft-delete marker; once set the row is immutable). A message references exactly one of booking_id / inquiry_id (CHECK constraint).
+- **inquiries** (0040 — pre-booking trust threads): id, listing_id, starter_id (the owner), host_id, status (`open`|`converted`|`closed` enum — but see model note below: live rows stay `open` in perpetuity), created_at, updated_at, last_message_at (nullable), starter_last_opened_at / host_last_opened_at (nullable read-tracking, 0044). Fetch-or-create on "Message host" via the `(listing_id, starter_id)` partial-unique index `WHERE status='open'`.
 - **reviews**: id, booking_id, rater_id, ratee_id, stars (1–5), text_ar, created_at
 - **products** (display only): id, name_ar, seller_name, brand, price_sar, category, image_url, is_halal_certified (bool)
+
+**Messaging model (0040–0046 arc, shipped through 0046 / 2026-06-30).**
+Two thread kinds share the `messages` table: booking-scoped (`booking_id`)
+and pre-booking inquiries (`inquiry_id`). Key behaviors:
+- **Pre-booking inquiries (0040):** an owner can "Message host" from the
+  listing detail before committing — the trust conversation that should
+  precede handing over a pet. One inquiry per `(listing, starter)`.
+- **Delete-until-read (0044):** a sender can soft-delete their own message
+  (`deleted_at` set, `body` nulled) only until the other party has opened
+  the thread; per-thread read tracking via the `*_last_opened_at` columns
+  + `mark_thread_read` RPC.
+- **Inquiry-as-comprehensive-timeline (0046, "β model"):** once a booking
+  grows out of an inquiry (`bookings.inquiry_id`), the booking's messages
+  carry back into the same inquiry thread so the whole relationship reads
+  as one timeline. Inquiries stay `open` **forever** — 0043 removed the
+  close capability and 0046 deliberately never adds "convert", so despite
+  the 3-value enum the shipped reality is one perpetual conversation per
+  `(listing, starter)`. RLS was unchanged by 0046 (purely additive).
 
 RLS: users read/write only their own rows; a booking is visible to both its owner and the listing's host; approved listings publicly readable. **Listing INSERT (0039)** requires `role='host' AND host_application_status='approved' AND host_profile_complete=true` — pending applicants and approved-but-incomplete hosts cannot create listings even though they can read/update their own profile row.
 
@@ -205,8 +229,13 @@ launch.
   their default sending domain). Set in Supabase: Project Settings → Auth →
   SMTP Settings.
 
-- **Payments.** MVP uses a mock `PaymentProvider`. Swap to Moyasar or
-  HyperPay (mada + STC Pay + Apple Pay) before any real money moves.
+- **Payments.** MVP uses a mock `PaymentProvider` (`src/lib/payment.ts`,
+  moves no money). **Moyasar is the identified provider** (mada + STC Pay +
+  Apple Pay); HyperPay is the fallback. Swap in `MoyasarProvider` before any
+  real money moves. **Blocker:** requires the Saudi CR / merchant account
+  (multi-day external gate). Note the fee + refund *math* already exists in
+  `src/lib/payments-policy.ts` (see the Cancellation + Service-fee items
+  below) — only the real gateway + server-side charging is missing.
 
 - **Nafath ID verification for hosts.** `profiles.nafath_verified` ships as a
   `false` default. The post-approval profile-completion screen at
@@ -227,17 +256,27 @@ launch.
   showing a "coming soon" overlay. Does not block launch but is the path
   to expanding from hosting wedge → super-app.
 
-- **Cancellation policy.** No policy exists today. Pre-launch decision
-  needed: flexible / moderate / strict tiers per sitter (Rover model) or
-  a single platform-wide policy (simpler). Affects what we show on the
-  listing detail and what we let users do on a confirmed booking. See
-  Section 13 for the test-round-1 surfacing.
+- **Cancellation policy. — SHIPPED (math), real charging pending.** A
+  single platform-wide policy is BUILT in `src/lib/payments-policy.ts`:
+  **full refund ≥48h before start / 50% <48h / none on-or-after start**,
+  anchored to **Asia/Riyadh midnight** (UTC+3, no DST) and computed on
+  `total_charged_sar` (whole SAR via `Math.round`). The per-sitter
+  flexible/moderate/strict (Rover) model was NOT chosen — one policy for
+  everyone. **Still pending:** the tier is computed client-side today
+  (spoofable); pre-launch it must be recomputed server-side via a Postgres
+  RPC using `now()`, and it only bites once real charging exists (mock
+  provider moves no money). Unit-tested incl. the 01:30 Riyadh boundary in
+  `tests/payments-policy.test.ts`.
 
-- **Service fee model.** Decide Petbnb's cut per booking (Rover ~20%,
-  Cat in a Flat ~15%, Trusted Housesitters subscription-based). Affects
-  every displayed price across the owner feed, detail, and booking flow.
-  The mock provider currently charges 0%; pre-launch this must reflect
-  reality. See Section 13.
+- **Service fee model. — DECIDED + BUILT (math), real charging pending.**
+  Commission is LOCKED and implemented in `src/lib/payments-policy.ts`:
+  **15% host-fee** (`HOST_FEE_RATE`, deducted from total before payout) +
+  **5% owner-fee** (`OWNER_SERVICE_FEE_RATE`, added on top of total), both
+  whole-SAR via `Math.round` and snapshotted onto the booking at
+  host-accept (`owner_fee_sar` / `host_fee_sar` / `payout_sar` /
+  `total_charged_sar`). No longer "mock charges 0%" — the fee columns are
+  populated. **Still pending:** the numbers only move real money once the
+  gateway (Payments item above) is wired.
 
 - **Completed-bookings counter visible across users.**
   `countCompletedBookingsForHost()` in `src/lib/listings.ts` returns 0
@@ -282,25 +321,22 @@ launch.
   regex. False positives are the real risk; tightening too early
   frustrates legitimate conversations.
 
-- **Pre-booking inquiry path.** Messaging today (Step 9 / Round 5)
-  is BOOKING-SCOPED ONLY — `messages.booking_id` is NOT NULL since
-  migration 0001, so a thread cannot exist before the owner has
-  committed to a booking request. The trust conversation an owner
-  needs BEFORE handing their cat to a stranger has no home in the
-  product. Building this as Round 5b / Step 9.5. Design lives in
-  [`docs/round-5b-inquiry-plan.md`](./docs/round-5b-inquiry-plan.md):
-  a new `inquiries` parent table + `messages.inquiry_id` (nullable)
-  + a CHECK constraint enforcing exactly one of `booking_id` or
-  `inquiry_id` per row. RLS limits inquiry threads to the two
-  participants + active_user + admin-on-SELECT. UI adds a
-  "Message host" CTA on the listing detail, a compose surface
-  reusing the existing `MessagesSection`, and a `/inquiries` inbox
-  mirroring `/bookings`. Anti-leakage stays at the existing soft
-  nudge but flag this as the highest-priority surface for admin
-  spot-checks — pre-booking is where commission leaks. **Must
-  ship before launch** — without it the messaging product solves
-  only post-acceptance coordination, not the trust conversation
-  that should precede the booking.
+- **Pre-booking inquiry path. — ✅ SHIPPED (0040–0046).** This was the
+  Round 5b / Step 9.5 gap: messaging used to be BOOKING-SCOPED ONLY
+  (`messages.booking_id` NOT NULL since 0001), so no thread could exist
+  before an owner committed to a booking. Now built: the `inquiries`
+  parent table + nullable `messages.inquiry_id` + a CHECK enforcing
+  exactly one of `booking_id` / `inquiry_id` per row (0040), a
+  "Message host" CTA on the listing detail, and an `/inquiries` inbox.
+  Follow-on migrations completed the arc — 0043 removed the archive/close
+  path, 0044 added delete-until-read + per-thread read tracking, and 0046
+  made an inquiry the comprehensive timeline that a booking grows out of
+  (`bookings.inquiry_id`; inquiries stay `open` forever). Design trail in
+  [`docs/round-5b-inquiry-plan.md`](./docs/round-5b-inquiry-plan.md) +
+  [`docs/migration-0046-beta-thread-continuity-plan.md`](./docs/migration-0046-beta-thread-continuity-plan.md).
+  **Still pending for launch:** anti-leakage stays at the SOFT nudge
+  (see the item above) and pre-booking remains the highest-priority
+  surface for admin spot-checks — pre-booking is where commission leaks.
 
 - **DateField → RangeCalendar single-mode migration.** Today
   `src/components/DateField.tsx` (web calendar picker + native
@@ -410,6 +446,21 @@ in the feed. Verification is **not** the visibility gate — that's
 
 ## 13. Known gaps from test round 1 (2026-05-27)
 
+> **Current state as of migration 0046 (2026-06-30) — live baseline.**
+> Apply state is tracked in [`docs/migration-apply-log.md`](./docs/migration-apply-log.md)
+> (confirmed applied through **0046**). Since this section's early rounds:
+> Steps 1–10 core flows, condition reports (Step 6), listings status +
+> two-copy edit (Step 8), the host-signup funnel (Step 4.6 / 0039),
+> two-way reviews + written-review surfacing (R2C6 + 2026-07-02), and the
+> full pre-booking → booking messaging arc (inquiries 0040, per-host
+> service offers 0041–0042, archive removal 0043, delete-until-read +
+> read-tracking 0044, role-aware listing access 0045, β thread continuity
+> 0046) are all SHIPPED. Commission (15%+5%) and the single-tier
+> cancellation policy are DECIDED + built as pure math (§11) — only real
+> charging is pending. Reading below: treat the round-by-round entries as
+> the historical decision trail; where an item says "deferred / to
+> decide" cross-check §11 and this note before assuming it's still open.
+
 Surfaced when the founder first browsed the Step 5 owner feed with a
 non-developer eye. Items split into "fixed in Step 5.5" and "deferred" —
 each deferred item names where it lands and why it's safe to skip for now.
@@ -441,12 +492,12 @@ each deferred item names where it lands and why it's safe to skip for now.
 | # | Gap | Lands in | Why deferred |
 |---|-----|----------|--------------|
 | a | Booking type variants (overnight / day-care / hourly). `bookings` needs `booking_type` enum + start_time/end_time; per-listing pricing needs hourly_rate/daycare_rate. | Step 5.6 (day-care); hourly indefinite | MVP target is overnight cat boarding; day-care is common in KSA but adds significant schema/UI scope. Hourly sitting is rare for cats. |
-| b | Cancellation policy — flexible/moderate/strict per sitter vs single platform-wide. | Section 11 (launch-blocker) | Business decision required first; both models are easy to implement once chosen. |
+| b | Cancellation policy — flexible/moderate/strict per sitter vs single platform-wide. | ✅ DECIDED + built (math) | Single platform-wide policy chosen: full ≥48h / 50% <48h / none on-or-after, Riyadh-midnight anchored, in `src/lib/payments-policy.ts`. Only server-side recompute + real charging pending — see §11. |
 | c | Sitter availability calendar — per-listing available/blocked days. | Step 7 | Belongs in the host flow; today every listing is bookable any time. |
 | d | Daily photo updates during stay. | Step 7 | Lives where host listing creation lives — host needs to be set up before they can post updates. |
 | e | Messaging (owner ↔ sitter). | Step 9 | Already in build order. Critical pre-booking comms; nobody books without messaging first. |
 | f | Reviews / two-way ratings after completed stay. | Step 10 | Already in build order. |
-| g | Service fee — Petbnb's cut per booking. | Section 11 (launch-blocker) | Affects every displayed price; needs founder decision before any UI work. |
+| g | Service fee — Petbnb's cut per booking. | ✅ DECIDED + built (math) | Locked at 15% host + 5% owner, in `src/lib/payments-policy.ts`, snapshotted onto bookings at accept. Only real charging pending — see §11. |
 | h | Insurance partnership. | Section 11 | Need a real Saudi insurance partner before the `تأمين` addon can sell. |
 | i | Pickup / dropoff coordination — address on profile + drop-off method per booking. | Step 8 expansion | Folds with profile/settings expansion (Step 8 renamed to "Bookings list + status tracking + profile/settings expansion"). |
 | j | Emergency vet contact — preferred vet + emergency phone on profile. | Step 8 expansion | Same as above. |
