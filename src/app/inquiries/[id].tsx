@@ -178,7 +178,6 @@ export default function InquiryThreadScreen() {
         <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error ?? t('inquiry.not_found')}</Text>
-          {/* @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes. */}
           <Pressable onPress={() => router.replace('/inquiries')} style={styles.backButton}>
             <Text style={styles.backText}>{t('inquiry.back_to_inbox')}</Text>
           </Pressable>
@@ -213,7 +212,6 @@ export default function InquiryThreadScreen() {
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <ScrollView contentContainerStyle={styles.container}>
         {/* Back-to-inbox link */}
-        {/* @ts-expect-error — Expo Router file-path vs runtime URL mismatch on index routes. */}
         <Pressable onPress={() => router.replace('/inquiries')} style={styles.backLink}>
           <Text style={styles.backText}>{t('inquiry.back_to_inbox')}</Text>
         </Pressable>
