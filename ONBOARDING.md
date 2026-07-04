@@ -7,11 +7,17 @@
 > "why didn't they just…" questions get answered. Round-by-round decision
 > trails live in [`docs/batch-decisions.md`](./docs/batch-decisions.md).
 
-Last refresh: **2026-07-02** (after surfacing written host reviews on the
-listing-detail screen — app-only, no schema/RLS/lib changes — see the
-"Review surfacing" entry in CLAUDE.md §13). Prior major landmark: the
-host-signup funnel — migration 0039 + the persona-separation refactor —
-see §7 "Step 4.6 — host signup funnel" and CLAUDE.md §12.
+Last refresh: **2026-07-02** — reconciled to the live baseline at
+**migration 0046** (apply state confirmed in
+[`docs/migration-apply-log.md`](./docs/migration-apply-log.md)). Since
+the last major refresh (2026-06-17, host-signup funnel / 0039) these
+landed: the full pre-booking → booking **messaging arc** (inquiries
+0040, per-host service offers 0041–0042, archive removal 0043,
+delete-until-read + read-tracking 0044, role-aware listing access 0045,
+β thread continuity 0046), **two-way reviews** + written-review
+surfacing on the listing detail (2026-07-02), and a **CI fix** (removed
+stale `@ts-expect-error` directives; main is green again). CLAUDE.md was
+reconciled to this same 0046 baseline in the same pass — read it first.
 
 ---
 
@@ -20,13 +26,20 @@ see §7 "Step 4.6 — host signup funnel" and CLAUDE.md §12.
 - **What:** Petbnb is a Saudi Arabia–first, Arabic-language, RTL pet-hosting
   marketplace MVP (Airbnb-for-cats, expanding to dogs in Step 5.7).
 
-- **Stage:** Steps 1 → 8 + Phase 0a-c + Milestones A + B + Stretches S1 + S2
-  + Round 1 audit response + Round 2 behavior batch + **Step 4.6 host
-  signup funnel (0039)** all SHIPPED. 39 migrations applied through
-  `0039_host_application_schema.sql`. 35 vitest unit tests over the
-  pure money / pricing / availability / vaccination libraries gate every
-  push via GitHub Actions (`.github/workflows/ci.yml`). Step 9 (in-app
-  messaging) is the next planned build target.
+- **Stage:** Steps 1 → 10 core flows SHIPPED, plus Phase 0a-c +
+  Milestones A + B + Stretches S1 + S2 + Round 1 audit + Round 2 behavior
+  batch + **Step 4.6 host signup funnel (0039)** + the **Round 5b/9.5
+  pre-booking messaging arc (0040–0046)** + **two-way reviews** (R2C6)
+  with written-review surfacing on the listing detail. **46 migrations
+  applied through `0046_beta_thread_continuity.sql`** (apply state in
+  `docs/migration-apply-log.md`). **55 vitest unit tests across 5 files**
+  (payments-policy, pricing, availability/range-overlap, vaccination,
+  format) gate every push via GitHub Actions (`.github/workflows/ci.yml`);
+  main is green. What's left is **pre-launch hardening**, not new core
+  build — swap email→phone OTP, wire the real payment gateway (Moyasar;
+  the fee + refund *math* is already built in `src/lib/payments-policy.ts`),
+  Nafath, push notifications. See CLAUDE.md §11 for the full pre-launch
+  list.
 
 - **Strategic context the doc-reading Claude should know:**
   - **Saudi pet market is growing fast** — Saudization, rising disposable
@@ -232,14 +245,14 @@ defaults to `'cat'` since migration 0001).
 | Auth (pre-launch) | Saudi phone OTP via Unifonic/Taqnyat (Send SMS Hook + Edge Function). `src/lib/phone.ts` is pre-staged with the E.164 normalizer. |
 | Payments | Mocked. `PaymentProvider` interface in `src/lib/payment.ts` → `MockPaymentProvider` charges 0%. Fee policy + refund math live in pure `src/lib/payments-policy.ts` (whole-SAR, Riyadh-anchored — Round 1 R1C1). Pre-launch swap to Moyasar/HyperPay (CLAUDE.md §11). |
 | State | React Context (auth/session, locale, host-notifications) + Supabase JS direct (server state — no TanStack yet) |
-| i18n | `src/lib/i18n.tsx` (Context-aware) + `src/locales/(ar|en).json` (524 keys at parity, enforced by `scripts/check-i18n-parity.mjs` in CI). Plural-aware `t()` via `Intl.PluralRules`. |
+| i18n | `src/lib/i18n.tsx` (Context-aware) + `src/locales/(ar|en).json` (841 keys at parity, enforced by `scripts/check-i18n-parity.mjs` in CI — unreferenced keys are tolerated). Plural-aware `t()` via `Intl.PluralRules`. |
 | Styling | Single theme file `src/theme/tokens.ts`. RTL default. |
 | Location | `src/lib/geo.ts` wraps `navigator.geolocation` (web) and `expo-location` (native). |
 | Image picker | `expo-image-picker` (native) + `<input type="file">` (web), wrapped in `src/lib/pets.ts` `pickPetPhoto()` and `pickPhotosMulti()`. |
 | Date input | Shared `src/components/DateField.tsx` — HTML5 `<input type="date">` on web (calendar picker), `TextInput` fallback on native. Used by booking request, pet vaccination, host availability (R1C3 standardization). Real native modal picker still TODO. |
 | Confirm dialogs | `src/lib/confirm.ts` — single `confirmDialog(message): Promise<boolean>` used by all 14 destructive-action sites. Web wraps `window.confirm`; native uses `Alert.alert` with two buttons. Two `confirmLeaveIfDirty` helpers remain sync because they gate sync nav `onPress` — separate follow-up. |
 | Console logging | `src/lib/log.ts` — `logWarn`/`logInfo`/`logError`. `__DEV__`-gated so production builds stay silent. 76 raw `console.*` sites swapped in R1C5. |
-| Tests | Vitest (`tests/*.test.ts`). 35 cases across 4 files: payments-policy, pricing, availability/range-overlap, vaccination recency. Pure-lib scope only — component tests deferred. |
+| Tests | Vitest (`tests/*.test.ts`). 55 cases across 5 files: payments-policy, pricing, availability/range-overlap, vaccination recency, format (pins the Latin-digit decision). Pure-lib scope only — component tests deferred. |
 | CI | GitHub Actions (`.github/workflows/ci.yml`) on every push to `main` and every PR. Three steps: i18n parity → `tsc --noEmit` → vitest. All must be green. |
 | Repository | **PUBLIC** at `github.com/nuzul-saudi/petbnb`. Auth via Git Credential Manager (Windows Credential Manager backs the token). `gh` CLI is NOT used (McAfee TLS-inspection breaks its Go HTTPS stack — see §10). |
 
@@ -308,7 +321,10 @@ Petbnb/
 │   │   │   └── bookings.tsx    ← Read-only bookings overview
 │   │   ├── bookings/
 │   │   │   ├── index.tsx       ← "My Bookings" list. Role-driven mode (owner vs host views). R2C7 unread dot.
-│   │   │   └── [id].tsx        ← Booking detail. Role-driven controls (was persona-gated; 0039 simplified). ReviewCard mount (R2C6).
+│   │   │   └── [id].tsx        ← Booking detail. Role-driven controls (was persona-gated; 0039 simplified). ReviewCard mount (R2C6). MessagesSection mount (booking-scoped thread; β timeline pulls in the origin inquiry's messages, 0046).
+│   │   ├── inquiries/          ← Pre-booking inquiry threads (0040–0046)
+│   │   │   ├── index.tsx       ← "/inquiries" inbox — the owner's open trust threads, mirroring /bookings.
+│   │   │   └── [id].tsx        ← Inquiry thread = comprehensive timeline (0046): pre-booking messages + any booking that grew out of it, with a smart compose router + per-message delete-until-read (0044).
 │   │   ├── listings/
 │   │   │   ├── new.tsx         ← Host: create a listing. Pre-condition redirects (0039): non-host → /, no application → /become-host/application, pending → /profile, approved+incomplete → /become-host/complete-profile.
 │   │   │   └── [id]/
@@ -330,12 +346,15 @@ Petbnb/
 │   │   ├── AppHeader.tsx       ← Top-nav bar. Become-a-Host CTA for guests + owners. Inbox badge for hosts (0039 — replaced the persona pill).
 │   │   ├── Button.tsx          ← 3 variants × 2 sizes. The CTA component since the R1C5 audit migration.
 │   │   ├── DateField.tsx       ← Web calendar picker + native TextInput fallback. Used by booking request, pet vacc, availability (R1C3).
-│   │   └── bookings/           ← Booking-detail sub-components
-│   │       ├── HostActions.tsx              ← Accept/Decline/Start/Complete buttons
-│   │       ├── ConditionReportsSection.tsx  ← Heading + saved check-in + file button + compose form
-│   │       ├── DailyUpdatesSection.tsx      ← Heading + updates list (inline-edit fork) + compose form
-│   │       ├── CheckOutSection.tsx          ← Check-out report file form + Complete-stay button (Phase 6.4 finish)
-│   │       └── ReviewCard.tsx               ← Two-way reviews — compose mode + read-only mode (R2C6)
+│   │   ├── bookings/           ← Booking-detail sub-components
+│   │   │   ├── HostActions.tsx              ← Accept/Decline/Start/Complete buttons
+│   │   │   ├── ConditionReportsSection.tsx  ← Heading + saved check-in + file button + compose form
+│   │   │   ├── DailyUpdatesSection.tsx      ← Heading + updates list (inline-edit fork) + compose form
+│   │   │   ├── CheckOutSection.tsx          ← Check-out report file form + Complete-stay button (Phase 6.4 finish)
+│   │   │   ├── MessagesSection.tsx          ← Chat thread — shared by booking detail + inquiry thread (0040–0046). Compose + delete-until-read + contact-info soft nudge.
+│   │   │   └── ReviewCard.tsx               ← Two-way reviews — compose mode + read-only mode (R2C6)
+│   │   └── messaging/          ← Shared chat primitives
+│   │       └── MessageBubble.tsx            ← One message row — sender-aware alignment, Riyadh timestamp, soft-deleted placeholder.
 │   │
 │   ├── hooks/                  ← Custom React hooks
 │   │   ├── useBooking.ts            ← getBooking + refetch (with onLoadError callback)
@@ -371,6 +390,8 @@ Petbnb/
 │   │   ├── range-overlap.ts        ← Pure rangesOverlap helper — the math is unit-tested in availability.test.ts (R1C6)
 │   │   ├── vaccination.ts          ← classifyVaccinationDate + worstVaccinationStatus. 365-day boundary (R1C2).
 │   │   ├── reviews.ts              ← createReview + findMyReview (R2C6) + listReviewsForHost (host's reviews, newest-first, limit 10; anon-readable via reviews_select_public). NOTE: the listReviewsForHost JSDoc's "guests cannot read" line is STALE — 0030 kept anon read.
+│   │   ├── inquiries.ts            ← Pre-booking threads (0040). openInquiry (fetch-or-create via the (listing, starter) partial-unique index, 23505 race recovery), list/get helpers, mark_thread_read wrapper.
+│   │   ├── messages.ts             ← Send/list messages for either thread kind (booking_id | inquiry_id). Soft-delete (deleted_at) + containsContactInfo() anti-leakage soft nudge (0044).
 │   │   ├── last-seen-storage.ts    ← AsyncStorage per-user-per-booking last-seen stamps (R2C7 unread dot)
 │   │   └── admin.ts                ← Admin queries: getAdminListingReview, promoteListingDraft, etc.
 │   │
@@ -436,7 +457,14 @@ Petbnb/
         ├── 0036_available_listings_rls_parity.sql ← Adds the host-visibility EXISTS predicate inside the RPC to mirror the RLS reach.
         ├── 0037_anon_profiles_visibility.sql ← Bug fix: guest feed was empty. Adds an anon SELECT policy on profiles + narrows anon column-level GRANT to 6 display fields (id, full_name, full_name_en, avatar_url, is_verified, is_suspended). Phone/email/nafath stay private.
         ├── 0038_is_admin_security_definer.sql ← Turns is_admin() + is_active_user() into SECURITY DEFINER with pinned search_path = public, so they bypass the narrowed anon column grants from 0037.
-        └── 0039_host_application_schema.sql ← Step 4.6 host signup funnel. Drops 'both' from profiles.role CHECK + persona column. Adds 12 host_application_* columns (status, submitted_at, reviewed_at, reviewer_id, admin_notes, gender, city, neighborhood, pet_type_accepted, experience_years, bio_ar, profile_complete) + partial index on status='pending'. Tightens listings_insert_host RLS to require role='host' AND host_application_status='approved' AND host_profile_complete=true.
+        ├── 0039_host_application_schema.sql ← Step 4.6 host signup funnel. Drops 'both' from profiles.role CHECK + persona column. Adds 12 host_application_* columns (status, submitted_at, reviewed_at, reviewer_id, admin_notes, gender, city, neighborhood, pet_type_accepted, experience_years, bio_ar, profile_complete) + partial index on status='pending'. Tightens listings_insert_host RLS to require role='host' AND host_application_status='approved' AND host_profile_complete=true.
+        ├── 0040_inquiry_threads.sql       ← Round 5b — pre-booking inquiries. New inquiries parent table (listing_id, starter_id, host_id, status enum open/converted/closed) + nullable messages.inquiry_id + CHECK: a message references exactly one of booking_id / inquiry_id. Partial-unique index (listing_id, starter_id) WHERE status='open' = one open thread per pair (fetch-or-create). RLS scopes threads + inquiry-messages to the two participants + is_active_user + admin.
+        ├── 0041_per_host_service_offers.sql ← listings.offers_vet / offers_insurance / offers_transport booleans (per-host service flags beside the existing offers_grooming).
+        ├── 0042_promote_addon_flags.sql   ← Extends the promote_listing_draft RPC to copy the four addon flags (grooming/vet/insurance/transport) alongside the prior 0023/0026/0034 fields.
+        ├── 0043_archive_removal.sql       ← Removes the inquiry archive/close path. guard_inquiry_update now blocks new 'closed' transitions; messages_insert_participants inquiry branch relaxed from status='open' to status<>'converted'. Enum kept intact; existing 'closed' rows stay unreachable. App-layer Close button + closeInquiry() removed.
+        ├── 0044_message_deletion_and_read_tracking.sql ← Delete-until-read. messages.deleted_at (soft-delete) + body made nullable (nulled on delete; messages_body_presence CHECK guards live rows). Per-thread read tracking: bookings.owner/host_last_opened_at + inquiries.starter/host_last_opened_at (forward-only). mark_thread_read(text,uuid) SECURITY DEFINER RPC. Three guard triggers (message immutability, forward-only read stamps).
+        ├── 0045_role_aware_listing_access.sql ← is_host() SECURITY DEFINER helper. Sweeps 6 visibility sites + 15 editability policies to require host.role='host' (a demoted host's listings drop from the feed). listings_insert_host (0039) unchanged. Pure role-flip — no mutation of is_verified / host_application_status.
+        └── 0046_beta_thread_continuity.sql ← β model: inquiry = comprehensive timeline. bookings.inquiry_id (nullable fk inquiries, ON DELETE SET NULL) + status-transition timestamps accepted/declined/active/completed/disputed_at stamped by guard_booking_status_stamp (first-time-wins; cancelled_at excluded — owned by 0028). ZERO new RLS (purely additive). Inquiries stay 'open' forever (0043 removed close, 0046 never adds convert) — one perpetual conversation per (listing, starter).
 ```
 
 **Booking screen architecture:**
@@ -478,7 +506,8 @@ flagged `// shared with parent`). Tidy-up deferred.
 
 ## 5. The data model
 
-**15 tables** in `public` (was 14; added `user_favorites` in 0033). All
+**16 tables** in `public` (was 14 → 15 with `user_favorites` in 0033 →
+16 with `inquiries` in 0040). All
 with RLS enabled. Migration history in `supabase/migrations/`; type
 mirror in `src/types/database.ts`.
 
@@ -496,7 +525,8 @@ mirror in `src/types/database.ts`.
 | `booking_addons` | Multi-select services per booking. | `pet_id` nullable. Null = booking-wide (transport). Non-null = per-pet (grooming/vet/insurance). |
 | `condition_reports` | Check-in / check-out evidence. | **Immutable** by RLS. Photos in private `condition-report-photos` bucket. UNIQUE(`booking_id`, `phase`) backstops at-most-one-of-each. Step 6 ships the UI; Phase 6.4 + the CheckOutSection completed it. |
 | `daily_updates` | Host posts during stay. | Immutable. Gated to `booking.status='active'`. Photos in private `daily-update-media` bucket. Step 7 ships the UI; Phase 6.3 added inline edit. |
-| `messages` | Booking-scoped chat. | Immutable. **Step 9 will build the UI** (not yet started). |
+| `messages` | Two-thread chat: booking-scoped (`booking_id`) OR pre-booking inquiry (`inquiry_id`); a CHECK enforces exactly one. | **SHIPPED (0040–0046).** `body` nullable since 0044 (nulled on soft-delete; `deleted_at` marks it, then the row is immutable). Delete-until-read: a sender can soft-delete only until the other party opens the thread (`mark_thread_read` RPC + `*_last_opened_at` columns). Booking messages carry into the origin inquiry thread as one timeline (0046). |
+| `inquiries` | **0040 — pre-booking trust threads.** Parent of inquiry-scoped messages; `(listing_id, starter_id, host_id, status)`. | Fetch-or-create one `open` thread per (listing, starter) via the partial-unique index. Status enum is `open/converted/closed` but the shipped reality is **`open` forever** — 0043 removed close, 0046 never adds convert. Read-tracking `starter/host_last_opened_at` (0044). RLS: two participants + `is_active_user` + admin. |
 | `reviews` | Two-way post-stay reviews. | UNIQUE(`booking_id`, `rater_id`). **Live as of R2C6.** INSERT requires `booking.status='completed'` + role-symmetric pair (owner↔host). SELECT is `reviews_select_public` (anon + authenticated — founder Option A). No UPDATE/DELETE — immutable, mirrors condition_reports posture. |
 | `products` | Marketplace display only. | Read-only for clients. Admin manages via Supabase dashboard. |
 
@@ -1041,19 +1071,23 @@ came back on 8082. Documented in §10 below.
 
 ## 8. What's next
 
-The build is in a clean stopping state — Rounds 1 + 2 closed, all
-migrations applied, 30 migrations total, 35 vitest tests, CI green.
+The core build (Steps 1 → 10) is **complete**. As of migration 0046:
+46 migrations applied, 55 vitest tests, CI green on `main`. The remaining
+work is **pre-launch hardening** (below), not new core features.
 
-### Next build steps (per CLAUDE.md §3 build order)
+### Core build steps — all SHIPPED
 
-- **Step 9 — In-app messaging (owner ↔ host).** Schema already exists
-  (`messages` table from 0001, immutable per RLS posture). UI is the
-  remaining work. Critical pre-booking comms — nobody books without
-  messaging first.
-- **Step 10 — Reviews polish.** R2C6 shipped the review-create flow
-  and the listing-card aggregate display. Polish opportunities: text
-  visibility on listing detail (not just on card), filter/sort by
-  rating (S2 partial), badge rendering on host home self-view.
+- **Step 9 — In-app messaging (owner ↔ host).** ✅ Shipped as the
+  0040–0046 arc: booking-scoped threads PLUS pre-booking `inquiries`
+  ("Message host" before committing), an `/inquiries` inbox,
+  delete-until-read (0044), and the β model where a booking's messages
+  carry back into its origin inquiry as one comprehensive timeline
+  (0046). Anti-leakage stays at the SOFT nudge (`containsContactInfo`) —
+  pre-booking is the highest-priority admin spot-check surface.
+- **Step 10 — Reviews.** ✅ Two-way create flow (R2C6) + listing-card
+  aggregate + **written-review surfacing on the listing detail**
+  (stars + `text_ar` + rater + date, 2026-07-02). What stays out is any
+  *ratings algorithm* (auto weighting/promotion), not reviews themselves.
 
 ### Pre-launch milestones (CLAUDE.md §11)
 
@@ -1163,7 +1197,7 @@ dashboard SQL Editor.
 ### i18n
 
 Translations live in `src/locales/ar.json` and `src/locales/en.json`
-(524 keys at parity, enforced by `scripts/check-i18n-parity.mjs` in
+(841 keys at parity, enforced by `scripts/check-i18n-parity.mjs` in
 CI). Loader at `src/lib/i18n.tsx` provides a `LocaleProvider` React
 Context plus a module-scope `t()` for non-React callers.
 
@@ -1481,9 +1515,9 @@ push to `main` and every PR via `.github/workflows/ci.yml`.
 Individual pieces:
 
 ```powershell
-npm run check:i18n   # i18n parity only (524 keys, 412 referenced)
+npm run check:i18n   # i18n parity only (841 keys, 649 referenced)
 npx tsc --noEmit     # Type-check only
-npm test             # Vitest only (35 cases)
+npm test             # Vitest only (55 cases)
 npm run test:watch   # Watch mode for dev
 ```
 
