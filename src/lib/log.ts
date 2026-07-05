@@ -12,24 +12,38 @@
 //   logInfo('[tag]', payload)
 //   logError('[tag]', err)
 //
-// Production builds (`__DEV__ === false`) become no-ops.
+// In DEV these print to the console. In production (`__DEV__ === false`)
+// logWarn/logInfo stay silent, but logError now forwards to Sentry
+// (Phase 1) — which itself no-ops unless a DSN is configured. This is the
+// seam that turned the old "production is a black box" logger into real
+// error visibility without changing a single callsite.
 
 /* eslint-disable no-console */
 
+import { captureError } from '@/lib/sentry';
+
+const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+
 export function logWarn(...args: unknown[]): void {
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  if (isDev) {
     console.warn(...args);
   }
 }
 
 export function logInfo(...args: unknown[]): void {
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  if (isDev) {
     console.info(...args);
   }
 }
 
 export function logError(...args: unknown[]): void {
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  if (isDev) {
     console.error(...args);
+    return;
   }
+  // Production: forward the underlying error to Sentry. Callsites use the
+  // shape logError('[tag]', err), so prefer the first Error argument;
+  // fall back to a joined string of the args so a message still lands.
+  const err = args.find((a) => a instanceof Error);
+  captureError(err ?? args.map((a) => String(a)).join(' '));
 }
