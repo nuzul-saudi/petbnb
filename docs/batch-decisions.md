@@ -268,3 +268,53 @@ cat-only to cat + dog.
 ### Migrations written (Round 12)
 
 - `0034_listings_accepts_species.sql` — listings + listing_drafts columns, check constraints, GIN index on listings.accepts_species, `CREATE OR REPLACE promote_listing_draft` to include the new column in the field-draft → live copy.
+
+---
+
+## Phase 1 (2026-07-05) — Observability (Sentry + PostHog)
+
+First batch of the Pre-Pilot Hardening plan (`docs/systemupdateplan`). Goal:
+stop flying blind before real users touch the product. No migration.
+
+### Decisions
+
+- **Sentry SDK: `@sentry/browser`, NOT `@sentry/react-native`** (deviation
+  from the plan's literal wording, per engineering judgement + batch rule 4).
+  Rationale: the pilot deploys to Vercel (web) and "native app builds" is an
+  explicit plan non-goal, so the native wrapper's Metro/config-plugin weight
+  buys nothing and its web bundle can't be verified in the headless CC env.
+  `@sentry/browser` is the purpose-built web SDK. Native error tracking is a
+  post-pilot add when native builds happen.
+- **Lazy, guarded imports for both SDKs.** `initSentry()` / `initAnalytics()`
+  dynamically `import()` the SDK only when the DSN/key is present AND on web.
+  With no key configured (today's state until Omar sets them), the SDKs are
+  NEVER imported — a no-key build carries zero observability runtime and can't
+  be destabilized by them. tsc still type-checks the dynamic-import targets.
+- **`logError` is the Sentry seam.** Extended to forward the underlying Error
+  to Sentry in production (`!__DEV__`); DEV still logs to console. Zero
+  callsite changes — every existing `logError('[tag]', err)` across the app
+  now has error visibility for free.
+- **Closed `AnalyticsEvent` union + IDs-only props.** `track()` accepts only
+  the 8 funnel events the plan named; event props are scalars/IDs only — no
+  names, emails, phones, or free text. Instrumented at the **lib layer**
+  (single choke point per event) so every caller is covered once.
+- **Identity via `identifyUser(user.id)` on auth.** Wired in the auth session
+  lifecycle (identify on session, reset on sign-out). User id is an id, not
+  PII, consistent with the ids-only rule.
+- **`.env.example` added** documenting all env vars (Supabase + the three new
+  observability keys) so the Omar checkpoint is unambiguous.
+
+### ⛔ Omar checkpoint (external, before acceptance can be verified)
+
+1. Create a **Sentry** project (Platform: Browser/JavaScript) → copy its DSN.
+2. Create a **PostHog** project → copy the Project API Key (+ note the API host).
+3. Put `SENTRY_DSN`, `POSTHOG_KEY`, `POSTHOG_HOST` in local `.env` AND as Vercel
+   project env vars (Production + Preview). Redeploy.
+4. Smoke: trigger a forced error on the deployed build → confirm it lands in
+   Sentry; walk the funnel (view a listing → open inquiry → send message →
+   request/accept/complete a booking → leave a review) → confirm the events in
+   PostHog.
+
+### Migrations written (Phase 1)
+
+- None. Phase 1 is code-only.
