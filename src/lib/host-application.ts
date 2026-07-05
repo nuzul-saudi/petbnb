@@ -14,6 +14,7 @@
 // markHostProfileComplete() — called by the host after the
 //   post-approval profile-completion step.
 
+import { track } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import type { Enums, Tables } from '@/types/database';
 
@@ -90,6 +91,7 @@ export async function submitHostApplication(
       { onConflict: 'id' },
     );
   if (error) throw error;
+  track('host_application_submitted', { userId });
 }
 
 /**

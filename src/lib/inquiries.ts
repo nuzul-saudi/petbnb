@@ -34,6 +34,7 @@
 // surface (CLAUDE.md §11), so the regex MUST run before the first
 // message reaches the host.
 
+import { track } from '@/lib/analytics';
 import { logWarn } from '@/lib/log';
 import { containsContactInfo } from '@/lib/messages';
 import type { Message, MessagePreview } from '@/lib/messages';
@@ -143,7 +144,10 @@ export async function openInquiry(
   // this pair" the only thing the index can resolve, so this is
   // the only place a duplicate-tap collision can happen.
   const existing = await findOpenInquiry(listingId, starterId);
-  if (existing) return existing;
+  if (existing) {
+    track('inquiry_opened', { inquiryId: existing.id, listingId });
+    return existing;
+  }
 
   // Step 2 — INSERT. status defaults to 'open' (table default), but
   // we set it explicitly so the call site reads unambiguously.
@@ -174,7 +178,9 @@ export async function openInquiry(
     throw error;
   }
   if (!data) throw new Error('Failed to open inquiry');
-  return data as Inquiry;
+  const created = data as Inquiry;
+  track('inquiry_opened', { inquiryId: created.id, listingId });
+  return created;
 }
 
 // ---------------------------------------------------------------------------
@@ -344,6 +350,7 @@ export async function sendInquiryMessage(
     )
     .single();
   if (error || !data) throw error ?? new Error('Failed to send message');
+  track('message_sent', { thread: 'inquiry', inquiryId });
   return data as unknown as Message;
 }
 

@@ -15,6 +15,7 @@
 // useFocusEffect refetch as the MVP behavior — the trade-off is
 // documented in batch-decisions.
 
+import { track } from '@/lib/analytics';
 import { logWarn } from '@/lib/log';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
@@ -91,6 +92,7 @@ export async function sendMessage(
     )
     .single();
   if (error || !data) throw error ?? new Error('Failed to send message');
+  track('message_sent', { thread: 'booking', bookingId });
   return data as unknown as Message;
 }
 

@@ -15,6 +15,7 @@
 //     by design — same posture as condition_reports). A future
 //     moderation milestone can introduce admin-only updates.
 
+import { track } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
 
@@ -55,6 +56,7 @@ export async function createReview(input: CreateReviewInput): Promise<Review> {
     .select()
     .single();
   if (error || !data) throw error ?? new Error('Failed to create review');
+  track('review_submitted', { bookingId: input.bookingId, stars: input.stars });
   return data;
 }
 

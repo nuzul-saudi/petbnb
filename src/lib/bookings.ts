@@ -8,6 +8,7 @@
 // working. A follow-up migration post-5.6 will drop pet_id once no
 // callers remain.
 
+import { track } from '@/lib/analytics';
 import {
   computeCancellationRefund,
   snapshotFees,
@@ -152,6 +153,10 @@ export async function createBookingRequest(
     }
   }
 
+  track('booking_requested', {
+    bookingId: booking.id,
+    listingId: booking.listing_id,
+  });
   return booking;
 }
 
@@ -888,6 +893,7 @@ export async function acceptBookingAsHost(
   if (error || !data) {
     throw error ?? new Error('Failed to accept booking');
   }
+  track('booking_accepted', { bookingId: data.id, listingId: data.listing_id });
   return data;
 }
 
@@ -923,6 +929,10 @@ export async function completeBookingAsHost(
   if (error || !data) {
     throw error ?? new Error('Failed to complete booking');
   }
+  track('booking_completed', {
+    bookingId: data.id,
+    listingId: data.listing_id,
+  });
   return data;
 }
 

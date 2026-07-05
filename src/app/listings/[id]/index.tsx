@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
 import { PhotoMosaic } from '@/components/PhotoMosaic';
 import { SearchWhenModal } from '@/components/SearchWhenModal';
+import { track } from '@/lib/analytics';
 import { findCity, findDistrict } from '@/lib/cities';
 import { formatDate } from '@/lib/date';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
@@ -129,6 +130,7 @@ export default function ListingDetailScreen() {
       .then((data) => {
         if (cancelled) return;
         setListing(data);
+        if (data) track('listing_viewed', { listingId: data.id });
       })
       .catch((e: unknown) => {
         if (cancelled) return;
