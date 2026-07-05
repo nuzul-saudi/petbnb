@@ -38,6 +38,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 
+import { identifyUser, resetAnalytics } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
 
@@ -89,6 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setSession(data.session);
       if (data.session?.user) {
+        // Analytics identity (Phase 1) — user id only, no PII.
+        identifyUser(data.session.user.id);
         await fetchProfile(data.session.user.id);
       }
       setInitializing(false);
@@ -99,8 +102,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       if (newSession?.user) {
+        identifyUser(newSession.user.id);
         fetchProfile(newSession.user.id);
       } else {
+        resetAnalytics();
         setProfile(null);
       }
     });

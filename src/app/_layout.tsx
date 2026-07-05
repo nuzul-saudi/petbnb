@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/lib/auth';
 import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
 import { HostNotificationsProvider } from '@/lib/host-notifications';
+import { initAnalytics } from '@/lib/analytics';
 import { initSentry } from '@/lib/sentry';
 import { useTheme } from '@/theme/theme';
 
@@ -37,11 +38,12 @@ function configureRTL(locale: Locale) {
 }
 
 export default function RootLayout() {
-  // Phase 1 observability — initialize error tracking once, client-side.
-  // No-ops unless a Sentry DSN is configured (and only on web). Kept in an
-  // effect so it never runs during static HTML generation.
+  // Phase 1 observability — initialize error tracking + analytics once,
+  // client-side. Both no-op unless their key/DSN is configured (and only
+  // on web). Kept in an effect so neither runs during static HTML gen.
   useEffect(() => {
     initSentry();
+    initAnalytics();
   }, []);
 
   // Kick off font loading but never gate render on it. System fonts show
