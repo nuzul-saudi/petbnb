@@ -1,5 +1,6 @@
 import { logWarn } from '@/lib/log';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { track } from '@/lib/analytics';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -459,6 +460,35 @@ function OwnerFeedHome() {
   // 2 rows. Filter STATE is untouched — only the layout/visibility.
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+
+  // Phase 1.5 — feed_filtered analytics. One event per filter/sort
+  // change with the full filter snapshot (scalars only, no PII). The
+  // ref skips the initial mount so default state isn't logged as a
+  // "filtering" action.
+  const feedFilterFiredRef = useRef(false);
+  useEffect(() => {
+    if (!feedFilterFiredRef.current) {
+      feedFilterFiredRef.current = true;
+      return;
+    }
+    track('feed_filtered', {
+      city,
+      femaleOnly,
+      groomingOnly,
+      noResidentPets: noResidentPetsOnly,
+      species: speciesFilter ?? 'all',
+      priceBand: priceBand ?? 'all',
+      sort: sortBy,
+    });
+  }, [
+    city,
+    femaleOnly,
+    groomingOnly,
+    noResidentPetsOnly,
+    speciesFilter,
+    priceBand,
+    sortBy,
+  ]);
 
   // Move 4 (2026-06-13) — search-as-hero state. Where (district —
   // city already lives above) + When (start/end dates) + Which pet

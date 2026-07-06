@@ -9,6 +9,7 @@ import {
   type Href,
 } from 'expo-router';
 
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -68,6 +69,10 @@ export default function SignInScreen() {
         options: { shouldCreateUser: true },
       });
       if (e) throw e;
+      // Phase 1.5 — auth-funnel entry (OTP sent). Includes returning
+      // OTP sign-ins; pair with signup_completed (first-time-only) in
+      // funnel insights. No email in props (PII rule).
+      track('signup_started', { flow: isHostFlow ? 'host' : 'owner' });
       router.push({
         pathname: '/verify',
         params: {

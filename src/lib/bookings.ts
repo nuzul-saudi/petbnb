@@ -733,7 +733,7 @@ export async function cancelBookingAsOwner(
   // (CLAUDE.md §11) the refund tier MUST be computed server-side
   // via an RPC using Postgres `now()`. Do NOT trust this value past
   // the mock-payments milestone.
-  const { refundSAR } = computeCancellationRefund(
+  const { tier, refundSAR } = computeCancellationRefund(
     charged,
     current.start_date,
     new Date().toISOString(),
@@ -751,6 +751,11 @@ export async function cancelBookingAsOwner(
     .select()
     .single();
   if (error || !data) throw error ?? new Error('Failed to cancel booking');
+  track('booking_cancelled', {
+    bookingId: data.id,
+    listingId: data.listing_id,
+    refundTier: tier,
+  });
   return data;
 }
 
@@ -900,7 +905,9 @@ export async function acceptBookingAsHost(
 export async function declineBookingAsHost(
   bookingId: string,
 ): Promise<Tables<'bookings'>> {
-  return transitionBookingStatus(bookingId, 'requested', 'declined');
+  const data = await transitionBookingStatus(bookingId, 'requested', 'declined');
+  track('booking_declined', { bookingId: data.id, listingId: data.listing_id });
+  return data;
 }
 
 export async function startBookingAsHost(

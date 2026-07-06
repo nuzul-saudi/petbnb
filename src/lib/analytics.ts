@@ -27,7 +27,7 @@ const POSTHOG_HOST =
     ? extra.posthogHost
     : 'https://us.i.posthog.com';
 
-/** Closed set of funnel events (pre-pilot plan, Phase 1). */
+/** Closed set of funnel events (pre-pilot plan, Phases 1 + 1.5). */
 export type AnalyticsEvent =
   | 'listing_viewed'
   | 'inquiry_opened'
@@ -35,6 +35,14 @@ export type AnalyticsEvent =
   | 'booking_requested'
   | 'booking_accepted'
   | 'booking_completed'
+  // Phase 1.5 additions (Strategy-locked names):
+  | 'feed_filtered'
+  | 'signup_started'
+  | 'signup_completed'
+  | 'booking_declined'
+  | 'booking_cancelled'
+  | 'contact_nudge_shown'
+  | 'contact_nudge_sent_anyway'
   | 'review_submitted'
   | 'host_application_submitted';
 
@@ -71,6 +79,21 @@ export function initAnalytics(): void {
       // Never let analytics wiring break the app.
     }
   })();
+}
+
+/**
+ * SPA pageview (Phase 1.5). Fired by the root layout on every route
+ * change so PostHog sees navigation paths, landing pages, and guest
+ * journeys. Expo Router paths carry UUIDs only — no PII. No-op until
+ * initAnalytics() resolves; never throws.
+ */
+export function trackPageview(path: string): void {
+  if (!posthog) return;
+  try {
+    posthog.capture('$pageview', { path });
+  } catch {
+    /* swallow */
+  }
 }
 
 /**

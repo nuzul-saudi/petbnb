@@ -40,6 +40,7 @@ import {
   markThreadRead,
   sendMessage,
 } from "@/lib/messages";
+import { track } from "@/lib/analytics";
 import { markSeen } from "@/lib/last-seen-storage";
 import { markThreadNotificationsRead } from "@/lib/notifications";
 import { useHostNotifications } from "@/lib/host-notifications";
@@ -1277,8 +1278,12 @@ export default function BookingDetailScreen() {
               // sending. Sending is still allowed if the user
               // confirms.
               if (containsContactInfo(body)) {
+                // Phase 1.5 — measure disintermediation pressure: how
+                // often the nudge fires, and how often users send anyway.
+                track("contact_nudge_shown", { thread: "booking" });
                 const ok = await confirmDialog(t('messages.contact_warning'));
                 if (!ok) return;
+                track("contact_nudge_sent_anyway", { thread: "booking" });
               }
               await sendMessage(booking.id, body);
               await refetchMessages();

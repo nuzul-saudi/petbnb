@@ -21,6 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -50,6 +51,8 @@ export default function NameScreen() {
         .update({ full_name: name.trim(), role: 'owner' })
         .eq('id', user.id);
       if (e) throw e;
+      // Phase 1.5 — owner signup funnel complete (name saved → home).
+      track('signup_completed', { flow: 'owner' });
       await refreshProfile();
       router.replace('/');
     } catch (err) {

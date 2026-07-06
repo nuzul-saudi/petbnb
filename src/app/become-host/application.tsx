@@ -17,6 +17,7 @@
 // bio + pictures + Nafath stub before they can list.
 
 import { logWarn } from '@/lib/log';
+import { track } from '@/lib/analytics';
 import { useState } from 'react';
 import {
   Pressable,
@@ -119,6 +120,9 @@ export default function HostApplicationScreen() {
         experienceYears: hasExperience ? (yearsNum ?? 0) : null,
       };
       await submitHostApplication(user.id, input);
+      // Phase 1.5 — host signup funnel complete (application submitted;
+      // host_application_submitted fires in the lib alongside this).
+      track('signup_completed', { flow: 'host' });
       await refreshProfile();
       router.replace('/become-host/submitted');
     } catch (e) {

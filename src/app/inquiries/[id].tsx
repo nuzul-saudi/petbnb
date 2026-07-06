@@ -63,6 +63,7 @@ import {
   type TimelineItem,
 } from '@/lib/inquiry-timeline';
 import { logWarn } from '@/lib/log';
+import { track } from '@/lib/analytics';
 import { useHostNotifications } from '@/lib/host-notifications';
 import { markThreadNotificationsRead } from '@/lib/notifications';
 import {
@@ -374,6 +375,8 @@ export default function InquiryThreadScreen() {
                   setSending(true);
                   try {
                     if (containsContactInfo(body)) {
+                      // Phase 1.5 — disintermediation pressure metric.
+                      track('contact_nudge_shown', { thread: 'inquiry' });
                       const ok = await confirmDialog(
                         t('messages.contact_warning'),
                       );
@@ -381,6 +384,7 @@ export default function InquiryThreadScreen() {
                         setSending(false);
                         return;
                       }
+                      track('contact_nudge_sent_anyway', { thread: 'inquiry' });
                     }
                     const target = pickComposeTarget(
                       rawTimeline.bookings,

@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { useFonts } from 'expo-font';
 import {
   Tajawal_400Regular,
@@ -16,7 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/lib/auth';
 import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
 import { HostNotificationsProvider } from '@/lib/host-notifications';
-import { initAnalytics } from '@/lib/analytics';
+import { initAnalytics, trackPageview } from '@/lib/analytics';
 import { initSentry } from '@/lib/sentry';
 import { useTheme } from '@/theme/theme';
 
@@ -76,10 +76,17 @@ export default function RootLayout() {
 function AppShell() {
   const { locale } = useTranslation();
   const theme = useTheme();
+  const pathname = usePathname();
 
   useEffect(() => {
     configureRTL(locale);
   }, [locale]);
+
+  // Phase 1.5 — SPA pageview per route change. Router paths carry ids
+  // only (no PII). No-ops until PostHog is configured + initialized.
+  useEffect(() => {
+    if (pathname) trackPageview(pathname);
+  }, [pathname]);
 
   // Theme-aware screen background: applied in ONE place here so that
   // any screen whose own SafeAreaView omits backgroundColor inherits
