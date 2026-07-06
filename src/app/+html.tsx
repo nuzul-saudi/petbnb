@@ -40,6 +40,17 @@ import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
 
 export default function Root({ children }: PropsWithChildren) {
+  // Phase 3 — share/OG meta. HONEST SPA LIMITATION: Expo web is client-
+  // rendered, every route serves this same shell, so these tags are
+  // SITE-WIDE — a shared listing link unfurls with the brand card, not
+  // the listing's own title/photo. Per-listing dynamic OG needs server
+  // rendering; logged as a post-pilot Vercel follow-up (CLAUDE.md §11).
+  // og:image must be an ABSOLUTE url for WhatsApp — built from
+  // EXPO_PUBLIC_APP_URL at export time (set in .env + Vercel).
+  const baseUrl = (process.env.EXPO_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  const title = 'Petbnb — رعاية الحيوانات الأليفة في الرياض';
+  const description =
+    'مضيفون موثوقون يستضيفون حيوانك الأليف في منازلهم — كل مضيف تمت مقابلته والتحقق منه شخصياً.';
   return (
     <html lang="ar" dir="rtl">
       <head>
@@ -49,6 +60,15 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={`${baseUrl}/og-card.png`} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
         <ScrollViewStyleReset />
         <style
           id="petbnb-viewport-fix"
