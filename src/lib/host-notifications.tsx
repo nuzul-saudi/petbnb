@@ -28,6 +28,7 @@ import {
 
 import { useAuth } from '@/lib/auth';
 import { countPendingHostBookings } from '@/lib/listings';
+import { countUnreadNotifications } from '@/lib/notifications';
 
 type HostNotificationsContextValue = {
   /**
@@ -46,6 +47,16 @@ type HostNotificationsContextValue = {
    * fetch leaves the previous value in place.
    */
   refreshPendingHostCount: () => void;
+  /**
+   * Unread-notifications count (0047 / Phase 2a) for ANY signed-in user —
+   * owners included, unlike pendingHostCount. Backs the 🔔 bell badge in
+   * AppHeader. Fetched on user change + explicit refreshUnread() calls
+   * (the /notifications screen refreshes after mark-read). Not realtime —
+   * that's Phase 5. Zero for signed-out users and while loading.
+   */
+  unreadCount: number;
+  /** Force a re-fetch of unreadCount (after marking notifications read). */
+  refreshUnread: () => void;
 };
 
 const HostNotificationsContext =
@@ -99,9 +110,44 @@ export function HostNotificationsProvider({
     };
   }, [user?.id, profile?.role, pendingRefreshTick]);
 
+  // Unread notifications count (0047). Fetched for EVERY signed-in user
+  // (owners too), unlike pendingHostCount. Refreshed on user change and
+  // explicit refreshUnread() calls. No polling/realtime (Phase 5).
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadRefreshTick, setUnreadRefreshTick] = useState(0);
+  const refreshUnread = useCallback(() => {
+    setUnreadRefreshTick((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const count = await countUnreadNotifications();
+        if (!cancelled) setUnreadCount(count);
+      } catch (e) {
+        logWarn('[host_notifications.unread_count_failed]', e);
+        // Leave the previous value — a transient failure shouldn't clear
+        // an existing badge.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, unreadRefreshTick]);
+
   const value = useMemo<HostNotificationsContextValue>(
-    () => ({ pendingHostCount, refreshPendingHostCount }),
-    [pendingHostCount, refreshPendingHostCount],
+    () => ({
+      pendingHostCount,
+      refreshPendingHostCount,
+      unreadCount,
+      refreshUnread,
+    }),
+    [pendingHostCount, refreshPendingHostCount, unreadCount, refreshUnread],
   );
 
   return (
@@ -122,5 +168,7 @@ export function useHostNotifications(): HostNotificationsContextValue {
   return {
     pendingHostCount: 0,
     refreshPendingHostCount: () => undefined,
+    unreadCount: 0,
+    refreshUnread: () => undefined,
   };
 }
