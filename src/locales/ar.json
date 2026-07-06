@@ -361,6 +361,15 @@
     "already_rated_hint": "شكراً — لقد أرسلت تقييمك لهذه الإقامة.",
     "anon_rater": "مستخدم"
   },
+  "notifications": {
+    "booking_requested": "طلب حجز جديد",
+    "booking_accepted": "تم قبول حجزك",
+    "booking_declined": "تم رفض حجزك",
+    "booking_cancelled": "تم إلغاء حجز على إعلانك",
+    "message_received": "رسالة جديدة",
+    "host_application_approved": "تمت الموافقة على طلبك للاستضافة",
+    "host_application_rejected": "لم تتم الموافقة على طلبك للاستضافة"
+  },
   "daily_updates": {
     "section_title": "تحديثات يومية",
     "empty": "لا توجد تحديثات بعد",

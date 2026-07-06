@@ -359,6 +359,15 @@
     "already_rated_hint": "Thanks — your review for this stay has been sent.",
     "anon_rater": "User"
   },
+  "notifications": {
+    "booking_requested": "New booking request",
+    "booking_accepted": "Your booking was accepted",
+    "booking_declined": "Your booking was declined",
+    "booking_cancelled": "A booking was cancelled",
+    "message_received": "New message",
+    "host_application_approved": "Your host application was approved",
+    "host_application_rejected": "Your host application wasn't approved"
+  },
   "daily_updates": {
     "section_title": "Daily updates",
     "empty": "No updates yet",

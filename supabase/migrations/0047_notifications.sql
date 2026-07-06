@@ -30,11 +30,12 @@
 -- ============================================================
 create table public.notifications (
   id           uuid primary key default gen_random_uuid(),
-  user_id      uuid not null references auth.users(id) on delete cascade,  -- the RECIPIENT
+  user_id      uuid not null references public.profiles(id) on delete cascade,  -- the RECIPIENT (R3: profiles FK, per 0001/0040 convention)
   type         text not null check (type in (
                  'booking_requested',
                  'booking_accepted',
                  'booking_declined',
+                 'booking_cancelled',
                  'message_received',
                  'host_application_approved',
                  'host_application_rejected'
@@ -235,6 +236,8 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_host uuid;
 begin
   if new.status is not distinct from old.status then
     return new;
@@ -249,6 +252,18 @@ begin
     perform public.emit_notification(
       new.owner_id, 'booking_declined',
       'notifications.booking_declined', '{}'::jsonb,
+      '/bookings/' || new.id::text
+    );
+  elsif new.status = 'cancelled' then
+    -- R1 — owner-initiated cancel is the ONLY cancel path today, so the
+    -- recipient is always the listing's host. Revisit recipient logic if
+    -- a host-initiated cancel ever ships.
+    select l.host_id into v_host
+      from public.listings l
+     where l.id = new.listing_id;
+    perform public.emit_notification(
+      v_host, 'booking_cancelled',
+      'notifications.booking_cancelled', '{}'::jsonb,
       '/bookings/' || new.id::text
     );
   end if;
@@ -266,6 +281,9 @@ create trigger notify_booking_decided
 --     participant of whichever thread kind (booking | inquiry). Fires
 --     only on INSERT, so a sender's own soft-delete UPDATE (0044) never
 --     notifies. Coexists with touch_inquiry_last_message_at (0040).
+--     ASSUMPTION (R4): the sender is a thread participant, so "the other
+--     participant" is the recipient. No admin-compose UI exists today; if
+--     one ever ships, recipient resolution must become sender-aware.
 create or replace function public.notify_message_received()
 returns trigger
 language plpgsql
@@ -290,6 +308,23 @@ begin
      where i.id = new.inquiry_id;
     v_link := '/inquiries/' || new.inquiry_id::text;
   end if;
+
+  -- R2 — per-thread dedupe. The unread badge counts unread THREADS, not
+  -- individual messages: if the recipient already has an UNREAD
+  -- message_received notification for this thread, don't stack another.
+  -- Once they open the thread and it's marked read, the next message
+  -- creates a fresh unread row. This same (user_id, link_path, unread)
+  -- row is also the natural anchor for the 2b email throttle.
+  if v_recipient is not null and v_link is not null and exists (
+    select 1 from public.notifications
+     where user_id = v_recipient
+       and type = 'message_received'
+       and link_path = v_link
+       and read_at is null
+  ) then
+    return new;
+  end if;
+
   perform public.emit_notification(
     v_recipient,
     'message_received',
@@ -395,10 +430,14 @@ create trigger notify_host_application_decided
 --       link_path='/bookings/<id>'.
 --   (b) UPDATE that booking to 'accepted' → one row for the owner,
 --       type='booking_accepted'. To 'declined' → 'booking_declined'.
---       A no-op UPDATE (status unchanged) → NO new row.
+--       To 'cancelled' → one row for the HOST, type='booking_cancelled'
+--       (R1). A no-op UPDATE (status unchanged) → NO new row.
 --   (c) INSERT a message on a booking as the owner → one row for the
 --       host; as the host → one row for the owner. Same for an inquiry
---       (starter/host).
+--       (starter/host). Two rapid messages in the SAME thread while the
+--       recipient hasn't opened it → exactly ONE unread message_received
+--       row (R2 dedupe); after the recipient reads it, the next message
+--       creates a fresh unread row.
 --   (d) UPDATE a profile host_application_status pending→approved → one
 --       row for that profile id, link '/become-host/complete-profile';
 --       →rejected → link '/profile'.

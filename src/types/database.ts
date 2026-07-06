@@ -919,6 +919,7 @@ export type Database = {
             | 'booking_requested'
             | 'booking_accepted'
             | 'booking_declined'
+            | 'booking_cancelled'
             | 'message_received'
             | 'host_application_approved'
             | 'host_application_rejected';
@@ -950,7 +951,7 @@ export type Database = {
             foreignKeyName: 'notifications_user_id_fkey';
             columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: 'users';
+            referencedRelation: 'profiles';
             referencedColumns: ['id'];
           },
         ];
