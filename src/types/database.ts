@@ -43,6 +43,9 @@ export type Database = {
           is_verified: boolean;
           is_suspended: boolean;
           locale: string;
+          // 0048 — PDPL consent stamp; NULL for pre-consent accounts.
+          // Forward-only via guard_profile_tos_stamp (column-scoped).
+          tos_accepted_at: string | null;
           // ── 0039: host application fields ─────────────────────
           host_application_status:
             | Database['public']['Enums']['host_application_status']
@@ -70,6 +73,7 @@ export type Database = {
           role?: Database['public']['Enums']['user_role'];
           avatar_url?: string | null;
           nafath_verified?: boolean;
+          tos_accepted_at?: string | null;
           id_document_url?: string | null;
           is_verified?: boolean;
           is_suspended?: boolean;
@@ -100,6 +104,7 @@ export type Database = {
           role?: Database['public']['Enums']['user_role'];
           avatar_url?: string | null;
           nafath_verified?: boolean;
+          tos_accepted_at?: string | null;
           id_document_url?: string | null;
           is_verified?: boolean;
           is_suspended?: boolean;
