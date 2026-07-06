@@ -906,6 +906,57 @@ export type Database = {
       };
 
       // ---------------------------------------------------------------------
+      // 0047: notifications (Phase 2 — in_app channel). Rows are inserted
+      // ONLY by SECURITY DEFINER source-event triggers (no client INSERT
+      // policy). Clients read their own rows and may set read_at (once,
+      // forward-only) via the update policy + guard trigger. emailed_at is
+      // written by the 2b email channel, never the client.
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type:
+            | 'booking_requested'
+            | 'booking_accepted'
+            | 'booking_declined'
+            | 'message_received'
+            | 'host_application_approved'
+            | 'host_application_rejected';
+          title_key: string;
+          body_params: Json;
+          link_path: string;
+          created_at: string;
+          read_at: string | null;
+          emailed_at: string | null;
+        };
+        // Insert/Update kept minimal — clients never INSERT (trigger-only)
+        // and only ever UPDATE read_at. Shapes stay for parity with Row.
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: Database['public']['Tables']['notifications']['Row']['type'];
+          title_key: string;
+          body_params?: Json;
+          link_path: string;
+          created_at?: string;
+          read_at?: string | null;
+          emailed_at?: string | null;
+        };
+        Update: {
+          read_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'notifications_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+
+      // ---------------------------------------------------------------------
       // 0040: pre-booking inquiry threads. A first-class parent of
       // inquiry-scoped messages (see messages.inquiry_id above). UPSERT
       // against the (listing_id, starter_id) UNIQUE constraint to fetch-
@@ -1132,6 +1183,13 @@ export type Database = {
       // p_thread_kind isn't 'booking' or 'inquiry'.
       mark_thread_read: {
         Args: { p_thread_kind: 'booking' | 'inquiry'; p_thread_id: string };
+        Returns: void;
+      };
+      // 0047 (Phase 2) — mark every unread notification for the caller as
+      // read in one statement. Backs the /notifications "mark all read"
+      // button. SECURITY DEFINER; authenticated-only.
+      mark_all_notifications_read: {
+        Args: Record<string, never>;
         Returns: void;
       };
       // Step 8f (migration 0023) — admin promotes drafts to live.
