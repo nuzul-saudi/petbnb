@@ -17,6 +17,7 @@ import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { openInquiry } from '@/lib/inquiries';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
+import { CANCELLATION_FULL_REFUND_HOURS } from '@/lib/payments-policy';
 import { listReviewsForHost, type HostReview } from '@/lib/reviews';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/theme/theme';
@@ -287,6 +288,13 @@ export default function ListingDetailScreen() {
               </Text>
             </Text>
           </View>
+          {/* Phase 3 — one-line cancellation-policy summary, rendered
+              from the payments-policy constants (never hand-typed). */}
+          <Text style={styles.policySummary}>
+            {t('cancellation_policy.summary_line', {
+              hours: CANCELLATION_FULL_REFUND_HOURS,
+            })}
+          </Text>
 
           {/* Section 3: host card — the trust anchor. */}
           <View style={styles.sectionDivider} />
@@ -886,6 +894,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  policySummary: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    marginTop: 2,
   },
   price: {
     fontFamily: fonts.bodyBold,

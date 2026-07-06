@@ -39,7 +39,11 @@ import {
 import { worstVaccinationStatus } from '@/lib/vaccination';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { MockPaymentProvider } from '@/lib/payment';
-import { snapshotFees } from '@/lib/payments-policy';
+import {
+  CANCELLATION_FULL_REFUND_HOURS,
+  CANCELLATION_LATE_REFUND_RATE,
+  snapshotFees,
+} from '@/lib/payments-policy';
 import { listPetsForOwner } from '@/lib/pets';
 import { useSignedPetPhotoUrls } from '@/hooks/useSignedPetPhotoUrls';
 import {
@@ -1040,6 +1044,29 @@ export default function BookingRequestScreen() {
           </Text>
         ) : null}
 
+        {/* Phase 3 — cancellation-policy disclosure. Shown BEFORE the
+            owner commits; the tier copy renders from the payments-policy
+            constants so it can never drift from the refund math. */}
+        <View style={styles.policyCard}>
+          <Text style={styles.policyTitle}>
+            {t('cancellation_policy.title')}
+          </Text>
+          <Text style={styles.policyLine}>
+            {t('cancellation_policy.tier_full', {
+              hours: CANCELLATION_FULL_REFUND_HOURS,
+            })}
+          </Text>
+          <Text style={styles.policyLine}>
+            {t('cancellation_policy.tier_half', {
+              hours: CANCELLATION_FULL_REFUND_HOURS,
+              percent: Math.round(CANCELLATION_LATE_REFUND_RATE * 100),
+            })}
+          </Text>
+          <Text style={styles.policyLine}>
+            {t('cancellation_policy.tier_none')}
+          </Text>
+        </View>
+
         {/* FIX 5 (2026-06-26) — submit Button moved out of the
             ScrollView into the sticky footer below. Keeps the bottom
             of the form scrollable above the sticky bar. */}
@@ -1445,6 +1472,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginTop: spacing.md,
+    lineHeight: 20,
+  },
+  // Phase 3 — cancellation-policy disclosure card.
+  policyCard: {
+    backgroundColor: colors.paper,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    padding: spacing.md,
+    marginTop: spacing.lg,
+    gap: spacing.xs,
+  },
+  policyTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  policyLine: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
     lineHeight: 20,
   },
   errorText: {

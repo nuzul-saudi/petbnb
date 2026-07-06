@@ -372,6 +372,13 @@
     "loading": "Loading…",
     "mark_all": "Mark all read"
   },
+  "cancellation_policy": {
+    "title": "Cancellation policy",
+    "tier_full": "Full refund when cancelling {hours} hours or more before check-in",
+    "tier_half": "{percent}% refund when cancelling less than {hours} hours before check-in",
+    "tier_none": "No refund on or after the check-in date",
+    "summary_line": "Free cancellation up to {hours} hours before check-in"
+  },
   "daily_updates": {
     "section_title": "Daily updates",
     "empty": "No updates yet",
