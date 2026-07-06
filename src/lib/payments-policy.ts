@@ -23,6 +23,12 @@
 export const OWNER_SERVICE_FEE_RATE = 0.05;
 export const HOST_FEE_RATE = 0.15;
 
+// Cancellation tiers — exported (Phase 3) so the disclosure UI renders
+// its copy FROM these constants and the text can never drift from the
+// refund math below. Single platform-wide policy (locked decision).
+export const CANCELLATION_FULL_REFUND_HOURS = 48;
+export const CANCELLATION_LATE_REFUND_RATE = 0.5;
+
 export type FeeSnapshot = {
   totalSAR: number;
   ownerFeeSAR: number;
@@ -84,8 +90,11 @@ export function computeCancellationRefund(
     return { tier: 'none', refundSAR: 0 };
   }
   const hoursToStart = (start - now) / (1000 * 60 * 60);
-  if (hoursToStart >= 48) {
+  if (hoursToStart >= CANCELLATION_FULL_REFUND_HOURS) {
     return { tier: 'full', refundSAR: Math.round(totalChargedSAR) };
   }
-  return { tier: 'half', refundSAR: Math.round(totalChargedSAR * 0.5) };
+  return {
+    tier: 'half',
+    refundSAR: Math.round(totalChargedSAR * CANCELLATION_LATE_REFUND_RATE),
+  };
 }
