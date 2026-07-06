@@ -65,6 +65,26 @@ export async function markNotificationRead(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Mark every unread notification that deep-links to `linkPath` read.
+ * Visiting a target consumes ALL of its alerts — there's deliberately NO
+ * type filter, so a host opening /bookings/<id> clears its
+ * booking_requested AND any message_received for that thread at once.
+ * RLS scopes to the caller; the is-null filter keeps the forward-only
+ * guard happy (already-read rows are skipped).
+ */
+export async function markThreadNotificationsRead(
+  linkPath: string,
+): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('link_path', linkPath)
+    .is('read_at', null);
+  if (error) throw error;
+}
+
 /** Mark every unread notification for the caller read (SECURITY DEFINER RPC). */
 export async function markAllNotificationsRead(): Promise<void> {
   if (!supabase) return;

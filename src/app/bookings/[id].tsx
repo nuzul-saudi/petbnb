@@ -41,6 +41,7 @@ import {
   sendMessage,
 } from "@/lib/messages";
 import { markSeen } from "@/lib/last-seen-storage";
+import { markThreadNotificationsRead } from "@/lib/notifications";
 import { useHostNotifications } from "@/lib/host-notifications";
 import { findMyReview, type Review } from "@/lib/reviews";
 import {
@@ -79,7 +80,7 @@ export default function BookingDetailScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user, profile } = useAuth();
-  const { refreshPendingHostCount } = useHostNotifications();
+  const { refreshPendingHostCount, refreshUnread } = useHostNotifications();
   const toggleLocale = () => setLocale(locale === "ar" ? "en" : "ar");
   // FIX 1 (2026-06-26) — persona-aware accents. Hosts viewing a
   // booking now see gold for the host card heading, total line,
@@ -186,7 +187,13 @@ export default function BookingDetailScreen() {
       // helper (logged only); a failed mark-read shouldn't block
       // the screen.
       void markThreadRead("booking", id);
-    }, [refetchMessages, id]),
+      // 2a (0047) — opening the thread consumes ALL its notifications
+      // (request/accept/message alike). Refresh the bell once the clear
+      // lands so the count reflects immediately.
+      void markThreadNotificationsRead(`/bookings/${id}`)
+        .catch((e) => logWarn("[bookings.thread_notifs_failed]", e))
+        .finally(refreshUnread);
+    }, [refetchMessages, id, refreshUnread]),
   );
 
   // Round 6 — batch-sign pet photos for OwnerPetsSection. Booking

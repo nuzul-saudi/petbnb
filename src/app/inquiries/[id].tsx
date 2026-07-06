@@ -63,6 +63,8 @@ import {
   type TimelineItem,
 } from '@/lib/inquiry-timeline';
 import { logWarn } from '@/lib/log';
+import { useHostNotifications } from '@/lib/host-notifications';
+import { markThreadNotificationsRead } from '@/lib/notifications';
 import {
   deleteMessage,
   markThreadRead,
@@ -75,6 +77,7 @@ export default function InquiryThreadScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
   const { initializing, session, user } = useAuth();
+  const { refreshUnread } = useHostNotifications();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const params = useLocalSearchParams<{ id?: string }>();
@@ -136,12 +139,17 @@ export default function InquiryThreadScreen() {
       for (const b of raw.bookings) {
         void markThreadRead('booking', b.id);
       }
+      // 2a (0047) — opening the inquiry consumes its notifications
+      // (screen's own path). Refresh the bell once the clear lands.
+      void markThreadNotificationsRead(`/inquiries/${id}`)
+        .catch((e) => logWarn('[inquiry.thread_notifs_failed]', e))
+        .finally(refreshUnread);
     } catch (e) {
       logWarn('[inquiry.timeline_load_failed]', e);
     } finally {
       setTimelineLoading(false);
     }
-  }, [id]);
+  }, [id, refreshUnread]);
 
   useEffect(() => {
     void loadInquiry();
