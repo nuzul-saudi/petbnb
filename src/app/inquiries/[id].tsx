@@ -139,9 +139,14 @@ export default function InquiryThreadScreen() {
       for (const b of raw.bookings) {
         void markThreadRead('booking', b.id);
       }
-      // 2a (0047) — opening the inquiry consumes its notifications
-      // (screen's own path). Refresh the bell once the clear lands.
-      void markThreadNotificationsRead(`/inquiries/${id}`)
+      // 2a (0047) — notification coverage MIRRORS markThreadRead's
+      // coverage above: the β timeline renders the linked bookings'
+      // messages too, so their alerts are consumed along with the
+      // inquiry's own. One batched call, one bell refresh at the end.
+      void markThreadNotificationsRead([
+        `/inquiries/${id}`,
+        ...raw.bookings.map((b) => `/bookings/${b.id}`),
+      ])
         .catch((e) => logWarn('[inquiry.thread_notifs_failed]', e))
         .finally(refreshUnread);
     } catch (e) {

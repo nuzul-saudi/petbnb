@@ -66,21 +66,29 @@ export async function markNotificationRead(id: string): Promise<void> {
 }
 
 /**
- * Mark every unread notification that deep-links to `linkPath` read.
- * Visiting a target consumes ALL of its alerts — there's deliberately NO
- * type filter, so a host opening /bookings/<id> clears its
- * booking_requested AND any message_received for that thread at once.
- * RLS scopes to the caller; the is-null filter keeps the forward-only
- * guard happy (already-read rows are skipped).
+ * Mark every unread notification that deep-links to the given path(s)
+ * read. Visiting a target consumes ALL of its alerts — there's
+ * deliberately NO type filter, so a host opening /bookings/<id> clears
+ * its booking_requested AND any message_received for that thread at
+ * once. RLS scopes to the caller; the is-null filter keeps the
+ * forward-only guard happy (already-read rows are skipped).
+ *
+ * SCOPE-MIRRORING RULE: this function's coverage must MIRROR
+ * markThreadRead's coverage at every call site — the 0047 R2 dedupe
+ * keys off unread rows, so any surface that consumes messages must
+ * consume their alerts (e.g. the inquiry timeline also sweeps its
+ * linked bookings' paths).
  */
 export async function markThreadNotificationsRead(
-  linkPath: string,
+  linkPaths: string | string[],
 ): Promise<void> {
   if (!supabase) return;
+  const paths = Array.isArray(linkPaths) ? linkPaths : [linkPaths];
+  if (paths.length === 0) return;
   const { error } = await supabase
     .from('notifications')
     .update({ read_at: new Date().toISOString() })
-    .eq('link_path', linkPath)
+    .in('link_path', paths)
     .is('read_at', null);
   if (error) throw error;
 }
