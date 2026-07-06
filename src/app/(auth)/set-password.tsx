@@ -49,6 +49,10 @@ export default function SetPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Phase 3 (D1) — Terms + Privacy consent. Signup mode only: both
+  // funnels (owner AND host) pass through this screen exactly once;
+  // reset mode never shows it, so returning users aren't nagged.
+  const [consented, setConsented] = useState(false);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   // Must be signed in (post-OTP) to set a password.
@@ -76,6 +80,17 @@ export default function SetPasswordScreen() {
     try {
       const { error: e } = await supabase.auth.updateUser({ password });
       if (e) throw e;
+      // Phase 3 — PDPL consent evidence (migration 0048). Written at
+      // signup completion, right after the password lands. Best-effort:
+      // a failed stamp is logged but doesn't strand the user mid-funnel
+      // (they DID tick the box; the stamp is evidence, not the gate).
+      if (mode === 'signup' && session.user) {
+        const { error: tosErr } = await supabase
+          .from('profiles')
+          .update({ tos_accepted_at: new Date().toISOString() })
+          .eq('id', session.user.id);
+        if (tosErr) logWarn('[auth.tos_stamp_failed]', tosErr);
+      }
       // Mode routing:
       //   signup + flow=host → /become-host/application (host funnel)
       //   signup             → /name (finish owner onboarding)
@@ -97,6 +112,7 @@ export default function SetPasswordScreen() {
   const canSubmit =
     password.length >= MIN_PASSWORD &&
     confirm.length >= MIN_PASSWORD &&
+    (mode !== 'signup' || consented) &&
     !submitting;
 
   return (
@@ -150,6 +166,38 @@ export default function SetPasswordScreen() {
             returnKeyType="done"
           />
         </View>
+
+        {/* Phase 3 (D1) — consent checkbox, signup mode only. Submit
+            stays disabled until checked. Links open the draft legal
+            screens; state survives the round trip (push, not replace). */}
+        {mode === 'signup' ? (
+          <View style={styles.consentRow}>
+            <Pressable
+              onPress={() => setConsented((v) => !v)}
+              style={[styles.checkbox, consented && styles.checkboxChecked]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: consented }}
+            >
+              {consented ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            </Pressable>
+            <Text style={styles.consentText}>
+              {t('auth.consent_agree')}{' '}
+              <Text
+                style={styles.consentLink}
+                onPress={() => router.push('/terms' as Href)}
+              >
+                {t('auth.consent_terms')}
+              </Text>{' '}
+              {t('auth.consent_and')}{' '}
+              <Text
+                style={styles.consentLink}
+                onPress={() => router.push('/privacy' as Href)}
+              >
+                {t('auth.consent_privacy')}
+              </Text>
+            </Text>
+          </View>
+        ) : null}
 
         <Pressable
           onPress={onSubmit}
@@ -221,6 +269,46 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     color: colors.mossDeep,
+  },
+  // Phase 3 — consent checkbox row.
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.inkSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.paper,
+    marginTop: 1,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.mossDeep,
+    borderColor: colors.mossDeep,
+  },
+  checkboxMark: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.cream,
+    lineHeight: 16,
+  },
+  consentText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 20,
+  },
+  consentLink: {
+    fontFamily: fonts.bodyBold,
+    color: colors.mossDeep,
+    textDecorationLine: 'underline',
   },
   button: {
     backgroundColor: colors.moss,
