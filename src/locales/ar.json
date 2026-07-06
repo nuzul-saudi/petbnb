@@ -368,7 +368,11 @@
     "booking_cancelled": "تم إلغاء حجز على إعلانك",
     "message_received": "رسالة جديدة",
     "host_application_approved": "تمت الموافقة على طلبك للاستضافة",
-    "host_application_rejected": "لم تتم الموافقة على طلبك للاستضافة"
+    "host_application_rejected": "لم تتم الموافقة على طلبك للاستضافة",
+    "screen_title": "الإشعارات",
+    "empty": "لا توجد إشعارات بعد",
+    "loading": "جارٍ التحميل…",
+    "mark_all": "تعليم الكل كمقروء"
   },
   "daily_updates": {
     "section_title": "تحديثات يومية",
@@ -938,6 +942,8 @@
     "lang_toggle_to_en_full": "English",
     "lang_toggle_to_ar_full": "العربية",
     "become_host": "كن مُضيفاً",
-    "host_inbox_badge": "صندوق الطلبات"
+    "host_inbox_badge": "صندوق الطلبات",
+    "notifications": "الإشعارات",
+    "notifications_bell": "الإشعارات"
   }
 }

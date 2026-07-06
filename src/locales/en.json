@@ -366,7 +366,11 @@
     "booking_cancelled": "A booking was cancelled",
     "message_received": "New message",
     "host_application_approved": "Your host application was approved",
-    "host_application_rejected": "Your host application wasn't approved"
+    "host_application_rejected": "Your host application wasn't approved",
+    "screen_title": "Notifications",
+    "empty": "No notifications yet",
+    "loading": "Loading…",
+    "mark_all": "Mark all read"
   },
   "daily_updates": {
     "section_title": "Daily updates",
@@ -925,6 +929,8 @@
     "lang_toggle_to_en_full": "English",
     "lang_toggle_to_ar_full": "العربية",
     "become_host": "Become a Host",
-    "host_inbox_badge": "Booking inbox"
+    "host_inbox_badge": "Booking inbox",
+    "notifications": "Notifications",
+    "notifications_bell": "Notifications"
   }
 }
