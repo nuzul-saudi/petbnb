@@ -318,3 +318,50 @@ stop flying blind before real users touch the product. No migration.
 ### Migrations written (Phase 1)
 
 - None. Phase 1 is code-only.
+
+---
+
+## Phase 3 (2026-07-06) — Trust surface batch (0048 written)
+
+Plan: docs/migration-0048-trust-surface-plan.md (approved with D1/D2/D3).
+
+### Decisions
+
+- **D1 applied:** consent checkbox lives on `(auth)/set-password.tsx`,
+  signup mode only — both funnels pass it exactly once; reset mode and
+  returning users never see it. Submit disabled until checked; the
+  stamp write is best-effort (a failure logs, never strands the funnel —
+  the stamp is evidence, not the gate).
+- **D2 applied:** existing accounts keep `tos_accepted_at = NULL`;
+  re-consent prompt is a Business-Track follow-up with the real PDPL text.
+- **D3 applied with Strategy's constraint:** `guard_profile_tos_stamp`
+  is COLUMN-SCOPED — a `WHEN (old.tos_accepted_at IS DISTINCT FROM
+  new.tos_accepted_at)` clause keeps it out of every other profiles
+  update entirely; the body checks only that one column (forward-only).
+  Deliberately NOT the 0047 whole-row style.
+- **Cancellation copy renders from code:** the 48h/50% literals moved to
+  exported constants (CANCELLATION_FULL_REFUND_HOURS /
+  CANCELLATION_LATE_REFUND_RATE) consumed by both the refund math and
+  the i18n placeholders — text can't drift from behavior.
+- **OG meta is SITE-WIDE (honest SPA limitation):** per-listing dynamic
+  OG needs server rendering — post-pilot follow-up. og:image is built
+  from EXPO_PUBLIC_APP_URL at export time (WhatsApp needs absolute
+  URLs); documented in .env.example. Brand card generated from the §8
+  tokens with the app's own Reem Kufi/Tajawal fonts (public/og-card.png).
+- **Legal placeholders are i18n-only swaps:** final PDPL/ToS text
+  replaces locale strings — zero code changes. /privacy ships the
+  required analytics-disclosure section (PostHog, anonymous IDs,
+  purpose, Sentry, no message contents).
+
+### Migrations written (Phase 3)
+
+- `0048_tos_accepted_at.sql` — profiles.tos_accepted_at + column-scoped
+  forward-only guard + verification block. WRITTEN, not applied; Omar
+  applies after Strategy's SQL review. Independent of 0049 (either first).
+
+### ⛔ Omar checkpoint
+
+Apply 0048 → verifications → log in migration-apply-log.md. Smoke both
+signup funnels (checkbox blocks; tos_accepted_at populated for the new
+user). Set EXPO_PUBLIC_APP_URL in .env + Vercel, redeploy, share a link
+to yourself on WhatsApp → brand unfurl card.
