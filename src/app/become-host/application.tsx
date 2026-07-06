@@ -17,6 +17,7 @@
 // bio + pictures + Nafath stub before they can list.
 
 import { logWarn } from '@/lib/log';
+import { LegalFooterLinks } from '@/components/LegalPage';
 import { track } from '@/lib/analytics';
 import { useState } from 'react';
 import {
@@ -267,6 +268,9 @@ export default function HostApplicationScreen() {
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {/* Phase 3 — legal links under the application form. */}
+        <LegalFooterLinks />
       </ScrollView>
     </SafeAreaView>
   );

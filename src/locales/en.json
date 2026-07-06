@@ -372,6 +372,26 @@
     "loading": "Loading…",
     "mark_all": "Mark all read"
   },
+  "legal": {
+    "draft_banner": "Draft — the final legal text is being prepared and will replace this placeholder.",
+    "terms_title": "Terms & Conditions",
+    "terms_p1": "Welcome to Petbnb. By creating an account or using the app you agree to these terms. Petbnb is a marketplace that connects pet owners with hosts who board pets in their own homes; the hosting agreement is between the owner and the host.",
+    "terms_p2": "You agree to provide accurate information, to use the platform respectfully, and not to move confirmed transactions outside the platform.",
+    "terms_bookings_title": "Bookings & cancellations",
+    "terms_p3": "A booking becomes binding when the host accepts it. The cancellation policy shown before you book (full refund 48+ hours before check-in, 50% under 48 hours, none on or after check-in day) applies to all bookings.",
+    "terms_p4": "Check-in and check-out condition reports are part of every stay and form the evidence record in case of a dispute.",
+    "privacy_title": "Privacy Policy",
+    "privacy_p1": "Petbnb collects the information you provide (name, email, pet profiles, listings, bookings, messages) to operate the service. We do not sell your data.",
+    "privacy_p2": "Your exact home address is never shown publicly — listings display the district only until a booking is accepted.",
+    "privacy_analytics_title": "Analytics & error reporting",
+    "privacy_analytics_p1": "We use PostHog to understand how the product is used. Visitors are identified by an anonymous ID; if you sign in, your activity is associated with your account ID. We record which screens are visited and product events (e.g. a listing was viewed, a booking was requested).",
+    "privacy_analytics_p2": "Analytics events never include your messages, phone number, or email — only internal IDs. The purpose is product improvement and measuring where users get stuck.",
+    "privacy_analytics_p3": "We use Sentry for error reporting: if the app crashes, a technical report (without your personal content) is sent so we can fix it.",
+    "privacy_contact_title": "Contact",
+    "privacy_contact_p1": "Questions about your data? Contact us through the app and we will help.",
+    "footer_terms": "Terms",
+    "footer_privacy": "Privacy"
+  },
   "cancellation_policy": {
     "title": "Cancellation policy",
     "tier_full": "Full refund when cancelling {hours} hours or more before check-in",

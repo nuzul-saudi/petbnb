@@ -7,6 +7,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
+import { LegalFooterLinks } from '@/components/LegalPage';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
 import { PhotoMosaic } from '@/components/PhotoMosaic';
 import { SearchWhenModal } from '@/components/SearchWhenModal';
@@ -600,6 +601,9 @@ export default function ListingDetailScreen() {
           <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
             <Text style={styles.backText}>{t('listing.back')}</Text>
           </Pressable>
+
+          {/* Phase 3 — legal links in the listing-detail footer. */}
+          <LegalFooterLinks />
         </View>
       </ScrollView>
 

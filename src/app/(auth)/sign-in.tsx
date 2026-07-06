@@ -9,6 +9,7 @@ import {
   type Href,
 } from 'expo-router';
 
+import { LegalFooterLinks } from '@/components/LegalPage';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
@@ -314,6 +315,9 @@ export default function SignInScreen() {
             {t('auth.continue_as_guest')}
           </Text>
         </Pressable>
+
+        {/* Phase 3 — legal links in the auth funnel footer. */}
+        <LegalFooterLinks />
       </View>
     </SafeAreaView>
   );
