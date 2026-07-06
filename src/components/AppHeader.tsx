@@ -43,7 +43,7 @@ export function AppHeader({
   const router = useRouter();
   const pathname = usePathname();
   const { session, profile, signOut } = useAuth();
-  const { pendingHostCount } = useHostNotifications();
+  const { pendingHostCount, unreadCount } = useHostNotifications();
   const theme = useTheme();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -142,6 +142,27 @@ export function AppHeader({
         </Pressable>
       ) : null}
 
+      {/* Notifications bell — signed-in only, ALL roles (0047 / Phase 2a).
+          Universal unread-count badge; taps through to /notifications.
+          The host-only 📥 badge above stays during the transition (D5). */}
+      {!isGuest ? (
+        <Pressable
+          onPress={safeNav(() => router.push('/notifications' as never))}
+          style={styles.bell}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.notifications_bell')}
+        >
+          <Text style={styles.bellIcon}>🔔</Text>
+          {unreadCount > 0 ? (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>
+                {unreadCount > 9 ? '9+' : String(unreadCount)}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : null}
+
       {/* Hamburger — signed-in only. Opens the Modal menu below. */}
       {!isGuest ? (
         <Pressable
@@ -169,6 +190,10 @@ export function AppHeader({
           onPress={() => setMenuOpen(false)}
         >
           <Pressable style={styles.menuSheet} onPress={() => {}}>
+            <MenuItem
+              label={t('nav.notifications')}
+              onPress={goAndClose('/notifications')}
+            />
             <MenuItem
               label={t('nav.account')}
               onPress={goAndClose('/profile')}
@@ -336,6 +361,37 @@ const styles = StyleSheet.create({
   guestLangButtonText: {
     fontFamily: fonts.bodyBold,
     fontSize: 13,
+  },
+  // Notifications bell (0047) — relative container so the count badge can
+  // pin to the top-trailing corner of the glyph.
+  bell: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellIcon: {
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    borderRadius: 8,
+    backgroundColor: colors.terracotta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    lineHeight: 12,
+    color: colors.cream,
   },
   requestsBadge: {
     flexDirection: 'row',
