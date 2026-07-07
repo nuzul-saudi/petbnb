@@ -5,15 +5,6 @@ after the pilot validates the core loop. Each entry names its trigger /
 prod evidence so we know *why* it's safe to defer and *when* it stops
 being safe.
 
-> **⚠️ Note (2026-07-07):** Strategy has a comprehensive index to paste
-> here verbatim (per-listing OG cards + district-only privacy guardrail,
-> 2b-deploy, read receipts, nights metric, session-replay gate, file diet,
-> E2E smoke, leakage ratio, parked North-Star scope). That paste hasn't
-> come through yet (arrived as an empty placeholder twice). The items
-> below were added from explicit in-flight decisions; **merge the
-> canonical index in when it lands** — these entries are additive, not a
-> replacement for it.
-
 ---
 
 ## Data model / RLS
@@ -61,3 +52,80 @@ disabled listing.
   `+tos` aliases) so they don't pollute the first real pilot analytics.
   Add the detect + purge SQL to `docs/data-hygiene-prelaunch.md` when
   running the sweep.
+
+## Growth / distribution
+
+### Per-listing OG cards (server-side rendering)
+Status: deferred post-pilot (Omar decision, 2026-07-06). Today every
+shared link unfurls the same site-wide brand card (verified on WhatsApp
+2026-07-06). Wanted: sharing a listing link shows THAT listing — host
+area, price/night, photo. Deferred because the app is an SPA: crawlers
+read the raw HTML shell and never run JS, so per-listing cards need a
+Vercel serverless/edge function that intercepts /listings/:id, looks up
+the listing, and injects its meta into <head> before any JS (bot-targeted
+SSR; humans still get the SPA). Effort ~half-day+.
+Trigger to build: real payments live + organic sharing at volume; or
+earlier as a host-recruiting demo if recruiting stalls.
+GUARDRAIL: the og:image/description must honor the district-only privacy
+posture — no host address, no exact geo, same rule as listing detail.
+
+## Notifications (Phase 2 follow-ons)
+
+- Phase 2b email — DEPLOY (written + reviewed; commit b8822d9 + migration
+  0049). Waits on Omar's runbook checkpoint (Resend key, apply 0049,
+  deploy function, webhook). Runbook: docs/phase-2b-email-runbook.md.
+- Read receipts / ticks — deferred per the 0047 plan.
+- Per-type notification preferences / mute — deferred per the 0047 plan.
+- Push notifications — needs native builds; post-pilot.
+- Dedicated meet_greet_* notification types (v1 reuses message_received
+  per 0050 plan A6).
+
+## Analytics (Phase 1.5 follow-ons)
+
+- North-star nights metric: dashboard proxies completed nights with a
+  weekly booking_completed COUNT; add a nights prop for a true nights-sum
+  (noted in docs/posthog-dashboard-recipe.md).
+- Session replay: intentionally OFF. Revisit at pilot start, gated on
+  (a) the live privacy policy and (b) mask-all-text config.
+
+## Code health (from Strategy review, non-blocking)
+
+- File diet: bookings/[id].tsx (~1,900 lines, regrown past its
+  post-refactor ~1,200) and request.tsx (~1,540). Extraction only, zero
+  behavior change; schedule before a phase adds more to these files.
+- E2E smoke in CI: one Playwright golden-path test (guest browse →
+  sign-in → inquiry → request) against the web build, as a 4th CI step.
+- Leakage measurement: once PostHog is live, add the contact_nudge_shown
+  vs contact_nudge_sent_anyway ratio to the dashboard.
+- Sign-in email button arms on any single character — disable until a
+  basic email-format check passes (rider previously sent; land it in the
+  next convenient batch).
+
+## UX decisions parked for pilot data
+
+### 📥 pending-requests badge vs 🔔 bell — one badge or two?
+Status: KEEP BOTH through the pilot (Strategy decision 2026-07-06,
+supersedes D5's "absorb later" assumption; also logged in
+batch-decisions).
+Rationale: post-sweep the semantics diverged — 🔔 clears on READ
+(thread-open sweep), 📥 clears on DECIDE (accept/decline). 📥 is the only
+"undecided work" signal once a host has opened a request without
+deciding; response rate is a core liquidity metric.
+Merge target design (if pilot data says merge): one 🔔 icon; inside, a
+pinned "يتطلب إجراء / Action needed" section (live pending count, clears
+on DECIDE) above the activity feed (clears on READ); badge = unread +
+pending. Decide with PostHog: pageviews on /notifications vs
+reservations + time-to-decide funnel.
+
+### Owner feed empty-state nudge
+For brand-new owners: "أضف ملف قطتك ليكون الطلب أسرع" linking to
+pet-profile creation. Small conversion polish, post-pilot.
+
+## Parked product scope (North Star, NOT roadmap)
+
+Explicitly out of scope until well after pilot — recorded so they stay
+parked: dogs (behind SPECIES_ENABLED), super-app tiles / services
+marketplace, merchandise marketplace, text search over listings, native
+iOS/Android builds, insurance add-on product (offers_insurance flag
+exists per-host; hidden until a partner — e.g. Tree Digital Insurance —
+is signed; business-track outreach item, not code).
