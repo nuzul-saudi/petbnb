@@ -854,6 +854,7 @@
   "mybookings": {
     "title": "حجوزاتي",
     "host_title": "حجوزات إعلاناتي",
+    "pets_hidden_fallback": "تفاصيل الحيوان بعد المراجعة",
     "back": "← رجوع",
     "loading": "جارٍ التحميل…",
     "load_failed": "تعذّر تحميل الحجوزات",

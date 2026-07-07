@@ -157,6 +157,14 @@ export default function MyBookingsScreen() {
                 <Text style={styles.rowMeta}>
                   🐈 {item.pets.map((p) => p.name).join('، ')}
                 </Text>
+              ) : isHostMode ? (
+                // Host-side rows can render with no pets when RLS didn't
+                // grant SELECT reach on the booked pet(s) (pre-0050
+                // junction gap). Show a neutral placeholder rather than a
+                // blank row — never a white screen.
+                <Text style={styles.rowMeta}>
+                  🐈 {t('mybookings.pets_hidden_fallback')}
+                </Text>
               ) : null}
               {/* FIX 3 \xe2\x80\x94 was raw ISO via toArabicDigits. Now uses
                   formatDateRange's short-form span. */}

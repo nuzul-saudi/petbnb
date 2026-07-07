@@ -841,6 +841,7 @@
   "mybookings": {
     "title": "My bookings",
     "host_title": "Bookings on my listings",
+    "pets_hidden_fallback": "Pet details after review",
     "back": "← Back",
     "loading": "Loading…",
     "load_failed": "Couldn't load bookings",

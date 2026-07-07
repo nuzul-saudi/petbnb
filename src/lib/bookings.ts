@@ -299,7 +299,10 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
     owner_avg_rating: ownerAvgRating,
     owner_review_count: ownerReviewCount,
     addons: addons ?? [],
-    pets: (bp ?? []).map((b) => b.pet),
+    // RLS can legitimately null ANY joined row (a host may lack SELECT
+    // reach on some booked pets — see the 0050 pets-visibility fix), so
+    // compact nulls here. Every joined-entity render must survive null.
+    pets: (bp ?? []).map((b) => b.pet).filter(Boolean),
   };
 }
 
@@ -598,7 +601,10 @@ export async function listBookingsForOwner(
     return {
       ...(rest as Tables<'bookings'>),
       listing: (row.listing ?? null) as MyBookingListItem['listing'],
-      pets: (bp ?? []).map((b) => b.pet),
+      // RLS can legitimately null ANY joined row (a host may lack SELECT
+    // reach on some booked pets — see the 0050 pets-visibility fix), so
+    // compact nulls here. Every joined-entity render must survive null.
+    pets: (bp ?? []).map((b) => b.pet).filter(Boolean),
       latest_update_at: null,
       latest_message,
     };
@@ -687,7 +693,10 @@ export async function listBookingsForHost(
     return {
       ...(rest as Tables<'bookings'>),
       listing: (row.listing ?? null) as MyBookingListItem['listing'],
-      pets: (bp ?? []).map((b) => b.pet),
+      // RLS can legitimately null ANY joined row (a host may lack SELECT
+    // reach on some booked pets — see the 0050 pets-visibility fix), so
+    // compact nulls here. Every joined-entity render must survive null.
+    pets: (bp ?? []).map((b) => b.pet).filter(Boolean),
       latest_message,
     };
   });
