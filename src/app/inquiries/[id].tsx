@@ -226,11 +226,14 @@ export default function InquiryThreadScreen() {
   // inquiry messages' kind. Starter can request; host can confirm a
   // pending request. RLS (D-A1 TIGHT) enforces the role rule regardless
   // of what the UI shows.
+  // Ignore soft-deleted rows (0044). A crafted sender soft-delete is
+  // UI-unreachable today (pills expose no delete affordance) but RLS
+  // permits it — a ghosted MG row must not drive the CTA state.
   const mgRequested = rawTimeline.inquiryMessages.some(
-    (m) => m.kind === 'meet_greet_request',
+    (m) => m.kind === 'meet_greet_request' && m.deleted_at == null,
   );
   const mgConfirmed = rawTimeline.inquiryMessages.some(
-    (m) => m.kind === 'meet_greet_confirmed',
+    (m) => m.kind === 'meet_greet_confirmed' && m.deleted_at == null,
   );
   const mgPending = mgRequested && !mgConfirmed;
 

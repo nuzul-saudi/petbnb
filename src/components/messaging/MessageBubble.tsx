@@ -55,7 +55,14 @@ export function MessageBubble({
   // Phase 4 (0050) — meet & greet lifecycle pills. Rendered centered with
   // a hairline divider so they read as a lifecycle marker in the timeline,
   // not a chat bubble. Keyed on `kind`; the stored body is ignored here.
-  if (m.kind === 'meet_greet_request' || m.kind === 'meet_greet_confirmed') {
+  //
+  // isDeleted is checked FIRST: a soft-deleted MG row (0044 permits a
+  // crafted sender delete) falls through to the standard deleted
+  // placeholder below rather than rendering a ghost pill.
+  if (
+    !isDeleted &&
+    (m.kind === 'meet_greet_request' || m.kind === 'meet_greet_confirmed')
+  ) {
     const confirmed = m.kind === 'meet_greet_confirmed';
     return (
       <View style={styles.mgWrap}>

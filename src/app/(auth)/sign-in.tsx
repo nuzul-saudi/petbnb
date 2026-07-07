@@ -161,7 +161,9 @@ export default function SignInScreen() {
     }
   };
 
-  const canSubmit = email.trim().length > 0 && !submitting;
+  // Gate submit on a basic email-format check, not just non-empty — the
+  // button shouldn't arm on a single stray character.
+  const canSubmit = EMAIL_RE.test(email.trim().toLowerCase()) && !submitting;
 
   return (
     <SafeAreaView style={styles.safe}>
