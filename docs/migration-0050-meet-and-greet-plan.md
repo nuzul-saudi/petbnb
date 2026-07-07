@@ -131,6 +131,17 @@ masculine register.
 The UI is already built (§2). The only work is closing the pets gap so a
 host actually receives ALL pets on a multi-pet booking.
 
+> **⚠️ PRODUCTION EVIDENCE (2026-07-07).** This RLS-reach item is no longer
+> theoretical — it caused a **production white-screen** on the host
+> `/bookings` list: `pets_select_owner_or_booking_host` nulled the joined
+> pet rows a host couldn't see, and the assembly kept the nulls. A
+> **client-only Layer 1 hotfix** already shipped (commit `4da8bf4`):
+> `.map((b) => b.pet).filter(Boolean)` on every pets assembly + a neutral
+> host-row fallback, so the UI now *survives* the nulls. **This 0050
+> change is the Layer 2 ROOT FIX** — it makes the host actually *see* the
+> pets rather than just not crash. Ship it here (in Phase 4), NOT as a
+> rushed standalone migration.
+
 ### B1. Verify FIRST (before writing the fix)
 ```sql
 -- As a host, on a MULTI-pet booking on their listing, how many pets come
@@ -146,25 +157,35 @@ select
 ```
 
 ### B2. The fix (0050) — widen `pets_select_owner_or_booking_host`
-`create or replace`/`drop`+recreate the policy so the host branch matches
-via the **junction** (and keeps the legacy `pet_id` match for safety):
+`drop`+recreate the policy. The **root cause is junction-era staleness**:
+the 0002 predicate checks `bookings.pet_id` (the single-pet column), but
+the app has stored pets in the `booking_pets` junction since 0009. Add an
+**EXISTS over the junction**, and keep the legacy `b.pet_id` clause OR-ed
+for any pre-0009 rows (Strategy's specified form):
 ```sql
--- host may read a pet if it's linked to a booking on their listing,
--- via booking_pets (multi-pet) OR the legacy bookings.pet_id.
+-- host may read a pet linked to a booking on their listing, via the
+-- booking_pets junction (0009+) ...
 or exists (
-  select 1
-  from public.bookings b
+  select 1 from public.booking_pets bp
+  join public.bookings b on b.id = bp.booking_id
   join public.listings l on l.id = b.listing_id
-  left join public.booking_pets bp on bp.booking_id = b.id
-  where l.host_id = (select auth.uid())
+  where bp.pet_id = pets.id
+    and l.host_id = (select auth.uid())
     and b.status in ('requested','accepted','active','completed','disputed')
-    and (bp.pet_id = pets.id or b.pet_id = pets.id)
+)
+-- ... OR the legacy single-pet column (pre-0009 rows).
+or exists (
+  select 1 from public.bookings b
+  join public.listings l on l.id = b.listing_id
+  where b.pet_id = pets.id
+    and l.host_id = (select auth.uid())
+    and b.status in ('requested','accepted','active','completed','disputed')
 )
 ```
 - Owner branch (`owner_id = auth.uid()`) preserved unchanged.
 - The status set is preserved from 0002 (host sees pets only while a
   live/relevant booking exists).
-- No new parallel policy — single source (0030 lesson).
+- No new parallel policy — single `drop`+recreate (0030 lesson).
 
 ### B3. Owner rating aggregate — already wired
 `OwnerPetsSection` already receives `ownerAvgRating`/`ownerReviewCount`;
@@ -172,6 +193,21 @@ or exists (
 reviews. No RLS change. (If the aggregate uses a host-only RPC, confirm
 an owner-ratee path exists during build — the props are already populated
 today, so this is a no-op check.)
+
+### B4. Owner-profile visibility — check for the SAME junction-era staleness
+Strategy flagged: while fixing the pets predicate, **audit the owner-side
+join for the same pre-0009 assumption.** Findings from this plan's audit:
+- **`profiles` — SAFE.** `profiles_select_authenticated` (0002) is
+  `to authenticated using (true)`; a host reads any owner profile row
+  regardless of how the booking links pets. No `pet_id`/junction
+  dependency, so no staleness. `booking.owner` resolves.
+- **`booking_pets` mutation policies — VERIFY.** `booking_pets_select_
+  owner_or_host` (0007) and the 0010 owner update/delete policies are the
+  junction-era analogues; confirm during build that the host-SELECT path
+  there also keys off the junction (it should — it's the 0007 rewrite),
+  not a stale `pet_id`. One-query `pg_policies` check, per the 0030 lesson.
+- **Net:** the pets SELECT policy (B2) is the only confirmed stale
+  predicate; B4 is a belt-and-suspenders audit, not a known second bug.
 
 ## 5. Migration 0050 shape (sections) + verification
 
