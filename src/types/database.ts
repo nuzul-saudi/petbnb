@@ -860,6 +860,10 @@ export type Database = {
           // immutable (guard_message_update rejects all further
           // updates).
           deleted_at: string | null;
+          // 0050 — pill type. 'text' for ordinary messages; the two
+          // meet_greet_* kinds render as lifecycle pills (inquiry-only,
+          // role-gated at INSERT). Immutable after insert.
+          kind: 'text' | 'meet_greet_request' | 'meet_greet_confirmed';
         };
         Insert: {
           id?: string;
@@ -869,14 +873,16 @@ export type Database = {
           body: string; // 0044 — insert MUST provide non-empty body
           created_at?: string;
           deleted_at?: string | null; // 0044 — should always be null on insert
+          // 0050 — defaults to 'text'; set explicitly for meet & greet.
+          kind?: 'text' | 'meet_greet_request' | 'meet_greet_confirmed';
         };
         Update: {
           // 0044 — only soft-delete is permitted. guard_message_update
           // rejects updates that touch any column other than
           // deleted_at + body, and requires deleted_at to move null →
           // non-null while body moves non-null → null on the same call.
-          // Other columns kept in the Update type for shape parity with
-          // Row, but writes will raise at the trigger.
+          // 0050 — kind is immutable too. Other columns kept for shape
+          // parity with Row, but writes will raise at the trigger.
           id?: string;
           booking_id?: string | null;
           inquiry_id?: string | null;
@@ -884,6 +890,7 @@ export type Database = {
           body?: string | null;
           created_at?: string;
           deleted_at?: string | null;
+          kind?: 'text' | 'meet_greet_request' | 'meet_greet_confirmed';
         };
         Relationships: [
           {
