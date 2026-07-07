@@ -49,6 +49,7 @@ import {
   containsContactInfo,
   getInquiry,
   sendInquiryMessage,
+  sendMeetGreet,
   type InquiryDetail,
 } from '@/lib/inquiries';
 import {
@@ -221,6 +222,33 @@ export default function InquiryThreadScreen() {
   // for terminal threads.
   const canSend = inquiry.status === 'open';
 
+  // Phase 4 (0050) — meet & greet lifecycle state, derived from the
+  // inquiry messages' kind. Starter can request; host can confirm a
+  // pending request. RLS (D-A1 TIGHT) enforces the role rule regardless
+  // of what the UI shows.
+  const mgRequested = rawTimeline.inquiryMessages.some(
+    (m) => m.kind === 'meet_greet_request',
+  );
+  const mgConfirmed = rawTimeline.inquiryMessages.some(
+    (m) => m.kind === 'meet_greet_confirmed',
+  );
+  const mgPending = mgRequested && !mgConfirmed;
+
+  const sendMG = async (action: 'request' | 'confirm') => {
+    if (sending) return;
+    setSendError(null);
+    setSending(true);
+    try {
+      await sendMeetGreet(inquiry.id, action);
+      await refetchTimeline();
+    } catch (e) {
+      logWarn('[inquiry.meet_greet_failed]', e);
+      setSendError(t('meet_greet.failed'));
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
@@ -354,6 +382,36 @@ export default function InquiryThreadScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.composeBar}>
+            {/* Phase 4 — meet & greet action row. Starter requests; host
+                confirms a pending request. Shown above the compose input;
+                RLS is the real gate (D-A1 TIGHT). */}
+            {isStarter && !mgRequested ? (
+              <Pressable
+                onPress={() => void sendMG('request')}
+                disabled={sending}
+                style={styles.mgActionBtn}
+                accessibilityRole="button"
+              >
+                <Text style={styles.mgActionText}>
+                  🤝 {t('meet_greet.request_cta')}
+                </Text>
+              </Pressable>
+            ) : null}
+            {isStarter && mgPending ? (
+              <Text style={styles.mgHint}>{t('meet_greet.pending_hint')}</Text>
+            ) : null}
+            {!isStarter && mgPending ? (
+              <Pressable
+                onPress={() => void sendMG('confirm')}
+                disabled={sending}
+                style={[styles.mgActionBtn, styles.mgActionBtnConfirm]}
+                accessibilityRole="button"
+              >
+                <Text style={styles.mgActionText}>
+                  ✓ {t('meet_greet.confirm_cta')}
+                </Text>
+              </Pressable>
+            ) : null}
             {sendError ? (
               <Text style={styles.sendError}>{sendError}</Text>
             ) : null}
@@ -774,6 +832,32 @@ const styles = StyleSheet.create({
     borderTopColor: colors.whisper,
     backgroundColor: colors.paper,
     gap: spacing.xs,
+  },
+  // Phase 4 — meet & greet action row.
+  mgActionBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    backgroundColor: colors.cream,
+  },
+  mgActionBtnConfirm: {
+    borderColor: colors.moss,
+  },
+  mgActionText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  mgHint: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    fontStyle: 'italic',
   },
   composeRow: {
     flexDirection: 'row',

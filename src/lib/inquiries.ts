@@ -355,6 +355,55 @@ export async function sendInquiryMessage(
 }
 
 // ---------------------------------------------------------------------------
+// Meet & greet (Phase 4 / 0050) — inquiry-scoped lifecycle messages.
+//
+// The owner (inquiry starter) inserts a `meet_greet_request`; the host
+// inserts a `meet_greet_confirmed`. The DB enforces the role-vs-kind rule
+// in the messages_insert_participants WITH CHECK (D-A1 TIGHT) — a forged
+// insert (wrong role, or a MG kind on a booking thread) is rejected by
+// RLS. The body carries a non-empty marker so the 0044 body CHECK holds;
+// the UI renders a pill keyed on `kind` and ignores the marker text.
+// ---------------------------------------------------------------------------
+
+// Non-empty marker bodies (Arabic-first; the pill UI renders localized
+// labels by kind, so these only surface as a no-JS fallback).
+const MG_MARKER: Record<'request' | 'confirm', string> = {
+  request: 'طلب زيارة تعارف',
+  confirm: 'تم تأكيد زيارة التعارف',
+};
+
+export async function sendMeetGreet(
+  inquiryId: string,
+  action: 'request' | 'confirm',
+): Promise<Message> {
+  if (!supabase) throw new Error('No Supabase client');
+  const { data: authData } = await supabase.auth.getUser();
+  const senderId = authData.user?.id;
+  if (!senderId) throw new Error('Not signed in');
+
+  const kind =
+    action === 'request' ? 'meet_greet_request' : 'meet_greet_confirmed';
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      inquiry_id: inquiryId,
+      sender_id: senderId,
+      body: MG_MARKER[action],
+      kind,
+    })
+    .select(
+      `
+      *,
+      sender:profiles!messages_sender_id_fkey(id, full_name, full_name_en, avatar_url)
+    `,
+    )
+    .single();
+  if (error || !data) throw error ?? new Error('Failed to send meet & greet');
+  return data as unknown as Message;
+}
+
+// ---------------------------------------------------------------------------
 // 0043 (2026-06-28) — closeInquiry() removed. The archive/close
 // affordance is gone from the product (founder decision). Inquiry
 // threads stay open forever; the only valid terminal status is

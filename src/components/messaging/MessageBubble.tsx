@@ -52,6 +52,37 @@ export function MessageBubble({
     ? pickLocalized(m.sender.full_name ?? '', m.sender.full_name_en, locale)
     : '—';
 
+  // Phase 4 (0050) — meet & greet lifecycle pills. Rendered centered with
+  // a hairline divider so they read as a lifecycle marker in the timeline,
+  // not a chat bubble. Keyed on `kind`; the stored body is ignored here.
+  if (m.kind === 'meet_greet_request' || m.kind === 'meet_greet_confirmed') {
+    const confirmed = m.kind === 'meet_greet_confirmed';
+    return (
+      <View style={styles.mgWrap}>
+        <View style={styles.mgDivider} />
+        <View
+          style={[
+            styles.mgPill,
+            confirmed ? styles.mgPillConfirmed : styles.mgPillRequest,
+          ]}
+        >
+          <Text style={styles.mgIcon}>{confirmed ? '✓' : '🤝'}</Text>
+          <Text style={styles.mgText}>
+            {senderName}{' '}
+            {t(
+              confirmed
+                ? 'meet_greet.pill_confirmed'
+                : 'meet_greet.pill_request',
+            )}
+          </Text>
+        </View>
+        <Text style={styles.mgStamp}>
+          {formatRiyadhStamp(m.created_at, locale)}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.row, own ? styles.rowOwn : styles.rowOther]}>
       {/* Other party gets an avatar + name above the bubble. Own
@@ -190,5 +221,47 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.inkSoft,
     marginTop: 2,
+  },
+  // Phase 4 — meet & greet lifecycle pill (centered marker).
+  mgWrap: {
+    alignItems: 'center',
+    gap: 4,
+    marginVertical: spacing.sm,
+  },
+  mgDivider: {
+    alignSelf: 'stretch',
+    height: 1,
+    backgroundColor: colors.whisper,
+    marginBottom: spacing.xs,
+  },
+  mgPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  mgPillRequest: {
+    backgroundColor: colors.paper,
+    borderColor: colors.gold,
+  },
+  mgPillConfirmed: {
+    backgroundColor: colors.cream,
+    borderColor: colors.moss,
+  },
+  mgIcon: {
+    fontSize: 13,
+  },
+  mgText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.ink,
+  },
+  mgStamp: {
+    fontFamily: fonts.body,
+    fontSize: 10,
+    color: colors.inkSoft,
   },
 });

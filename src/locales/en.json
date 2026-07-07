@@ -399,6 +399,14 @@
     "tier_none": "No refund on or after the check-in date",
     "summary_line": "Free cancellation up to {hours} hours before check-in"
   },
+  "meet_greet": {
+    "request_cta": "Request a meet & greet",
+    "confirm_cta": "Confirm meet & greet",
+    "pending_hint": "Meet & greet requested — awaiting the host's confirmation",
+    "failed": "Couldn't send. Please try again.",
+    "pill_request": "requested a meet & greet",
+    "pill_confirmed": "confirmed the meet & greet"
+  },
   "daily_updates": {
     "section_title": "Daily updates",
     "empty": "No updates yet",
