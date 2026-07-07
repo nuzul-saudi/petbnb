@@ -133,20 +133,37 @@ host actually receives ALL pets on a multi-pet booking.
 
 > **⚠️ PRODUCTION EVIDENCE (2026-07-07).** This RLS-reach item is no longer
 > theoretical — it caused a **production white-screen** on the host
-> `/bookings` list: `pets_select_owner_or_booking_host` nulled the joined
-> pet rows a host couldn't see, and the assembly kept the nulls. A
-> **client-only Layer 1 hotfix** already shipped (commit `4da8bf4`):
+> `/bookings` list.
+>
+> **Refined diagnosis (from prod data):** `bookings.pet_id` is still
+> **dual-written** by the request flow, so the legacy predicate DOES match
+> the *first* pet — a host sees pet #1 fine. The nulls (and the crash) are
+> **specific to MULTI-pet bookings**: every pet *beyond the first* lives
+> only in `booking_pets`, which the stale predicate never checks, so those
+> rows come back null. Single-pet bookings were never affected.
+> **Prod repros:** booking `494087eb` (2 pets) and `bdbbb950` (3 pets).
+>
+> A **client-only Layer 1 hotfix** already shipped (commit `4da8bf4`):
 > `.map((b) => b.pet).filter(Boolean)` on every pets assembly + a neutral
-> host-row fallback, so the UI now *survives* the nulls. **This 0050
-> change is the Layer 2 ROOT FIX** — it makes the host actually *see* the
-> pets rather than just not crash. Ship it here (in Phase 4), NOT as a
-> rushed standalone migration.
+> host-row fallback, so the UI now *survives* the nulls (showing pet #1 +
+> the placeholder for the rest). **This 0050 change is the Layer 2 ROOT
+> FIX** — it makes the host actually *see* all the pets rather than just
+> not crash. Ship it here (in Phase 4), NOT as a rushed standalone
+> migration.
+>
+> **Decision-for-later (→ post-pilot backlog):** once B2 makes the junction
+> the source of truth for host pet-visibility, `bookings.pet_id` is pure
+> legacy. Decide post-0050 whether to **keep the dual-write** (cheap
+> back-compat, one redundant column) or **migrate off `bookings.pet_id`**
+> (drop the column + the legacy OR-clause once no code reads it). Logged
+> in `docs/post-pilot-backlog.md`.
 
 ### B1. Verify FIRST (before writing the fix)
 ```sql
 -- As a host, on a MULTI-pet booking on their listing, how many pets come
 -- back vs. how many are actually linked? A mismatch proves the gap.
--- (Run in a host session / with RLS on.)
+-- (Run in a host session / with RLS on.) Prod repros: 494087eb (2 pets),
+-- bdbbb950 (3 pets) — pre-fix these return visible_to_host = 1.
 select
   (select count(*) from public.booking_pets bp where bp.booking_id = '<multi-pet booking id>') as linked,
   (select count(*) from public.pets p
