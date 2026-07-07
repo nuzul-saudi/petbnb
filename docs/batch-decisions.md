@@ -365,3 +365,31 @@ Apply 0048 → verifications → log in migration-apply-log.md. Smoke both
 signup funnels (checkbox blocks; tos_accepted_at populated for the new
 user). Set EXPO_PUBLIC_APP_URL in .env + Vercel, redeploy, share a link
 to yourself on WhatsApp → brand unfurl card.
+
+---
+
+## UX decisions parked for pilot data (2026-07-06)
+
+### 📥 pending-requests badge vs 🔔 bell — one badge or two?
+
+**Status: KEEP BOTH through the pilot** (Strategy decision 2026-07-06 —
+**supersedes** the migration-0047 plan doc's D5 "keep one release, then
+absorb" assumption).
+
+**Rationale:** post-thread-open-sweep, the two badges' semantics
+diverged and are no longer redundant:
+- 🔔 bell clears on **READ** (the thread-open notification sweep marks
+  its rows read).
+- 📥 pending-requests clears on **DECIDE** (accept/decline flips the
+  booking out of `requested`).
+
+The read-vs-act gap means 📥 is the **only** "you have undecided work"
+signal once a host has opened a request without deciding on it. Response
+rate is a core liquidity metric, so we don't remove the action counter
+for aesthetics.
+
+**Decide with pilot data:** PostHog `$pageview` on `/notifications` vs.
+the reservations screen + a time-to-decide funnel
+(`booking_requested` → `booking_accepted`/`booking_declined`). If hosts
+act from 🔔, retire 📥; if 📥 drives accepts, keep it — possibly expand
+it into a general "action needed" counter.

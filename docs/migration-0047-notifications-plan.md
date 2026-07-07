@@ -359,6 +359,10 @@ column is cheap and avoids a second migration.
   Resend/Edge infra is set up? *(rec: yes.)*
 - **D5** — does the universal 🔔 bell subsume the host-only 📥 badge? *(rec: yes,
   keep `pendingHostCount` one release for safety.)*
+  **→ SUPERSEDED 2026-07-06:** KEEP BOTH through the pilot — post-sweep the
+  semantics diverged (🔔 clears on READ, 📥 clears on DECIDE), so 📥 is now
+  the only "undecided work" signal. Decide by pilot data. See the "UX
+  decisions parked for pilot data" entry in `docs/batch-decisions.md`.
 - **D6** — param-free titles vs. templated bodies for v1. *(rec: param-free.)*
 
 ## 13. Explicit non-goals (Phase 2)
