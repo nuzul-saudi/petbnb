@@ -117,6 +117,21 @@ on DECIDE) above the activity feed (clears on READ); badge = unread +
 pending. Decide with PostHog: pageviews on /notifications vs
 reservations + time-to-decide funnel.
 
+### Response-time badge — add response RATE as the companion metric
+Status: shipped the SPEED half (Phase 5 / 0051 `host_response_stats` —
+"usually responds within an hour", median first-response over ANSWERED
+inquiries, hidden under 3 samples). Gap: **survivorship bias** — it
+medians only the inquiries a host actually replied to, so a host who
+ignores 90% of inquiries but answers the other 10% fast still shows a
+fast badge. The honest companion is **response RATE = answered inquiries
+/ total inquiries received**. Post-pilot: extend the RPC to also return
+`total_inquiries` (and/or `answered_count`), and have the badge show
+both — e.g. "responds within an hour · replies to 8 in 10". Until then
+the copy deliberately says "responds within…", never "responsiveness",
+so it doesn't overclaim. Decide the exact surface with pilot data (does
+rate move bookings? is a low-rate host worth surfacing at all, or hide
+the badge below some rate floor?).
+
 ### Owner feed empty-state nudge
 For brand-new owners: "أضف ملف قطتك ليكون الطلب أسرع" linking to
 pet-profile creation. Small conversion polish, post-pilot.

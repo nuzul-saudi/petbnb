@@ -47,6 +47,36 @@ If a future Claude session sees an unexplained anomaly in any of those
 surfaces, re-confirm the relevant migration via a one-row
 `information_schema` check before assuming a code bug.
 
+## Written, pending apply
+
+These are committed to `supabase/migrations/` but NOT yet applied to the
+live project. Apply in the usual flow: line-by-line review → `begin/commit`
+→ run the migration's verification tail → append a **Confirmed applied**
+row.
+
+| Migration / toggle | Written | Waiting on |
+|---|---|---|
+| 0049 (`notifications_email_guard`, Phase 2b) | commit history | The 2b email deploy runbook (Resend key + Edge Function). Independent of 0050/0051. |
+| 0051 (`host_response_stats`, Phase 5 Part C) | commit `870017c` | Line-by-line review, then apply. SECURITY DEFINER RPC; verification tail in the file (signature, definer+stable+search_path, empty-input, thin-host sample_count, anon execute). |
+| **Realtime publication toggle** (Phase 5 Part A) | n/a (dashboard, not SQL) | Omar adds `public.messages` + `public.notifications` to the `supabase_realtime` publication (Dashboard → Database → Replication). **Nothing client-side receives realtime events until this is on** — the Round 9 `useMessages` subscription, the new inquiry-timeline subscription, and the notifications toast are all dormant without it. |
+
+**⚠️ Verify-first (Phase 5 A1):** before flipping, run this read-only
+check and record the result here —
+
+```sql
+select schemaname, tablename
+from pg_publication_tables
+where pubname = 'supabase_realtime'
+order by 1, 2;
+```
+
+If `public.messages` is **absent** from the result, then the Round 9
+realtime subscription (shipped 2026-06-12, wired into `bookings/[id]`)
+has been **dormant since birth** — it subscribes but never receives —
+which explains any "chat/badge only updates on refresh" report from the
+founder. After adding both tables, re-run the query and confirm both
+now appear, then log it.
+
 ## Known unwritten
 
 _(none currently — 0042 landed on 2026-06-27 and is recorded above.)_

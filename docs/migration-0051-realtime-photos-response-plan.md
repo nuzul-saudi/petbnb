@@ -1,12 +1,34 @@
 # Migration 0051 / Phase 5 — Realtime + pet-photo paths + response badge (PLAN)
 
-> **Status: PLAN — not yet built.** Plan-doc-first (a migration + a
-> realtime dashboard toggle). Flow: this doc → Strategy review → build
-> (SQL written-not-applied, app code) → line-by-line SQL review → Omar
-> applies + flips the realtime toggle → verification → apply log.
+> **Status: APPROVED + BUILT (client) — SQL written, not applied.**
+> Strategy approved 2026-07-08 (D-A1 YES / D-B1 KEEP / D-C1 YES). Client
+> code shipped (see "Build state"); the 0051 RPC is written-not-applied
+> pending line-by-line review; the realtime publication toggle is an Omar
+> checkpoint. Remaining flow: SQL review → Omar applies 0051 + flips the
+> realtime toggle → verification → apply log.
 >
 > **Baseline:** main through Phase 4 (0050 applied; 0049 written-not-
 > deployed). Migrations applied through **0050**.
+>
+> ## Build state (2026-07-08)
+> - **Part C RPC + types + photo_url comment** — commit `870017c`
+>   (`0051_host_response_stats.sql` written-not-applied; `database.ts`).
+> - **Part C badge client** — commit `89fb7cb` (`host-response.ts` +
+>   ListingCard + detail + i18n `response.*` + unit tests).
+> - **Part A notifications realtime + ToastProvider** — commit `855175d`.
+> - **Part A inquiry-timeline realtime** — commit `abb07b0`.
+> - **Part B** — D-B1 KEEP: the `photo_url` storage-path comment landed
+>   in `870017c`. No column rename, no backfill/re-upload UI (pre-pilot
+>   has ~no legacy https rows; the sign helpers already pass any through
+>   until expiry).
+> - **A1 dormant-realtime finding:** I cannot query the DB — the
+>   verify-first step is Omar's. The check + the "dormant since birth"
+>   interpretation is recorded in `docs/migration-apply-log.md` under
+>   "Written, pending apply" (run the `pg_publication_tables` query; if
+>   `public.messages` is absent, Round 9 realtime — shipped 2026-06-12 —
+>   has never received an event, which explains any refresh-only report).
+> - **Survivorship bias (D-C1):** documented in the 0051 RPC comment +
+>   the post-pilot backlog (response RATE companion metric).
 
 ## 1. Goal & scope (from the plan, extended by founder)
 
@@ -150,14 +172,18 @@ log — not part of the SQL file.
   pops a toast live; a pet photo still renders after > 7 days (re-sign);
   a seeded host with ≥3 replies shows a response badge, a thin host none.
 
-## 8. Open decisions
+## 8. Open decisions — RESOLVED (Strategy, 2026-07-08)
 
 - **D-A1** — notification toast: current-user + foreground only for v1?
-  *(rec: yes.)*
-- **D-B1** — rename `photo_url` → `photo_path`, or keep the (correct but
-  mis-named) `photo_url`? *(rec: KEEP — cosmetic; avoid a churny sweep.)*
-- **D-C1** — first-response measured from `inquiry.created_at` to the
-  host's first message? *(rec: yes.)*
+  **YES.** (Realtime only delivers while foregrounded; no OS push.)
+- **D-B1** — rename `photo_url` → `photo_path`, or keep it? **KEEP** —
+  cosmetic churn avoided; mitigation is a one-line `database.ts` comment
+  stating the column holds a storage path (landed `870017c`).
+- **D-C1** — first-response from `inquiry.created_at` to the host's first
+  message, median via `percentile_cont`, hidden < 3? **YES**, with the
+  survivorship-bias caveat: it medians only ANSWERED inquiries. Companion
+  **response RATE** metric logged to the post-pilot backlog; RPC comment
+  + badge copy stay honest ("responds within…", never "responsiveness").
 
 ## 9. Non-goals (Phase 5)
 
