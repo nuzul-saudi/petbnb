@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/lib/auth';
 import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
 import { HostNotificationsProvider } from '@/lib/host-notifications';
+import { ToastProvider } from '@/lib/toast';
 import { initAnalytics, trackPageview } from '@/lib/analytics';
 import { initSentry } from '@/lib/sentry';
 import { useTheme } from '@/theme/theme';
@@ -60,11 +61,20 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <HostNotificationsProvider>
-          <LocaleProvider>
-            <AppShell />
-          </LocaleProvider>
-        </HostNotificationsProvider>
+        {/* Phase 5 — LocaleProvider hoisted above ToastProvider +
+            HostNotificationsProvider so the notifications provider can
+            translate a notification's title_key for the realtime toast.
+            LocaleProvider reads the session directly (not via useAuth),
+            so it composes fine below AuthProvider at this depth.
+            ToastProvider must wrap HostNotificationsProvider — the
+            latter calls useToast() in its realtime effect. */}
+        <LocaleProvider>
+          <ToastProvider>
+            <HostNotificationsProvider>
+              <AppShell />
+            </HostNotificationsProvider>
+          </ToastProvider>
+        </LocaleProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

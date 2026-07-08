@@ -27,8 +27,15 @@ import {
 } from 'react';
 
 import { useAuth } from '@/lib/auth';
+import { useTranslation } from '@/lib/i18n';
 import { countPendingHostBookings } from '@/lib/listings';
-import { countUnreadNotifications } from '@/lib/notifications';
+import {
+  countUnreadNotifications,
+  NOTIFICATION_GLYPH,
+  type NotificationType,
+} from '@/lib/notifications';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/lib/toast';
 
 type HostNotificationsContextValue = {
   /**
@@ -139,6 +146,56 @@ export function HostNotificationsProvider({
       cancelled = true;
     };
   }, [user?.id, unreadRefreshTick]);
+
+  // Phase 5 / realtime — live notifications. Subscribe to INSERTs on
+  // `notifications` scoped to the current user; on arrival bump the bell
+  // badge AND pop a tappable toast (foreground-only by nature — the
+  // channel only delivers while the app is open, D-A1). Best-effort: a
+  // failed subscribe just falls back to the focus/action refetch that
+  // already exists. Requires `notifications` on the supabase_realtime
+  // publication (dashboard toggle — see the apply log).
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid || !supabase) return;
+    const channel = supabase
+      .channel(`notifications:${uid}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${uid}`,
+        },
+        (payload) => {
+          const n = payload.new as {
+            title_key?: string;
+            body_params?: Record<string, string | number> | null;
+            link_path?: string;
+            type?: NotificationType;
+          };
+          // Badge bumps live.
+          refreshUnread();
+          // Toast the localized title + route to its deep link on tap.
+          if (n.title_key) {
+            showToast(t(n.title_key, n.body_params ?? undefined), {
+              linkPath: n.link_path,
+              glyph: n.type ? NOTIFICATION_GLYPH[n.type] : undefined,
+            });
+          }
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          logWarn('[host_notifications.realtime_subscribe_status]', status);
+        }
+      });
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [user?.id, refreshUnread, showToast, t]);
 
   const value = useMemo<HostNotificationsContextValue>(
     () => ({
