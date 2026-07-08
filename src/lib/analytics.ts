@@ -18,6 +18,15 @@ import { Platform } from 'react-native';
 type AnalyticsExtra = { posthogKey?: string; posthogHost?: string };
 const extra = (Constants.expoConfig?.extra ?? {}) as AnalyticsExtra;
 
+// TEMP DEBUG (remove after diagnosis) — expose the resolved `extra` on the
+// window so we can confirm whether posthogKey/sentryDsn actually reached
+// Constants.expoConfig.extra in the deployed bundle. `any` cast is
+// justified: attaching an ad-hoc debug property to window has no typed home.
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).__DEBUG_EXTRA__ = extra;
+}
+
 const POSTHOG_KEY =
   typeof extra.posthogKey === 'string' && extra.posthogKey.length > 0
     ? extra.posthogKey
