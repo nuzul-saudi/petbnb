@@ -73,6 +73,7 @@ import {
   sendMessage,
   type Message,
 } from '@/lib/messages';
+import { supabase } from '@/lib/supabase';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 export default function InquiryThreadScreen() {
@@ -167,6 +168,65 @@ export default function InquiryThreadScreen() {
       void refetchTimeline();
     }, [refetchTimeline]),
   );
+
+  // Phase 5 realtime — the β timeline spans the inquiry thread AND every
+  // linked booking's thread (a message lives physically in one or the
+  // other; 0040 XOR). Subscribe to message INSERTs on both keys and
+  // refetch on arrival — no optimistic insert; the cached fetch stays
+  // the single source of truth (Round 9 decision). Focus-refetch remains
+  // the fallback if the subscription drops. The booking-id set is only
+  // known after the first fetch, so the effect re-subscribes when it
+  // changes. Requires `messages` on the supabase_realtime publication
+  // (dashboard toggle — see the apply log).
+  const linkedBookingIdsKey = useMemo(
+    () =>
+      rawTimeline.bookings
+        .map((b) => b.id)
+        .sort()
+        .join(','),
+    [rawTimeline.bookings],
+  );
+  useEffect(() => {
+    if (!id || !supabase) return;
+    const bookingIds = linkedBookingIdsKey
+      ? linkedBookingIdsKey.split(',')
+      : [];
+    const channel = supabase.channel(`inquiry-timeline:${id}`);
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `inquiry_id=eq.${id}`,
+      },
+      () => {
+        void refetchTimeline();
+      },
+    );
+    for (const bid of bookingIds) {
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `booking_id=eq.${bid}`,
+        },
+        () => {
+          void refetchTimeline();
+        },
+      );
+    }
+    channel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        logWarn('[inquiry.realtime_subscribe_status]', status);
+      }
+    });
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [id, linkedBookingIdsKey, refetchTimeline]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user)
