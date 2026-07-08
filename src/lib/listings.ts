@@ -88,6 +88,12 @@ export type ListingFeedItem = Tables<'listings'> & {
   // query failed); UI shows the "new host" badge as fallback.
   host_avg_rating?: number | null;
   host_review_count?: number;
+  // Phase 5 / 0051 — median host first-response minutes + sample size.
+  // Populated by listActiveListings via the host_response_stats RPC.
+  // Undefined/null when the RPC failed or the host has no answered
+  // inquiries; the card hides the response badge under 3 samples.
+  host_response_median_minutes?: number | null;
+  host_response_sample_count?: number;
 };
 
 /**
@@ -308,6 +314,31 @@ export async function listActiveListings(
         }
       } catch {
         // RPC or network — silently skip the rating data.
+      }
+
+      // Phase 5 / 0051 — host response-time aggregate, same best-effort
+      // posture as ratings: a failure just leaves the response badge
+      // hidden (the card already treats missing stats as "no badge").
+      try {
+        const { data: responseStats } = await supabase.rpc(
+          'host_response_stats',
+          { host_ids: hostIds },
+        );
+        if (responseStats && responseStats.length > 0) {
+          const byHost = new Map<string, { median: number; count: number }>(
+            responseStats.map((r) => [
+              r.host_id,
+              { median: Number(r.median_minutes), count: Number(r.sample_count) },
+            ]),
+          );
+          for (const it of items) {
+            const agg = byHost.get(it.host_id);
+            it.host_response_median_minutes = agg ? agg.median : null;
+            it.host_response_sample_count = agg?.count ?? 0;
+          }
+        }
+      } catch {
+        // RPC or network — silently skip the response data.
       }
     }
   }

@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import { ListingPhotoCarousel } from '@/components/ListingPhotoCarousel';
 import { findCity, findDistrict } from '@/lib/cities';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
+import { responseBadgeKey } from '@/lib/host-response';
 import { useTranslation } from '@/lib/i18n';
 import type { ListingFeedItem } from '@/lib/listings';
 import { speciesEmoji, type Species } from '@/lib/species';
@@ -204,6 +205,23 @@ export function ListingCard({
           <Text style={styles.newHost}>{t('listing.host_new_badge')}</Text>
         )}
 
+        {/* Phase 5 / 0051 — response-time trust signal. Independent of
+            the rating line: a host can show both. Hidden under 3 answered
+            inquiries (responseBadgeKey returns null). Not shown in the
+            host's own status-badge view. */}
+        {(() => {
+          if (statusBadge) return null;
+          const key = responseBadgeKey(
+            listing.host_response_median_minutes,
+            listing.host_response_sample_count,
+          );
+          return key ? (
+            <Text style={styles.responseBadge} numberOfLines={1}>
+              💬 {t(key)}
+            </Text>
+          ) : null;
+        })()}
+
         <Text style={styles.title} numberOfLines={2}>
           {pickLocalized(listing.title_ar, listing.title_en, locale)}
         </Text>
@@ -340,6 +358,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.goldDeep,
     letterSpacing: 0.3,
+  },
+  responseBadge: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.moss,
+    marginTop: 2,
   },
   badge: {
     alignSelf: 'flex-start',

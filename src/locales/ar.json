@@ -350,6 +350,12 @@
     "host_complete_failed": "تعذر إنهاء الإقامة، حاولي مرة أخرى.",
     "host_completing": "جاري الإنهاء..."
   },
+  "response": {
+    "within_hour": "يرد عادةً خلال ساعة",
+    "within_hours": "يرد عادةً خلال ساعات",
+    "within_day": "يرد عادةً خلال يوم",
+    "within_days": "يرد عادةً خلال أيام"
+  },
   "reviews": {
     "rate_host_title": "قيّم المضيفة",
     "rate_owner_title": "قيّم مالكة الحيوان",

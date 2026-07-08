@@ -15,11 +15,13 @@ import { track } from '@/lib/analytics';
 import { findCity, findDistrict } from '@/lib/cities';
 import { formatDate } from '@/lib/date';
 import { formatSAR, pickLocalized, toArabicDigits } from '@/lib/format';
+import { responseBadgeKey } from '@/lib/host-response';
 import { useTranslation } from '@/lib/i18n';
 import { openInquiry } from '@/lib/inquiries';
 import { getListingWithPhotos, type ListingDetail } from '@/lib/listings';
 import { CANCELLATION_FULL_REFUND_HOURS } from '@/lib/payments-policy';
 import { listReviewsForHost, type HostReview } from '@/lib/reviews';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -117,6 +119,9 @@ export default function ListingDetailScreen() {
   // means a listing-detail open and a host-profile open could share
   // the cache (today they don't; trivial follow-up).
   const [reviews, setReviews] = useState<HostReview[]>([]);
+  // Phase 5 / 0051 — host response-time badge. Best-effort; null keeps
+  // the badge hidden (responseBadgeKey returns null on missing stats).
+  const [responseBadge, setResponseBadge] = useState<string | null>(null);
 
   // Lightbox state. Opens when any mosaic tile is tapped; closes
   // via X or the system back gesture.
@@ -157,6 +162,29 @@ export default function ListingDetailScreen() {
     void listReviewsForHost(hostId).then((rows) => {
       if (!cancelled) setReviews(rows);
     });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing?.host_id]);
+
+  // Phase 5 / 0051 — host response-time badge for the single host. Same
+  // best-effort posture as reviews; on any failure the badge stays hidden.
+  useEffect(() => {
+    const hostId = listing?.host_id;
+    if (!hostId || !supabase) return;
+    let cancelled = false;
+    void supabase
+      .rpc('host_response_stats', { host_ids: [hostId] })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const row = data?.[0];
+        setResponseBadge(
+          responseBadgeKey(
+            row ? Number(row.median_minutes) : null,
+            row ? Number(row.sample_count) : null,
+          ),
+        );
+      });
     return () => {
       cancelled = true;
     };
@@ -382,6 +410,13 @@ export default function ListingDetailScreen() {
                     </Text>
                   </View>
                 )}
+                {/* Phase 5 / 0051 — response-time trust signal. Hidden
+                    under 3 answered inquiries (null key). */}
+                {responseBadge ? (
+                  <Text style={styles.responseBadge} numberOfLines={1}>
+                    💬 {t(responseBadge)}
+                  </Text>
+                ) : null}
               </View>
             </View>
           </View>
@@ -835,6 +870,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.mossDeep,
     letterSpacing: 0.3,
+  },
+  responseBadge: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.moss,
+    width: '100%',
+    marginTop: 2,
   },
   reviewsList: {
     gap: spacing.md,

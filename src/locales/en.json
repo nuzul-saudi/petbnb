@@ -348,6 +348,12 @@
     "host_complete_failed": "Couldn't complete the stay. Please try again.",
     "host_completing": "Completing…"
   },
+  "response": {
+    "within_hour": "Usually responds within an hour",
+    "within_hours": "Usually responds within a few hours",
+    "within_day": "Usually responds within a day",
+    "within_days": "Usually responds within a few days"
+  },
   "reviews": {
     "rate_host_title": "Rate your host",
     "rate_owner_title": "Rate the owner",
