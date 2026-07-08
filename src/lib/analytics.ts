@@ -72,19 +72,44 @@ export function isAnalyticsEnabled(): boolean {
  * resolves.
  */
 export function initAnalytics(): void {
+  // TEMP DEBUG (remove after diagnosis) — a stage tracker so we can see
+  // from the live console exactly where init dies:
+  //   window.__POSTHOG_STAGE__      — furthest stage reached
+  //   window.__POSTHOG_INIT_ERROR__ — the thrown error, if any
+  // Read guide: undefined = initAnalytics never ran; 'called' = guard
+  // returned early; 'importing' (stuck) = the dynamic import never
+  // resolved (chunk 404 / CSP / code-split) — check the Network tab for a
+  // posthog-js JS chunk; 'errored' = init threw (read __POSTHOG_INIT_ERROR__).
+  const mark = (s: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__POSTHOG_STAGE__ = s;
+    }
+  };
+  mark('called');
   if (!POSTHOG_KEY || Platform.OS !== 'web' || initStarted) return;
   initStarted = true;
+  mark('guard_passed');
   void (async () => {
     try {
+      mark('importing');
       const { default: ph } = await import('posthog-js');
+      mark('imported');
       ph.init(POSTHOG_KEY, {
         api_host: POSTHOG_HOST,
         // We fire funnel events explicitly; no automatic pageview spam.
         capture_pageview: false,
         persistence: 'localStorage',
       });
+      mark('inited');
       posthog = ph;
-    } catch {
+    } catch (e) {
+      // TEMP DEBUG (remove after diagnosis) — surface the swallowed error.
+      mark('errored');
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__POSTHOG_INIT_ERROR__ = e;
+      }
       // Never let analytics wiring break the app.
     }
   })();
