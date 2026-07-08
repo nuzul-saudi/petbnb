@@ -156,6 +156,14 @@ export type Database = {
           medical_needs: string | null;
           dietary_restrictions: string | null;
           medications: string | null;
+          // NB (Phase 5, D-B1): despite the name, this stores a private
+          // STORAGE PATH, not a URL. uploadPetPhoto returns the path;
+          // signPetPhotoUrl signs it on render with a 1h TTL. Legacy
+          // pre-Round-6 rows may still hold an https:// signed URL — the
+          // sign helpers pass those through until expiry. The column was
+          // NOT renamed to photo_path (cosmetic churn, weighed + declined
+          // 2026-07-08); this comment is the mitigation so the name stops
+          // misleading readers.
           photo_url: string | null;
           created_at: string;
         };
@@ -1235,6 +1243,18 @@ export type Database = {
           host_id: string;
           avg_rating: number;
           review_count: number;
+        }[];
+      };
+      // Phase 5 / 0051 — median host first-response time + sample size,
+      // batched per feed page. sample_count < 3 → client hides the badge.
+      // NOTE: survivorship bias — medians only ANSWERED inquiries (see
+      // the migration comment + post-pilot-backlog response-RATE item).
+      host_response_stats: {
+        Args: { host_ids: string[] };
+        Returns: {
+          host_id: string;
+          median_minutes: number;
+          sample_count: number;
         }[];
       };
       // Feature 1 / 0035 — search-time availability filtering.
