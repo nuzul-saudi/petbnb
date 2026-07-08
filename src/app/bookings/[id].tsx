@@ -1016,6 +1016,20 @@ export default function BookingDetailScreen() {
               vaccination dates so they have the context they need.
               The viewer side check on isHost gates it to the listing
               host only (owners already know their own pet's notes). */}
+          {/* A booking always has >=1 pet, so an empty array means RLS
+              hid every pet from this viewer (declined/cancelled bookings
+              are outside the pets-visibility status set per 0004/0050).
+              Show the shared "pets hidden" fallback instead of an empty
+              gap — the getBooking assembly already compacted the nulls. */}
+          {booking.pets.length === 0 ? (
+            <View style={styles.petBlock}>
+              <View style={styles.petBlockHeader}>
+                <Text style={styles.petBlockName}>
+                  🐈 {t("mybookings.pets_hidden_fallback")}
+                </Text>
+              </View>
+            </View>
+          ) : null}
           {booking.pets.map((p) => {
             const services = isLegacyBooking
               ? []

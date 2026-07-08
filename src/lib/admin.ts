@@ -8,6 +8,7 @@ import {
   setListingStatus,
   type ListingStatus,
 } from '@/lib/listings';
+import { compactJoined } from '@/lib/joins';
 import { supabase } from '@/lib/supabase';
 import type { Database, Enums, Tables } from '@/types/database';
 
@@ -235,10 +236,9 @@ export async function listPendingReviews(): Promise<AdminReview[]> {
 
     if (reviewType === null || reviewedAt === null) continue;
 
-    const photos = (row.listing_photos ?? []) as {
-      photo_url: string;
-      sort_order: number;
-    }[];
+    const photos = compactJoined(
+      row.listing_photos as { photo_url: string; sort_order: number }[] | null,
+    );
     const cover = photos.length
       ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
       : null;
@@ -348,10 +348,9 @@ export async function listAllListings(): Promise<AdminReview[]> {
               .reduce((a, b) => (a > b ? a : b))
           : row.created_at;
 
-    const photos = (row.listing_photos ?? []) as {
-      photo_url: string;
-      sort_order: number;
-    }[];
+    const photos = compactJoined(
+      row.listing_photos as { photo_url: string; sort_order: number }[] | null,
+    );
     const cover = photos.length
       ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0].photo_url
       : null;
@@ -444,8 +443,12 @@ export async function getAdminListingReview(
   const fieldDraft = (data.listing_drafts ?? null) as
     | Tables<'listing_drafts'>
     | null;
-  const livePhotos = (data.listing_photos ?? []) as AdminListingPhoto[];
-  const draftPhotos = (data.listing_photo_drafts ?? []) as AdminListingPhoto[];
+  const livePhotos = compactJoined(
+    data.listing_photos as AdminListingPhoto[] | null,
+  );
+  const draftPhotos = compactJoined(
+    data.listing_photo_drafts as AdminListingPhoto[] | null,
+  );
   const hasFieldDraft = fieldDraft !== null;
   const hasPhotoDraft = draftPhotos.length > 0;
 

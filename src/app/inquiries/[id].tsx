@@ -582,12 +582,18 @@ function RichBookingPlacedDivider({
 }) {
   const dates = formatDateRange(booking.start_date, booking.end_date, locale);
   const petCount = booking.pets.length;
+  // petCount can be 0 when RLS hides every pet on this booking (e.g. a
+  // declined booking's pets are hidden from the host per 0004/0050). Show
+  // the shared "pets hidden" fallback rather than a "0 pets" label, and
+  // guard pets[0] against a compacted-to-empty array.
   const petsLabel =
-    petCount === 1
-      ? booking.pets[0].name
-      : petCount === 2
-        ? t('inquiry.timeline_placed_pets_count_two')
-        : t('inquiry.timeline_placed_pets_count_many', { count: petCount });
+    petCount === 0
+      ? t('mybookings.pets_hidden_fallback')
+      : petCount === 1
+        ? booking.pets[0].name
+        : petCount === 2
+          ? t('inquiry.timeline_placed_pets_count_two')
+          : t('inquiry.timeline_placed_pets_count_many', { count: petCount });
   return (
     <View style={styles.dividerRich}>
       <View style={styles.dividerLine} />

@@ -30,6 +30,7 @@
 //     §6) — it doesn't close the block. Its divider renders if a
 //     disputed_at exists.
 
+import { pluckJoined } from '@/lib/joins';
 import { logWarn } from '@/lib/log';
 
 import { supabase } from '@/lib/supabase';
@@ -165,7 +166,10 @@ export async function fetchInquiryTimelineRaw(
     return {
       ...(r as unknown as Tables<'bookings'>),
       listing: (r.listing ?? null) as TimelineBooking['listing'],
-      pets: (r.booking_pets ?? []).map((bp) => bp.pet),
+      // RLS can null the inner pet embed (e.g. a declined booking's pets
+      // are hidden from the host per 0004/0050) — pluck + compact so the
+      // timeline never carries null pet elements. See src/lib/joins.ts.
+      pets: pluckJoined(r.booking_pets, (bp) => bp.pet),
     };
   });
 

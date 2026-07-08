@@ -38,6 +38,7 @@ import type { ConditionReport } from "@/lib/condition-reports";
 import type { DailyUpdate } from "@/lib/daily-updates";
 import { formatRiyadhStamp } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n";
+import { compactJoined } from "@/lib/joins";
 import type { PetPhotoSource } from "@/lib/pets";
 import { colors, fonts, radii, shadows, spacing } from "@/theme/tokens";
 
@@ -129,7 +130,7 @@ export function DailyUpdatesSection({
         <View style={styles.updatesList}>
           {updates.map((u) => {
             const photos = Array.isArray(u.photos)
-              ? (u.photos as string[])
+              ? compactJoined(u.photos as (string | null)[])
               : [];
             // Belt-and-suspenders: also gate the edit-form render on
             // canMutateUpdates, so a stale editingEntryId during a

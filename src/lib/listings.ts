@@ -1,3 +1,4 @@
+import { compactJoined } from '@/lib/joins';
 import { logWarn } from '@/lib/log';
 // Read-only data access for the listings feed and listing detail screen.
 // Inserts/updates land in Step 7 (host create-listing flow).
@@ -242,7 +243,7 @@ export async function listActiveListings(
   // raw rows. Pick the lowest sort_order as the cover; compute distance
   // from the caller's location if provided.
   const items: ListingFeedItem[] = (data ?? []).map((row) => {
-    const rawPhotos = (row.listing_photos ?? []) as PhotoSummary[];
+    const rawPhotos = compactJoined(row.listing_photos as PhotoSummary[] | null);
     // Sort once, then derive cover + carousel set from the sorted
     // array so the cover always matches photos[0].
     const sortedPhotos = [...rawPhotos].sort(
@@ -344,7 +345,7 @@ export async function getListingWithPhotos(id: string): Promise<ListingDetail | 
   if (error) throw error;
   if (!data) return null;
 
-  const photos = ((data.listing_photos ?? []) as PhotoSummary[]).sort(
+  const photos = compactJoined(data.listing_photos as PhotoSummary[] | null).sort(
     (a, b) => a.sort_order - b.sort_order,
   );
   const fieldDraft = (data.listing_drafts ?? null) as { id: string } | null;
@@ -405,7 +406,7 @@ export async function listOwnListings(
   // Adds has_pending_edit derived from the draft embeds — true when
   // either a field draft or any photo draft exists for the listing.
   return (data ?? []).map((row) => {
-    const rawPhotos = (row.listing_photos ?? []) as PhotoSummary[];
+    const rawPhotos = compactJoined(row.listing_photos as PhotoSummary[] | null);
     const sortedPhotos = [...rawPhotos].sort(
       (a, b) => a.sort_order - b.sort_order,
     );
@@ -953,8 +954,10 @@ export async function getListingForEdit(
   const draft = (data.listing_drafts ?? null) as
     | Tables<'listing_drafts'>
     | null;
-  const livePhotos = (data.listing_photos ?? []) as PhotoSummary[];
-  const draftPhotos = (data.listing_photo_drafts ?? []) as PhotoSummary[];
+  const livePhotos = compactJoined(data.listing_photos as PhotoSummary[] | null);
+  const draftPhotos = compactJoined(
+    data.listing_photo_drafts as PhotoSummary[] | null,
+  );
 
   const hasFieldDraft = draft !== null;
   const hasPhotoDraft = draftPhotos.length > 0;

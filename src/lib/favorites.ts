@@ -19,6 +19,7 @@
 //         supabase insert+ignore pattern; a duplicate doesn't throw.
 //       - remove DELETE matches by composite PK; no-op if absent.
 
+import { compactJoined } from '@/lib/joins';
 import { logWarn } from '@/lib/log';
 import type { ListingFeedItem } from '@/lib/listings';
 import { distanceKm } from '@/lib/listings';
@@ -93,11 +94,11 @@ export async function listFavoriteListings(
       const fav = row as unknown as FavoriteRow;
       if (!fav.listing) return null;
       const l = fav.listing;
-      const rawPhotos = (l.listing_photos ?? []) as {
-        id: string;
-        photo_url: string;
-        sort_order: number;
-      }[];
+      const rawPhotos = compactJoined(
+        l.listing_photos as
+          | { id: string; photo_url: string; sort_order: number }[]
+          | null,
+      );
       const sortedPhotos = [...rawPhotos].sort(
         (a, b) => a.sort_order - b.sort_order,
       );

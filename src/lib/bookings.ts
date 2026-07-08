@@ -9,6 +9,7 @@
 // callers remain.
 
 import { track } from '@/lib/analytics';
+import { pluckJoined } from '@/lib/joins';
 import {
   computeCancellationRefund,
   snapshotFees,
@@ -302,7 +303,7 @@ export async function getBooking(id: string): Promise<BookingDetail | null> {
     // RLS can legitimately null ANY joined row (a host may lack SELECT
     // reach on some booked pets — see the 0050 pets-visibility fix), so
     // compact nulls here. Every joined-entity render must survive null.
-    pets: (bp ?? []).map((b) => b.pet).filter(Boolean),
+    pets: pluckJoined(bp, (b) => b.pet),
   };
 }
 
@@ -604,7 +605,7 @@ export async function listBookingsForOwner(
       // RLS can legitimately null ANY joined row (a host may lack SELECT
     // reach on some booked pets — see the 0050 pets-visibility fix), so
     // compact nulls here. Every joined-entity render must survive null.
-    pets: (bp ?? []).map((b) => b.pet).filter(Boolean),
+    pets: pluckJoined(bp, (b) => b.pet),
       latest_update_at: null,
       latest_message,
     };
@@ -696,7 +697,7 @@ export async function listBookingsForHost(
       // RLS can legitimately null ANY joined row (a host may lack SELECT
     // reach on some booked pets — see the 0050 pets-visibility fix), so
     // compact nulls here. Every joined-entity render must survive null.
-    pets: (bp ?? []).map((b) => b.pet).filter(Boolean),
+    pets: pluckJoined(bp, (b) => b.pet),
       latest_message,
     };
   });

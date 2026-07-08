@@ -43,6 +43,7 @@ import { Button } from "@/components/Button";
 import type { ConditionReport } from "@/lib/condition-reports";
 import { formatRiyadhStamp } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n";
+import { compactJoined } from "@/lib/joins";
 import type { PetPhotoSource } from "@/lib/pets";
 import { colors, fonts, radii, shadows, spacing } from "@/theme/tokens";
 
@@ -111,7 +112,9 @@ export function CheckOutSection({
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.updatePhotosRow}
                   >
-                    {(checkOutReport.photos as string[]).map((url, i) => (
+                    {compactJoined(
+                      checkOutReport.photos as (string | null)[],
+                    ).map((url, i) => (
                       <Image
                         key={`${checkOutReport.id}-${i}`}
                         source={{ uri: url }}
