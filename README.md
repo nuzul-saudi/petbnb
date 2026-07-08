@@ -25,3 +25,8 @@ Expo (React Native) · TypeScript strict · Supabase · Vitest · GitHub Actions
 ## License
 
 Proprietary. All rights reserved.
+
+<!-- Deploy trigger: 2026-07-08 — force a fresh Vercel build from source so
+the SENTRY_DSN / POSTHOG_KEY / POSTHOG_HOST env vars bake into the bundle
+(a prior "Redeploy" promoted a cached artifact without them). No-op. -->
+
