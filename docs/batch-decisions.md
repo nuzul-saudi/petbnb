@@ -399,3 +399,26 @@ it into a general "action needed" counter.
 - **Root cause of the "PostHog never initializes" saga was a STALE VERCEL DEPLOY, not code.** Env vars, `app.config.ts` plumbing, and the init code were all correct throughout. Vercel was serving an old build; a genuine git-sourced deployment of the latest commit brought PostHog + Sentry live (confirmed: real Web-vitals events in PostHog Activity, `__SENTRY__` defined). Lesson: `Redeploy` reuses the cached artifact — force a fresh build with a real new commit, and verify the Production alias points at the newest deployment.
 - **`window.posthog` is a FALSE diagnostic signal — never use it as a health check.** The npm-module build of posthog-js does NOT populate `window.posthog` (snippet-loader-only behavior); it stays `undefined` even when `capture()` works. This wrongly implied init was failing and cost a debug round. Verify PostHog via the dashboard Activity feed (or the module-level `posthog` var in `analytics.ts`), never a `window` global. Pinned as a code comment at `analytics.ts` `let posthog`.
 - **SPA-rewrite-swallows-the-chunk theory: formally dead.** The runtime `import('posthog-js')` RESOLVED on the phone; no `vercel.json` change was needed.
+
+## Realtime channel discipline (2026-07-10 — mandatory for all future channels)
+
+Locked after the inquiry-timeline channel-collision crash (fixed in
+`6eb29a3`; latent from Jul 8, armed the moment the realtime publication
+went live). Every Supabase realtime subscription in this codebase MUST
+follow all three rules:
+
+1. **Effect deps = topic identity ONLY** (the ids that name the channel —
+   e.g. `[bookingId]`, `[id, linkedBookingIdsKey]`, `[user?.id]`). Never
+   put a refetch/callback the handler itself calls into the deps — a
+   handler-triggered state change then re-runs the effect mid-flight.
+2. **Handlers read the latest callback via a ref** (`ref.current = fn`
+   each render; handler calls `ref.current()`), so callbacks stay fresh
+   without being deps.
+3. **Teardown via `supabase.removeChannel(channel)` — never bare
+   `channel.unsubscribe()`.** Bare unsubscribe leaves the topic in the
+   client registry, so the next `supabase.channel(<same topic>)` collides
+   with the stale instance and throws.
+
+All three existing channels (`useMessages`, inquiry timeline,
+host-notifications) conform as of `6eb29a3`. New channels copy that
+pattern verbatim.
