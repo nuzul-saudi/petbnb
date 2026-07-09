@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/lib/auth';
 import { LocaleProvider, useTranslation, type Locale } from '@/lib/i18n';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { HostNotificationsProvider } from '@/lib/host-notifications';
 import { ToastProvider } from '@/lib/toast';
 import { initAnalytics, trackPageview } from '@/lib/analytics';
@@ -59,24 +60,30 @@ export default function RootLayout() {
   });
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        {/* Phase 5 — LocaleProvider hoisted above ToastProvider +
-            HostNotificationsProvider so the notifications provider can
-            translate a notification's title_key for the realtime toast.
-            LocaleProvider reads the session directly (not via useAuth),
-            so it composes fine below AuthProvider at this depth.
-            ToastProvider must wrap HostNotificationsProvider — the
-            latter calls useToast() in its realtime effect. */}
-        <LocaleProvider>
-          <ToastProvider>
-            <HostNotificationsProvider>
-              <AppShell />
-            </HostNotificationsProvider>
-          </ToastProvider>
-        </LocaleProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    // ErrorBoundary is the OUTERMOST wrapper — above SafeAreaProvider —
+    // so even a provider crash renders the retry card instead of a
+    // blank screen. It uses no hooks/context by design (module-scope
+    // t() + static tokens only), so this placement is safe.
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <AuthProvider>
+          {/* Phase 5 — LocaleProvider hoisted above ToastProvider +
+              HostNotificationsProvider so the notifications provider can
+              translate a notification's title_key for the realtime toast.
+              LocaleProvider reads the session directly (not via useAuth),
+              so it composes fine below AuthProvider at this depth.
+              ToastProvider must wrap HostNotificationsProvider — the
+              latter calls useToast() in its realtime effect. */}
+          <LocaleProvider>
+            <ToastProvider>
+              <HostNotificationsProvider>
+                <AppShell />
+              </HostNotificationsProvider>
+            </ToastProvider>
+          </LocaleProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

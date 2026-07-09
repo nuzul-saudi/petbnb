@@ -354,6 +354,10 @@
     "within_day": "Usually responds within a day",
     "within_days": "Usually responds within a few days"
   },
+  "errors": {
+    "boundary_title": "Something went wrong",
+    "boundary_retry": "Try again"
+  },
   "reviews": {
     "rate_host_title": "Rate your host",
     "rate_owner_title": "Rate the owner",

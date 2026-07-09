@@ -356,6 +356,10 @@
     "within_day": "يرد عادةً خلال يوم",
     "within_days": "يرد عادةً خلال أيام"
   },
+  "errors": {
+    "boundary_title": "حدث خطأ غير متوقع",
+    "boundary_retry": "إعادة المحاولة"
+  },
   "reviews": {
     "rate_host_title": "قيّم المضيفة",
     "rate_owner_title": "قيّم مالكة الحيوان",
