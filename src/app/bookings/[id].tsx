@@ -169,11 +169,14 @@ export default function BookingDetailScreen() {
     refetch: refetchConditionReports,
   } = useConditionReports(id);
 
-  // Round 5b — messages. Same hook pattern as the others. Refetched
-  // on screen-focus (useFocusEffect below) — that's the MVP
-  // behavior in lieu of Supabase Realtime. The trade-off is that
-  // navigating away and back is the implicit "pull-to-refresh"
-  // gesture for the other party's new messages.
+  // Round 5b — messages, via useMessages. As of Round 9 (2026-06-12)
+  // useMessages subscribes to postgres_changes INSERTs on this booking's
+  // messages and refetches LIVE (see the hook). This focus-refetch is the
+  // FALLBACK for subscription drops (network blip / device sleep), not the
+  // primary path. NB: live delivery requires the `messages` table on the
+  // `supabase_realtime` publication (dashboard toggle) — if only
+  // `notifications` was published, bells/toasts update live but chat
+  // bubbles won't, and this focus-refetch silently carries the thread.
   const {
     data: messages,
     loading: messagesLoading,
