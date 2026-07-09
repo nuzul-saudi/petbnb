@@ -108,7 +108,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           pointerEvents="box-none"
           style={[
             styles.wrap,
-            { top: Math.max(insets.top, spacing.md) + spacing.xs, opacity },
+            // Anchored to the BOTTOM so it never overlaps the top bar's
+            // notification bell — a top toast covered the very badge it
+            // was bumping (2026-07-09 founder report).
+            { bottom: Math.max(insets.bottom, spacing.md) + spacing.md, opacity },
           ]}
         >
           <Pressable
