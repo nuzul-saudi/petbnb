@@ -18,7 +18,7 @@
 //     total). The cost is one extra round-trip per arrival.
 //   - Unsubscribe on unmount / bookingId change.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { listMessages, type Message } from '@/lib/messages';
 import { logWarn } from '@/lib/log';
@@ -49,13 +49,22 @@ export function useMessages(bookingId: string): UseMessagesResult {
     void refetch();
   }, [refetch]);
 
+  // Latest refetch held in a ref so the realtime handler calls the
+  // current one without refetch being an effect dep — the handler
+  // triggers refetch, so keeping refetch in the deps risks re-running
+  // the effect and re-subscribing to a still-registered channel topic.
+  // Effect dep is the topic identity ONLY: [bookingId].
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+
   // Realtime subscription. One channel per bookingId; tears down when
   // bookingId changes or the consumer unmounts. Best-effort — a
   // failed subscribe doesn't break the screen; focus-refetch remains
   // as backup.
   useEffect(() => {
     if (!bookingId || !supabase) return;
-    const channel = supabase
+    const client = supabase;
+    const channel = client
       .channel(`messages:${bookingId}`)
       .on(
         'postgres_changes',
@@ -68,7 +77,7 @@ export function useMessages(bookingId: string): UseMessagesResult {
         () => {
           // Refetch to pick up the joined sender profile. See header
           // comment for the cost rationale.
-          void refetch();
+          void refetchRef.current();
         },
       )
       .subscribe((status) => {
@@ -79,10 +88,12 @@ export function useMessages(bookingId: string): UseMessagesResult {
           logWarn('[messages.realtime_subscribe_status]', status);
         }
       });
+    // removeChannel (not bare unsubscribe) frees the topic from the
+    // client registry so a re-subscribe with the same topic can't collide.
     return () => {
-      void channel.unsubscribe();
+      void client.removeChannel(channel);
     };
-  }, [bookingId, refetch]);
+  }, [bookingId]);
 
   return { data, loading, refetch };
 }

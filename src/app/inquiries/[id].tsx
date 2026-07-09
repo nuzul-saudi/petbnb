@@ -17,7 +17,7 @@
 //   * mark_thread_read on focus for the inquiry AND every linked
 //     booking, so 0044 read-tracking stays correct across the merge
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -186,12 +186,25 @@ export default function InquiryThreadScreen() {
         .join(','),
     [rawTimeline.bookings],
   );
+
+  // Latest refetchTimeline held in a ref so the realtime handler always
+  // calls the current one WITHOUT refetchTimeline being an effect dep.
+  // Critical: the handler itself calls refetchTimeline, which replaces
+  // rawTimeline — if refetchTimeline were a dep, a handler-triggered
+  // refetch could re-run the effect, and re-subscribing to the same
+  // channel topic while the previous one is still registered throws
+  // ("subscribe … multiple times" / .on after subscribe). Deps are the
+  // topic identity ONLY: [id, linkedBookingIdsKey].
+  const refetchTimelineRef = useRef(refetchTimeline);
+  refetchTimelineRef.current = refetchTimeline;
+
   useEffect(() => {
     if (!id || !supabase) return;
+    const client = supabase;
     const bookingIds = linkedBookingIdsKey
       ? linkedBookingIdsKey.split(',')
       : [];
-    const channel = supabase.channel(`inquiry-timeline:${id}`);
+    const channel = client.channel(`inquiry-timeline:${id}`);
     channel.on(
       'postgres_changes',
       {
@@ -201,7 +214,7 @@ export default function InquiryThreadScreen() {
         filter: `inquiry_id=eq.${id}`,
       },
       () => {
-        void refetchTimeline();
+        void refetchTimelineRef.current();
       },
     );
     for (const bid of bookingIds) {
@@ -214,7 +227,7 @@ export default function InquiryThreadScreen() {
           filter: `booking_id=eq.${bid}`,
         },
         () => {
-          void refetchTimeline();
+          void refetchTimelineRef.current();
         },
       );
     }
@@ -223,10 +236,13 @@ export default function InquiryThreadScreen() {
         logWarn('[inquiry.realtime_subscribe_status]', status);
       }
     });
+    // removeChannel (not bare unsubscribe) so the topic is freed from the
+    // client registry — otherwise the next channel(`inquiry-timeline:<id>`)
+    // collides with a still-registered instance.
     return () => {
-      void channel.unsubscribe();
+      void client.removeChannel(channel);
     };
-  }, [id, linkedBookingIdsKey, refetchTimeline]);
+  }, [id, linkedBookingIdsKey]);
 
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user)

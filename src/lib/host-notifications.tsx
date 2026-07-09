@@ -22,6 +22,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -156,10 +157,38 @@ export function HostNotificationsProvider({
   // publication (dashboard toggle — see the apply log).
   const { t } = useTranslation();
   const { showToast } = useToast();
+
+  // The INSERT handler is held in a ref so t / showToast / refreshUnread
+  // stay current WITHOUT being effect deps — otherwise a locale change (t)
+  // would tear down + re-subscribe, and any dep churn risks re-subscribing
+  // to a still-registered channel topic. Effect dep is the topic identity
+  // ONLY: [user?.id].
+  const onNotificationRef = useRef<(payload: { new: unknown }) => void>(
+    () => {},
+  );
+  onNotificationRef.current = (payload) => {
+    const n = payload.new as {
+      title_key?: string;
+      body_params?: Record<string, string | number> | null;
+      link_path?: string;
+      type?: NotificationType;
+    };
+    // Badge bumps live.
+    refreshUnread();
+    // Toast the localized title + route to its deep link on tap.
+    if (n.title_key) {
+      showToast(t(n.title_key, n.body_params ?? undefined), {
+        linkPath: n.link_path,
+        glyph: n.type ? NOTIFICATION_GLYPH[n.type] : undefined,
+      });
+    }
+  };
+
   useEffect(() => {
     const uid = user?.id;
     if (!uid || !supabase) return;
-    const channel = supabase
+    const client = supabase;
+    const channel = client
       .channel(`notifications:${uid}`)
       .on(
         'postgres_changes',
@@ -170,21 +199,7 @@ export function HostNotificationsProvider({
           filter: `user_id=eq.${uid}`,
         },
         (payload) => {
-          const n = payload.new as {
-            title_key?: string;
-            body_params?: Record<string, string | number> | null;
-            link_path?: string;
-            type?: NotificationType;
-          };
-          // Badge bumps live.
-          refreshUnread();
-          // Toast the localized title + route to its deep link on tap.
-          if (n.title_key) {
-            showToast(t(n.title_key, n.body_params ?? undefined), {
-              linkPath: n.link_path,
-              glyph: n.type ? NOTIFICATION_GLYPH[n.type] : undefined,
-            });
-          }
+          onNotificationRef.current(payload);
         },
       )
       .subscribe((status) => {
@@ -192,10 +207,12 @@ export function HostNotificationsProvider({
           logWarn('[host_notifications.realtime_subscribe_status]', status);
         }
       });
+    // removeChannel (not bare unsubscribe) frees the topic from the client
+    // registry so re-subscribes can't collide with a stale instance.
     return () => {
-      void channel.unsubscribe();
+      void client.removeChannel(channel);
     };
-  }, [user?.id, refreshUnread, showToast, t]);
+  }, [user?.id]);
 
   const value = useMemo<HostNotificationsContextValue>(
     () => ({
