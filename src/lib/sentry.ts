@@ -43,24 +43,11 @@ export function isSentryEnabled(): boolean {
  * asynchronously and captureError() simply no-ops until it does.
  */
 export function initSentry(): void {
-  // TEMP DEBUG (remove with the /debug route) — stage tracker mirroring
-  // analytics.ts so the /debug screen can report the Sentry differential
-  // (same dynamic-import mechanism as PostHog).
-  const mark = (s: string) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__SENTRY_STAGE__ = s;
-    }
-  };
-  mark('called');
   if (!SENTRY_DSN || Platform.OS !== 'web' || initStarted) return;
   initStarted = true;
-  mark('guard_passed');
   void (async () => {
     try {
-      mark('importing');
       const mod = await import('@sentry/browser');
-      mark('imported');
       mod.init({
         dsn: SENTRY_DSN,
         // v1: error tracking only — no performance tracing.
@@ -70,15 +57,8 @@ export function initSentry(): void {
             ? 'development'
             : 'production',
       });
-      mark('inited');
       sentry = mod;
-    } catch (e) {
-      // TEMP DEBUG (remove with the /debug route) — surface the error.
-      mark('errored');
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).__SENTRY_INIT_ERROR__ = e;
-      }
+    } catch {
       // Never let observability wiring break the app.
     }
   })();

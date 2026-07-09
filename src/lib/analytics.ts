@@ -18,15 +18,6 @@ import { Platform } from 'react-native';
 type AnalyticsExtra = { posthogKey?: string; posthogHost?: string };
 const extra = (Constants.expoConfig?.extra ?? {}) as AnalyticsExtra;
 
-// TEMP DEBUG (remove after diagnosis) — expose the resolved `extra` on the
-// window so we can confirm whether posthogKey/sentryDsn actually reached
-// Constants.expoConfig.extra in the deployed bundle. `any` cast is
-// justified: attaching an ad-hoc debug property to window has no typed home.
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__DEBUG_EXTRA__ = extra;
-}
-
 const POSTHOG_KEY =
   typeof extra.posthogKey === 'string' && extra.posthogKey.length > 0
     ? extra.posthogKey
@@ -58,6 +49,12 @@ export type AnalyticsEvent =
 /** Prop values are scalars only — pass IDs, never PII. */
 type EventProps = Record<string, string | number | boolean>;
 
+// NOTE: this module-level `posthog` is the ONLY reliable "is PostHog up?"
+// signal. The npm module build of posthog-js does NOT populate
+// `window.posthog` (that's snippet-loader-only behavior) — checking
+// `window.posthog` gives a false negative even when capture works. Verify
+// via the PostHog dashboard's Activity, not a global. (Cost us a debug
+// round, 2026-07-08.)
 let posthog: import('posthog-js').PostHog | null = null;
 let initStarted = false;
 
@@ -72,44 +69,19 @@ export function isAnalyticsEnabled(): boolean {
  * resolves.
  */
 export function initAnalytics(): void {
-  // TEMP DEBUG (remove after diagnosis) — a stage tracker so we can see
-  // from the live console exactly where init dies:
-  //   window.__POSTHOG_STAGE__      — furthest stage reached
-  //   window.__POSTHOG_INIT_ERROR__ — the thrown error, if any
-  // Read guide: undefined = initAnalytics never ran; 'called' = guard
-  // returned early; 'importing' (stuck) = the dynamic import never
-  // resolved (chunk 404 / CSP / code-split) — check the Network tab for a
-  // posthog-js JS chunk; 'errored' = init threw (read __POSTHOG_INIT_ERROR__).
-  const mark = (s: string) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__POSTHOG_STAGE__ = s;
-    }
-  };
-  mark('called');
   if (!POSTHOG_KEY || Platform.OS !== 'web' || initStarted) return;
   initStarted = true;
-  mark('guard_passed');
   void (async () => {
     try {
-      mark('importing');
       const { default: ph } = await import('posthog-js');
-      mark('imported');
       ph.init(POSTHOG_KEY, {
         api_host: POSTHOG_HOST,
         // We fire funnel events explicitly; no automatic pageview spam.
         capture_pageview: false,
         persistence: 'localStorage',
       });
-      mark('inited');
       posthog = ph;
-    } catch (e) {
-      // TEMP DEBUG (remove after diagnosis) — surface the swallowed error.
-      mark('errored');
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).__POSTHOG_INIT_ERROR__ = e;
-      }
+    } catch {
       // Never let analytics wiring break the app.
     }
   })();

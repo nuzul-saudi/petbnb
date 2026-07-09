@@ -393,3 +393,9 @@ the reservations screen + a time-to-decide funnel
 (`booking_requested` → `booking_accepted`/`booking_declined`). If hosts
 act from 🔔, retire 📥; if 📥 drives accepts, keep it — possibly expand
 it into a general "action needed" counter.
+
+## PostHog/Sentry observability go-live (2026-07-08)
+
+- **Root cause of the "PostHog never initializes" saga was a STALE VERCEL DEPLOY, not code.** Env vars, `app.config.ts` plumbing, and the init code were all correct throughout. Vercel was serving an old build; a genuine git-sourced deployment of the latest commit brought PostHog + Sentry live (confirmed: real Web-vitals events in PostHog Activity, `__SENTRY__` defined). Lesson: `Redeploy` reuses the cached artifact — force a fresh build with a real new commit, and verify the Production alias points at the newest deployment.
+- **`window.posthog` is a FALSE diagnostic signal — never use it as a health check.** The npm-module build of posthog-js does NOT populate `window.posthog` (snippet-loader-only behavior); it stays `undefined` even when `capture()` works. This wrongly implied init was failing and cost a debug round. Verify PostHog via the dashboard Activity feed (or the module-level `posthog` var in `analytics.ts`), never a `window` global. Pinned as a code comment at `analytics.ts` `let posthog`.
+- **SPA-rewrite-swallows-the-chunk theory: formally dead.** The runtime `import('posthog-js')` RESOLVED on the phone; no `vercel.json` change was needed.
