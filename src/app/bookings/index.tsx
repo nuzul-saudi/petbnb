@@ -16,12 +16,14 @@ import { formatDateRange } from '@/lib/date';
 import { useTranslation } from '@/lib/i18n';
 import { getLastSeenBatch } from '@/lib/last-seen-storage';
 import { useHostNotifications } from '@/lib/host-notifications';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
 
 export default function MyBookingsScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
+  const theme = useTheme();
   const { initializing, session, user, profile } = useAuth();
   const { refreshPendingHostCount } = useHostNotifications();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
@@ -92,7 +94,7 @@ export default function MyBookingsScreen() {
         <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
           <Text style={styles.backText}>{t('mybookings.back')}</Text>
         </Pressable>
-        <Text style={styles.title}>
+        <Text style={[styles.title, { color: theme.accent }]}>
           {isHostMode ? t('mybookings.host_title') : t('mybookings.title')}
         </Text>
       </View>
@@ -202,7 +204,7 @@ export default function MyBookingsScreen() {
                   </Text>
                 );
               })()}
-              <Text style={styles.rowTotal}>{formatSAR(item.total_sar)}</Text>
+              <Text style={[styles.rowTotal, { color: theme.accent }]}>{formatSAR(item.total_sar)}</Text>
             </Pressable>
           );
           }}
@@ -253,7 +255,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fonts.headingBold,
     fontSize: 22,
-    color: colors.mossDeep,
   },
   error: {
     fontFamily: fonts.body,
@@ -333,7 +334,6 @@ const styles = StyleSheet.create({
   rowTotal: {
     fontFamily: fonts.bodyBold,
     fontSize: 14,
-    color: colors.mossDeep,
     marginTop: spacing.xs,
   },
   pill: {

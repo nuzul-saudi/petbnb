@@ -30,12 +30,14 @@ import {
   type InquiryListItem,
 } from '@/lib/inquiries';
 import { logWarn } from '@/lib/log';
+import { useTheme } from '@/theme/theme';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 import type { Enums } from '@/types/database';
 
 export default function MyInquiriesScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
+  const theme = useTheme();
   const { initializing, session, user, profile } = useAuth();
   const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
@@ -78,7 +80,7 @@ export default function MyInquiriesScreen() {
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
       <View style={styles.header}>
         <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
-          <Text style={styles.backText}>{t('myinquiries.back')}</Text>
+          <Text style={[styles.backText, { color: theme.accent }]}>{t('myinquiries.back')}</Text>
         </Pressable>
         <Text style={styles.title}>
           {isHostMode
@@ -243,7 +245,6 @@ const styles = StyleSheet.create({
   backText: {
     fontFamily: fonts.bodyBold,
     fontSize: 13,
-    color: colors.mossDeep,
   },
   title: {
     fontFamily: fonts.headingBold,
