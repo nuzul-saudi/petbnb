@@ -23,6 +23,28 @@ nothing that reads as transactional.
 
 ---
 
+## ⚠️ Locked decisions (the codebase is authoritative)
+
+These founder decisions are LOCKED and supersede anything else in this guide
+or its bundled components. The decision trail lives in the repo —
+`docs/batch-decisions.md` and `CLAUDE.md` §7 — and several are pinned by CI
+regression tests. Design work that contradicts them will be rejected in
+review:
+
+| Decision | Locked | Enforcement |
+|---|---|---|
+| **LATIN display digits** in both locales (`toArabicDigits()` is a no-op) | 2026-05-27 (test-round-3) | `tests/format.test.ts` pins it in CI |
+| **MASCULINE register** in all copy (the female-trust wedge lives in the product, not the grammar) | 2026-06-14 | Copy review; `ONBOARDING.md` |
+| **Separate owner/host accounts — NO `'both'` role, NO header persona toggle** | migration 0039 (2026-06-16) | DB CHECK constraint |
+| **Trust mark ✓ pinned to moss (`colors.verified`) in BOTH personas** — never the persona accent | 2026-06-26 (commit `7f67c79`) | token alias in `theme/tokens.ts` |
+| **No fabricated stats** — new hosts show "جديد", never fake ratings/counts | build spec §7 | product convention |
+
+Flipping any of these requires a founder re-decision recorded in
+`docs/batch-decisions.md`, plus (where pinned) rewriting the enforcing test
+in the same PR.
+
+---
+
 ## Sources this system was built from
 
 You may or may not have access to these; they are recorded so you can go deeper.
@@ -45,16 +67,17 @@ You may or may not have access to these; they are recorded so you can go deeper.
 
 ---
 
-## The four personas (and why theming matters)
+## The three personas (and why theming matters)
 
-`profiles.role` has four values, and the app **re-skins per persona**:
+`profiles.role` has three values (the `'both'` role + the header persona
+toggle were REMOVED by migration 0039 — owner and host are separate accounts,
+same email cannot create both; a user IS what they signed up as), and the app
+**re-skins per persona**:
 
 - **owner** — has a cat needing care. Browses hosts, requests bookings.
   *Owner lens: cream background, **moss** accent.*
 - **host** — boards cats. Creates listings (pending admin approval), accepts
   requests, posts daily updates. *Host lens: honey background, **deep-gold** accent.*
-- **both** — does everything; sees the owner feed as home, switches lens via a
-  destination toggle in the header.
 - **admin** — the founder's vetting account. Approves hosts + listings,
   suspends abusers. Uses the owner (moss) lens.
 
@@ -77,11 +100,12 @@ addressed to women.** Read `src/locales/ar.json` for the canonical voice.
 - **Saudi colloquial, not stiff MSA.** Warm and direct. "اطلب الحجز" (request
   the booking), "أبحث عن مكان لقطتي" (I'm looking for a place for my cat) — plain,
   human, not bureaucratic.
-- **Feminine address throughout (`-ي` verb endings).** Because the wedge is
-  women hosts and women owners, the app speaks to a woman: "هل أنتِ متأكدة من
-  إلغاء هذا الطلب؟" ("Are *you* [f.] sure…"), "حاولي مرة أخرى" ("try [f.] again"),
-  "اكتبي ملاحظة" ("write [f.] a note"). This is deliberate and non-negotiable —
-  never regress feminine endings to neutral/masculine.
+- **MASCULINE register throughout (locked 2026-06-14).** The app addresses the
+  user in the masculine: "هل أنت متأكد من إلغاء هذا الطلب؟", "حاول مرة أخرى",
+  "اكتب ملاحظة". The female-trust WEDGE lives in the product (founder-vetted
+  hosts, the female-hosts-only filter, the verified ✓) — not in grammatical
+  gender. Never regress copy to feminine endings; flipping this needs a
+  founder re-decision.
 - **First person for the user's own things.** Sections are named from the
   user's mouth: "قططي" (my cats), "حجوزاتي" (my bookings), "حسابي" (my account).
 
@@ -97,9 +121,14 @@ addressed to women.** Read `src/locales/ar.json` for the canonical voice.
   (couldn't load the listings), "تعذّر إرسال الرمز. يرجى المحاولة مرة أخرى."
 
 ### Mechanics
-- **Currency is always `ر.س`.** Never `$`. Format: `٤٥٠ ر.س` (digits then mark).
-- **Arabic-Indic digits in display** (`٠١٢٣٤٥٦٧٨٩`) via `toArabicDigits()`.
-  Prices, counts, ages, dates, distances all render in Arabic-Indic for `ar`.
+- **Currency is always `ر.س`.** Never `$`. Format: `450 ر.س` (digits then mark).
+- **LATIN digits in display (locked 2026-05-27, test-round-3).** Prices,
+  counts, ages, dates, distances render with Latin digits (`0123456789`) in
+  BOTH locales — Arabic-Indic digits scan poorly against the Latin digits
+  Saudis see in WhatsApp / Snap / banking apps. `toArabicDigits()` in
+  `src/lib/format.ts` is a deliberate NO-OP pass-through, pinned by a CI
+  regression test (`tests/format.test.ts`); flipping it needs a founder
+  re-decision + that test rewritten in the same PR.
 - **Phone format `+966 5X XXX XXXX`.** Saudi mobile, always `+966`, body starts
   with `5`. See `src/lib/phone.ts`.
 - **Riyadh-anchored time** (UTC+3, 24-hour) for stamps, regardless of device tz.
@@ -108,14 +137,15 @@ addressed to women.** Read `src/locales/ar.json` for the canonical voice.
 - **Used, but quietly and functionally — never decoratively.** The app uses a
   *handful* of glyphs as lightweight icons (the system has no icon font):
   📍 location, 🐈 cat / pet capacity, 🏠 home/host, 📥 pending requests,
-  ⚭ "both" roles, ✓ verified/selected. That is the whole working set.
+  ✓ verified/selected. That is the whole working set. (⚭ died with the
+  'both' role in 0039.)
 - **No emoji in headings, prices, or marketing copy.** No 🎉🚀😻-style
   decoration. If a glyph isn't carrying meaning, it doesn't appear.
 
 ### Voice in one line
-> Warm, feminine, Saudi-colloquial, trust-first. Speak to her like a careful
-> friend who has personally met the host — never like a marketplace optimizing
-> conversions.
+> Warm, Saudi-colloquial, trust-first (masculine register, locked). Speak like
+> a careful friend who has personally met the host — never like a marketplace
+> optimizing conversions.
 
 ---
 
@@ -211,7 +241,6 @@ new icon language.
 | 🐈 | cat / pet capacity / pet fallback | capacity badge, PetAvatar level-3 fallback, "owner" role |
 | 🏠 | home / host / listing | listing photo placeholder, "host" role |
 | 📥 | pending requests | host-mode header attention badge |
-| ⚭ | "both" roles | RoleEditor "both" card |
 | → ← | back / forward (directional) | back links ("← رجوع"), flips under RTL |
 
 - **Rule:** a glyph appears only when it carries meaning. No decorative emoji,

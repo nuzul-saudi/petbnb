@@ -20,12 +20,16 @@ file manifest). Then explore the other files as needed.
 
 ## Non-negotiables (read `readme.md` for detail)
 - **Arabic-first, RTL.** Test every layout in RTL. Saudi colloquial, not stiff MSA.
-- **Feminine address** (`-ي` verb endings) — the wedge is women hosts + owners.
-- **Currency always `ر.س`**, never `$`. Arabic-Indic digits (`٠١٢٣…`) in display.
-- **Female-trust tone:** warm, reassuring, never transactional. No hard CTAs,
+- **MASCULINE register** (locked 2026-06-14) — see "Locked decisions" in
+  `readme.md`; never regress to feminine endings.
+- **Currency always `ر.س`**, never `$`. **LATIN digits** in display (locked
+  2026-05-27; `toArabicDigits()` is a deliberate no-op, pinned by a CI test).
+- **Trust-first tone:** warm, reassuring, never transactional. No hard CTAs,
   no gamification, no fabricated stats (new hosts show "جديد", not fake ratings).
 - **Persona theming:** wrap UI in `data-persona="owner"` (cream/moss) or
   `"host"` (honey/gold). Accent reads `var(--accent)` — never hardcode the colour.
+  A user IS one persona (owner/host are separate accounts since 0039 — no
+  header toggle).
 - **Warm sand/cream surfaces, deep moss, gold accents.** Rounded 16–22px cards,
   soft shadows, generous space. No icon set — a tiny functional emoji vocabulary.
 
