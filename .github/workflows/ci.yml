@@ -42,3 +42,67 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+  # S10 (UX review, Wave 1a) — golden-path E2E: guest → browse → open
+  # listing → password sign-in → inquiry → booking request, against the
+  # exported web build + the real Supabase backend. GitHub Actions ONLY
+  # (not part of local `npm run ci`). Skips gracefully (still green)
+  # until the repo secrets + seed data exist — see README "E2E in CI".
+  # Analytics stay clean by construction: the export env omits
+  # POSTHOG_KEY / SENTRY_DSN so both SDKs no-op.
+  e2e:
+    runs-on: ubuntu-latest
+    needs: ci
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Gate on E2E secrets
+        id: gate
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          E2E_OWNER_PASSWORD: ${{ secrets.E2E_OWNER_PASSWORD }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$E2E_OWNER_PASSWORD" ]; then
+            echo "::notice title=E2E skipped::SUPABASE_URL / E2E_OWNER_PASSWORD secrets not configured — see README 'E2E in CI'."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node
+        if: steps.gate.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.ok == 'true'
+        run: npm ci
+
+      - name: Export web build
+        if: steps.gate.outputs.ok == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          # POSTHOG_KEY / SENTRY_DSN deliberately unset — analytics no-op.
+        run: npx expo export -p web
+
+      - name: Install Playwright Chromium
+        if: steps.gate.outputs.ok == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Golden-path E2E
+        if: steps.gate.outputs.ok == 'true'
+        env:
+          E2E_OWNER_PASSWORD: ${{ secrets.E2E_OWNER_PASSWORD }}
+        run: npx playwright test
+
+      - name: Upload trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

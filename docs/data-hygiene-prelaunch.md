@@ -12,6 +12,22 @@ SQL Editor when prepping for launch, after reviewing each.
 **Apply order:** review → run each block individually → re-run the
 "verify" query afterwards to confirm zero rows remain.
 
+## ⛔ EXCLUDE list — never delete these rows
+
+The dedicated **E2E CI accounts** (S10 golden-path test, Wave 1a) and
+everything they own are exercised by GitHub Actions on every push and
+MUST survive every purge below. Before running ANY cleanup block, add a
+`WHERE` exclusion for these two users (by email in `auth.users`, or by
+their profile ids once created):
+
+- `e2e-owner@petbnb.local` — signs in via password in CI; owns the seed
+  pet "E2E Cat" and accumulates inquiry messages + booking requests
+  (one per CI run — trim the *bookings* periodically if noisy, but never
+  the accounts, the pet, or the inquiry thread).
+- `e2e-host@petbnb.local` — owns the approved seed listing
+  "E2E Test Listing" (must stay approved + verified, with NO blocked
+  dates, or the golden path goes red).
+
 ---
 
 ## 1. Listings with mismatched city / neighborhood
