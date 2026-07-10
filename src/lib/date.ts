@@ -157,3 +157,34 @@ export function formatDateRange(
 ): string {
   return `${formatDate(startIso, locale, 'short')} → ${formatDate(endIso, locale, 'short')}`;
 }
+
+/**
+ * Relative inbox stamp — "just now" / "5m ago" / "2h ago" / "3d ago",
+ * falling back to formatDate (short, Latin digits) once the item is a
+ * week old. Extracted from inquiries/index.tsx (S2, UX review 10 Jul):
+ * the local copy fell back to raw `iso.slice(0, 10)` after 7 days — the
+ * exact raw-ISO leak FIX 3 eliminated everywhere else.
+ *
+ * `t` is injected by the caller rather than imported: this module stays
+ * pure (no i18n/React graph), which is also what keeps it testable in
+ * node vitest. Relative labels come from the myinquiries.* keys.
+ */
+export function formatRelativeStamp(
+  iso: string,
+  locale: 'ar' | 'en',
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const deltaMin = Math.max(0, Math.floor((now - then) / 60_000));
+  if (deltaMin < 1) return t('myinquiries.just_now');
+  if (deltaMin < 60) return t('myinquiries.minutes_ago', { n: deltaMin });
+  const deltaHr = Math.floor(deltaMin / 60);
+  if (deltaHr < 24) return t('myinquiries.hours_ago', { n: deltaHr });
+  const deltaDay = Math.floor(deltaHr / 24);
+  if (deltaDay < 7) return t('myinquiries.days_ago', { n: deltaDay });
+  // Older — localized short date, Latin digits (locked decision). The
+  // slice trims the timestamp to YYYY-MM-DD as formatDate INPUT — the
+  // output is localized, never raw ISO.
+  return formatDate(iso.slice(0, 10), locale, 'short');
+}

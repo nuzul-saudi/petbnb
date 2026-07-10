@@ -17,7 +17,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { toArabicDigits } from '@/lib/format';
-import { formatDate, formatDateRange } from '@/lib/date';
+import { formatDate, formatDateRange, formatRelativeStamp } from '@/lib/date';
 
 describe('toArabicDigits — locked no-op (test-round-3 founder decision)', () => {
   it('returns string input verbatim, no Arabic-Indic conversion', () => {
@@ -94,6 +94,43 @@ describe('formatDateRange — single-line span string', () => {
     );
     expect(formatDateRange('2026-07-01', '2026-07-05', 'ar')).toBe(
       '1 يول → 5 يول',
+    );
+  });
+});
+
+describe('formatRelativeStamp — no raw-ISO leak on the >7-day path (S2)', () => {
+  // Stub t mirrors the myinquiries.* usage; the >7d path must never
+  // reach it (it goes through formatDate instead).
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params ? `${key}:${params.n}` : key;
+
+  it('falls back to a localized short date after 7 days — never raw ISO', () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+      .toISOString();
+    const en = formatRelativeStamp(tenDaysAgo, 'en', t);
+    const ar = formatRelativeStamp(tenDaysAgo, 'ar', t);
+    // Localized output, not the YYYY-MM-DD raw slice.
+    expect(en).not.toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(ar).not.toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // formatDate short shape: "Jul 1" (en) / "1 يول" (ar) — month name
+    // present, digits Latin (locked decision).
+    expect(en).toMatch(/^[A-Z][a-z]{2} \d{1,2}$/);
+    expect(ar).toMatch(/^\d{1,2} \S+$/);
+    expect(ar).not.toMatch(/[٠-٩]/);
+  });
+
+  it('stays relative under 7 days (t-driven labels)', () => {
+    const now = new Date().toISOString();
+    expect(formatRelativeStamp(now, 'en', t)).toBe('myinquiries.just_now');
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000)
+      .toISOString();
+    expect(formatRelativeStamp(threeHoursAgo, 'en', t)).toBe(
+      'myinquiries.hours_ago:3',
+    );
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      .toISOString();
+    expect(formatRelativeStamp(twoDaysAgo, 'en', t)).toBe(
+      'myinquiries.days_ago:2',
     );
   });
 });

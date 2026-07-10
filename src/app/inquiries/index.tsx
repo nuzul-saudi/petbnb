@@ -21,6 +21,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/lib/auth';
+import { formatRelativeStamp } from '@/lib/date';
 import { pickLocalized } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import {
@@ -228,27 +229,6 @@ function StatusPill({ status }: { status: Enums<'inquiry_status'> }) {
       </Text>
     </View>
   );
-}
-
-/** Lightweight relative-stamp helper — same posture as
- *  formatRiyadhStamp but for inbox sort. "5m ago" / "2h ago" /
- *  date for older items. Pure date math; no external dep. */
-function formatRelativeStamp(
-  iso: string,
-  _locale: 'ar' | 'en',
-  t: (key: string, params?: Record<string, string | number>) => string,
-): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const deltaMin = Math.max(0, Math.floor((now - then) / 60_000));
-  if (deltaMin < 1) return t('myinquiries.just_now');
-  if (deltaMin < 60) return t('myinquiries.minutes_ago', { n: deltaMin });
-  const deltaHr = Math.floor(deltaMin / 60);
-  if (deltaHr < 24) return t('myinquiries.hours_ago', { n: deltaHr });
-  const deltaDay = Math.floor(deltaHr / 24);
-  if (deltaDay < 7) return t('myinquiries.days_ago', { n: deltaDay });
-  // Older — show the date YYYY-MM-DD (Latin per founder decision).
-  return iso.slice(0, 10);
 }
 
 const styles = StyleSheet.create({
