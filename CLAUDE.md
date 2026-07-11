@@ -362,16 +362,16 @@ launch.
   gap. Cosmetic; doesn't block functionality.
 
 - **`KeyboardAvoidingView` around the booking-request sticky
-  bar.** `src/app/listings/[id]/request.tsx` ships a sticky
-  summary + submit Button pinned to the viewport bottom
-  (`position: 'absolute'; bottom: 0`). On native iOS, when the
-  notes TextInput focuses, the on-screen keyboard will cover the
-  bar. Needs a `KeyboardAvoidingView` wrapper at the SafeAreaView
-  level — but the right behavior (lift the bar with the keyboard
-  vs. let it stay anchored to viewport-bottom and the form
-  scrolls behind) needs to be validated on a real iOS device
-  first. Comment at `request.tsx:969` references it as the
-  intended next move.
+  bar. — ✅ SHIPPED (FIX 5 tail, 2026-07-11).** The ScrollView +
+  sticky bar in `src/app/listings/[id]/request.tsx` are now wrapped
+  in a `KeyboardAvoidingView` (`behavior='padding'` on iOS;
+  `undefined` on web/Android so it's inert and the e2e web build is
+  unchanged). This lifts the absolute sticky bar above the keyboard
+  when the notes `TextInput` focuses. **Still wants a real-iOS-device
+  eyeball** to confirm the chosen behavior (lift-with-keyboard) reads
+  right vs. stay-anchored — `padding` is the safe default; flip to
+  `position` / add a `keyboardVerticalOffset` if the device test says
+  so.
 
 - **Scroll-to-field + red-ring on blocked-date overlap.** Same
   request screen. Today, when the picked date range overlaps a
@@ -699,7 +699,7 @@ round as the closing commits.
 | FIX 2 | One date-range picker — delete `AvailabilityCalendar.tsx`; migrate 4 `DateField` callers to `RangeCalendar mode="single"`. | `ca4f48b` | **Partial.** AvailabilityCalendar (dead code) deleted. DateField migration deferred — `RangeCalendar` needs a `mode` prop first. Tracked in §11. |
 | FIX 3 | New `src/lib/date.ts` owns date math (collapsed `todayIso` / `addDaysIso` / `daysInMonth` / `firstWeekdayOfMonth` from two old homes) and adds `formatDate(iso, locale, style?)` returning Latin-digit display strings. Sweep raw ISO leaks at booking detail + booking list + request flow. Add regression test. | `9d44bfd` | Applied (with one missed leak: `src/app/admin/bookings.tsx:76` still pipes ISO through `toArabicDigits` — admin-only, cosmetic). |
 | FIX 4 | Route primary CTAs through the shared `<Button>` component (booking request submit, become-host submit, pet add). Remove hand-rolled `Pressable` + `styles.cta` / `styles.emptyButton`. | `0c184cc` | Applied at 4 sites. 🔍 magnifier emoji on `SearchHero` deferred — needs an SVG/icon-library decision. Tracked in §11. |
-| FIX 5 | Sticky booking-summary bar pinned to viewport on the request screen — running total + nights/pets summary + submit `<Button>` on the trailing edge. Top shadow + whisper top border. | `ae44df1` | Sticky bar applied. `KeyboardAvoidingView` wrapper + scroll-to-field red-ring on blocked-date overlap both deferred (need native device validation). Both tracked in §11. |
+| FIX 5 | Sticky booking-summary bar pinned to viewport on the request screen — running total + nights/pets summary + submit `<Button>` on the trailing edge. Top shadow + whisper top border. | `ae44df1` | Sticky bar applied. Scroll-to-field red-ring on blocked-date overlap applied (L4). **`KeyboardAvoidingView` wrapper now SHIPPED (2026-07-11)** — iOS `padding`, web/Android inert; still wants a real-device eyeball on the exact behavior. |
 | FIX 6 | Status-aware booking-detail header — IIFE branches glyph + circle color + title key + title color on `booking.status`. Six statuses mapped (requested → ⏳ neutral; accepted/active/completed → ✓ `theme.accent`; declined/cancelled → ✕ terracotta; disputed → ! terracotta). Fixes the previous bug where declined/cancelled/disputed all rendered a celebratory ✓. | `c27db11` | Applied. |
 | Cleanup | Rename `src/lib/persona.tsx` → `src/lib/host-notifications.tsx`. Update all import sites. Sync `CLAUDE.md` §7 + `ONBOARDING.md` to the locked Latin-digits + masculine-register state. Drop stale "/ both home" header comment from `OwnerFeedHome` (historical context retained in body). | `b57eba3` | Applied. |
 

@@ -1,6 +1,8 @@
 import { logWarn } from '@/lib/log';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -677,7 +679,19 @@ export default function BookingRequestScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
+      {/* FIX 5 — KeyboardAvoidingView so the on-screen keyboard doesn't
+          cover the sticky summary bar when the notes TextInput focuses.
+          iOS 'padding' lifts the KAV's content (incl. the absolute
+          sticky bar) above the keyboard; web/Android pass undefined so
+          the KAV is inert (no layout change — the e2e web build is
+          unaffected). The exact iOS behavior (lift-with-keyboard vs.
+          stay-anchored) still wants a real-device eyeball; this is the
+          safe default. */}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
         <Pressable
           onPress={() => {
             if (isEditMode && editBookingId) {
@@ -1118,6 +1132,7 @@ export default function BookingRequestScreen() {
           />
         </View>
       </View>
+      </KeyboardAvoidingView>
 
       {/* 2026-06-26 — date range picker modal. Same SearchWhenModal
           the home page uses, now extended with blockedRanges so the
@@ -1176,6 +1191,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.cream,
+  },
+  // FIX 5 — the KeyboardAvoidingView fills the space under the header
+  // so the ScrollView + sticky bar share one keyboard-aware container.
+  flex: {
+    flex: 1,
   },
   scroll: {
     padding: spacing.xl,
