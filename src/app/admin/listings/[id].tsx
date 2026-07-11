@@ -24,6 +24,7 @@ import { logWarn } from '@/lib/log';
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -47,6 +48,7 @@ import {
   type AdminReviewDetail,
 } from '@/lib/admin';
 import { confirmDialog } from '@/lib/confirm';
+import { formatRawError } from '@/lib/errors';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -65,6 +67,10 @@ export default function AdminListingDetailScreen() {
   const [detail, setDetail] = useState<AdminReviewDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Part C — raw error line (English, admin-only). The founder debugs
+  // from a phone; the console is unreachable, so the underlying
+  // code+message renders under the friendly Arabic string.
+  const [rawError, setRawError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   // Editable form state — only used in non-pending_edit modes.
@@ -98,6 +104,7 @@ export default function AdminListingDetailScreen() {
     if (!id) return;
     setLoading(true);
     setError(null);
+    setRawError(null);
     try {
       const d = await getAdminListingReview(id);
       if (!d) {
@@ -108,6 +115,7 @@ export default function AdminListingDetailScreen() {
       hydrateForm(d);
     } catch (e) {
       logWarn('[admin.listing.load_failed]', e);
+      setRawError(formatRawError(e));
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
@@ -122,6 +130,7 @@ export default function AdminListingDetailScreen() {
     if (!supabase || !detail) return;
     setBusy('save');
     setError(null);
+    setRawError(null);
     try {
       const priceNum = Number(price);
       const maxPetsNum = Number(maxPets);
@@ -149,6 +158,7 @@ export default function AdminListingDetailScreen() {
       await load();
     } catch (e) {
       logWarn('[admin.listing.save_failed]', e);
+      setRawError(formatRawError(e));
       setError(t('admin.save_failed'));
     } finally {
       setBusy(null);
@@ -185,6 +195,7 @@ export default function AdminListingDetailScreen() {
 
     setBusy('approve');
     setError(null);
+    setRawError(null);
     try {
       if (isEdit) {
         await promoteListingDraft(detail.listing.id);
@@ -200,6 +211,7 @@ export default function AdminListingDetailScreen() {
       router.replace('/admin');
     } catch (e) {
       logWarn('[admin.listing.approve_failed]', e);
+      setRawError(formatRawError(e));
       setError(
         t(
           isEdit ? 'admin.approve_edit_failed' : 'admin.approve_new_failed',
@@ -226,6 +238,7 @@ export default function AdminListingDetailScreen() {
     if (!(await confirmDialog(t(confirmKey)))) return;
     setBusy('reject');
     setError(null);
+    setRawError(null);
     try {
       if (isEdit) {
         await rejectListingDraft(detail.listing.id);
@@ -235,6 +248,7 @@ export default function AdminListingDetailScreen() {
       await load();
     } catch (e) {
       logWarn('[admin.listing.reject_failed]', e);
+      setRawError(formatRawError(e));
       setError(
         t(
           isEdit ? 'admin.reject_edit_failed' : 'admin.reject_new_failed',
@@ -250,11 +264,13 @@ export default function AdminListingDetailScreen() {
     if (!(await confirmDialog(t('admin.take_offline_confirm')))) return;
     setBusy('take_offline');
     setError(null);
+    setRawError(null);
     try {
       await adminTakeOffline(detail.listing.id);
       await load();
     } catch (e) {
       logWarn('[admin.listing.take_offline_failed]', e);
+      setRawError(formatRawError(e));
       setError(t('admin.take_offline_failed'));
     } finally {
       setBusy(null);
@@ -265,11 +281,13 @@ export default function AdminListingDetailScreen() {
     if (!detail) return;
     setBusy('restore');
     setError(null);
+    setRawError(null);
     try {
       await adminRestoreListing(detail.listing.id);
       await load();
     } catch (e) {
       logWarn('[admin.listing.restore_failed]', e);
+      setRawError(formatRawError(e));
       setError(t('admin.restore_failed'));
     } finally {
       setBusy(null);
@@ -331,6 +349,11 @@ export default function AdminListingDetailScreen() {
 
         <View style={styles.bodyPad}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          {rawError ? (
+            <Text style={styles.rawError} selectable>
+              {rawError}
+            </Text>
+          ) : null}
 
           {/* Status pill — what state the listing is currently in. */}
           <View style={styles.statusCard}>
@@ -805,6 +828,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.terracotta,
     textAlign: 'center',
+  },
+  // Part C — raw admin-only error line (English, selectable so the
+  // founder can copy it from the phone).
+  rawError: {
+    fontFamily: Platform.OS === 'web' ? 'monospace' : 'Courier',
+    fontSize: 11,
+    color: colors.inkSoft,
+    textAlign: 'left',
+    writingDirection: 'ltr',
+    marginBottom: spacing.sm,
   },
   header: {
     paddingHorizontal: spacing.xl,

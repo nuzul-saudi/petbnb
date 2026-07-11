@@ -17,6 +17,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { toArabicDigits } from '@/lib/format';
+import { formatRawError } from '@/lib/errors';
 import { formatDate, formatDateRange, formatRelativeStamp } from '@/lib/date';
 
 describe('toArabicDigits — locked no-op (test-round-3 founder decision)', () => {
@@ -132,5 +133,30 @@ describe('formatRelativeStamp — no raw-ISO leak on the >7-day path (S2)', () =
     expect(formatRelativeStamp(twoDaysAgo, 'en', t)).toBe(
       'myinquiries.days_ago:2',
     );
+  });
+});
+
+describe('formatRawError — admin raw-error line (Part C)', () => {
+  it('formats the Supabase PostgrestError shape', () => {
+    expect(
+      formatRawError({
+        code: '42703',
+        message: 'column d.accepts_species does not exist',
+        details: null,
+        hint: null,
+      }),
+    ).toBe('42703: column d.accepts_species does not exist');
+  });
+
+  it('appends details when present and handles plain Errors', () => {
+    expect(
+      formatRawError({ code: '23514', message: 'check violated', details: 'row (x)' }),
+    ).toBe('23514: check violated — row (x)');
+    expect(formatRawError(new Error('boom'))).toBe('boom');
+  });
+
+  it('falls back to String() for exotic throws', () => {
+    expect(formatRawError('plain string')).toBe('plain string');
+    expect(formatRawError(42)).toBe('42');
   });
 });

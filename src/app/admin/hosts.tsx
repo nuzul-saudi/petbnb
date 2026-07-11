@@ -19,6 +19,7 @@ import { useCallback, useState } from 'react';
 import {
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -30,6 +31,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useAuth } from '@/lib/auth';
 import { findCity, findDistrict, type CityKey } from '@/lib/cities';
+import { formatRawError } from '@/lib/errors';
 import {
   approveHostApplication,
   listPendingHostApplications,
@@ -47,6 +49,10 @@ export default function HostApplicationsQueueScreen() {
   const [items, setItems] = useState<HostApplicationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Part C — raw error line (English, admin-only): the founder debugs
+  // from a phone, so the underlying code+message renders under the
+  // friendly Arabic string.
+  const [rawError, setRawError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<HostApplicationRow | null>(
     null,
@@ -56,10 +62,12 @@ export default function HostApplicationsQueueScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setRawError(null);
     try {
       setItems(await listPendingHostApplications());
     } catch (e) {
       logWarn('[admin.applications.load_failed]', e);
+      setRawError(formatRawError(e));
       setError(t('admin.load_failed'));
     } finally {
       setLoading(false);
@@ -76,11 +84,13 @@ export default function HostApplicationsQueueScreen() {
     if (!adminUser) return;
     setBusyId(applicant.id);
     setError(null);
+    setRawError(null);
     try {
       await approveHostApplication(applicant.id, adminUser.id);
       setItems((prev) => prev.filter((u) => u.id !== applicant.id));
     } catch (e) {
       logWarn('[admin.applications.approve_failed]', e);
+      setRawError(formatRawError(e));
       setError(t('admin.save_failed'));
     } finally {
       setBusyId(null);
@@ -91,6 +101,7 @@ export default function HostApplicationsQueueScreen() {
     if (!adminUser || !rejectTarget || rejectNotes.trim().length === 0) return;
     setBusyId(rejectTarget.id);
     setError(null);
+    setRawError(null);
     try {
       await rejectHostApplication(rejectTarget.id, adminUser.id, rejectNotes);
       setItems((prev) => prev.filter((u) => u.id !== rejectTarget.id));
@@ -98,6 +109,7 @@ export default function HostApplicationsQueueScreen() {
       setRejectNotes('');
     } catch (e) {
       logWarn('[admin.applications.reject_failed]', e);
+      setRawError(formatRawError(e));
       setError(t('admin.save_failed'));
     } finally {
       setBusyId(null);
@@ -117,6 +129,11 @@ export default function HostApplicationsQueueScreen() {
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {rawError ? (
+        <Text style={styles.rawError} selectable>
+          {rawError}
+        </Text>
+      ) : null}
 
       {loading ? (
         <View style={styles.centered}>
@@ -348,6 +365,16 @@ const styles = StyleSheet.create({
     color: colors.terracotta,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
+  },
+  // Part C — raw admin-only error line (selectable for phone copy).
+  rawError: {
+    fontFamily: Platform.OS === 'web' ? 'monospace' : 'Courier',
+    fontSize: 11,
+    color: colors.inkSoft,
+    textAlign: 'left',
+    writingDirection: 'ltr',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
   centered: {
     flex: 1,
