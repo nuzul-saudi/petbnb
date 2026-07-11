@@ -45,8 +45,17 @@ Required **seed data** (one-time, via the app):
 1. Account `e2e-owner@petbnb.local` (owner) — set a password via the normal
    set-password flow; add one **vaccinated** pet named exactly `E2E Cat`.
 2. Account `e2e-host@petbnb.local` (host) — approved + verified, with one
-   **approved** listing titled exactly `E2E Test Listing` and **no blocked
-   dates**.
+   **approved** listing titled exactly `E2E Test Listing`, city **Riyadh**
+   (a fresh browser's feed defaults to Riyadh — a Dammam listing is
+   invisible to the E2E), and **no blocked dates**.
+
+   One-query visibility check (all five columns must match for the guest
+   feed to show it):
+
+       select l.status, l.city, p.role, p.is_verified, p.is_suspended
+       from public.listings l join public.profiles p on p.id = l.host_id
+       where l.title_ar = 'E2E Test Listing';
+       -- expect: approved · riyadh · host · true · false
 3. Both accounts are on the purge EXCLUDE list in
    `docs/data-hygiene-prelaunch.md` — never delete them. Booking requests
    accumulate one per CI run on the E2E accounts; trim those bookings
