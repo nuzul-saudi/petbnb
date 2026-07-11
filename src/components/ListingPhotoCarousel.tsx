@@ -4,12 +4,26 @@
 //   - Show all of a listing's photos on the card. Lazy-load: only the
 //     cover is fetched eagerly; subsequent photos load when the user
 //     advances to them (or one step ahead — see prefetchAhead).
-//   - Web: hover-revealed left/right arrow buttons.
+//   - Web: left/right arrow buttons (always visible when there's
+//     somewhere to go — hover-reveal died in the Part A RTL fix:
+//     touch-web has no hover, and iPhone Safari's tap-as-hover made
+//     the arrows appear unpredictably).
 //   - Native: horizontal swipe via PanResponder.
 //   - Both: dot indicators at the bottom (suppressed when ≤ 1 photo).
 //   - The heart-overlay (Pressable from ListingCard) sits in an
-//     overlays slot. Heart top-trailing + arrows y-centered on the
-//     left/right edges below the heart's bottom — no hit-zone overlap.
+//     overlays slot; the shared 44pt arrows are y-centered, well below
+//     the heart's hit zone on card-shaped boxes.
+//
+// RTL (Part A, 2026-07-11): the strip KEEPS logical render order — a
+// flex row under RTL lays photos right-to-left and right-aligns, so
+// revealing photo i means translating the strip RIGHT (+i·W), not left.
+// The old hardcoded -i·W slid past the strip's edge and rendered BLANK.
+// Math lives in src/lib/carousel-paging (stripTranslateX, swipeTarget).
+//
+// Index note (A3): this widget positions via transform driven directly
+// by activeIndex — the visible photo IS the state, so it cannot desync
+// the way scroll-based paging could; setActiveIndex here is exact, not
+// optimistic.
 //
 // Performance: at 20 cards in the feed × ~6 photos each, eager-load
 // would be 120 image fetches per feed render. With lazy-load this
@@ -17,17 +31,19 @@
 // user opens that card's carousel.
 
 import { useMemo, useRef, useState } from 'react';
-import {
-  PanResponder,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { PanResponder, Platform, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
-import { colors, fonts, spacing } from '@/theme/tokens';
+import { CarouselArrow } from '@/components/CarouselArrow';
+import {
+  clampIndex,
+  nextArrowSide,
+  prevArrowSide,
+  stripTranslateX,
+  swipeTarget,
+} from '@/lib/carousel-paging';
+import { useTranslation } from '@/lib/i18n';
+import { colors, spacing } from '@/theme/tokens';
 
 export type CarouselPhoto = {
   id: string;
@@ -51,24 +67,38 @@ export function ListingPhotoCarousel({
   overlays,
   emptyEmoji = '🏠',
 }: ListingPhotoCarouselProps) {
+  // Reading direction — from the locale, per src/theme/rtl.ts.
+  const { locale } = useTranslation();
+  const isRTL = locale === 'ar';
+
   const [activeIndex, setActiveIndex] = useState(0);
   // Highest index whose image has been requested. Lazy-load anchor:
   // photo N renders a real <Image> only when N <= maxIndexSeen.
   const [maxIndexSeen, setMaxIndexSeen] = useState(0);
-  const [hovered, setHovered] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
 
   const total = photos.length;
 
   const goTo = (i: number) => {
-    const clamped = Math.max(0, Math.min(total - 1, i));
+    const clamped = clampIndex(i, total);
     setActiveIndex(clamped);
     setMaxIndexSeen((prev) => Math.max(prev, clamped));
   };
 
+  // Pin the live values so the PanResponder release handler never acts
+  // on a stale closure.
+  const activeRef = useRef(activeIndex);
+  activeRef.current = activeIndex;
+  const totalRef = useRef(total);
+  totalRef.current = total;
+  const isRTLRef = useRef(isRTL);
+  isRTLRef.current = isRTL;
+
   // Native swipe: PanResponder only claims responder once movement
   // exceeds a small threshold so a pure tap (favorite heart, card
-  // navigation) is never absorbed.
+  // navigation) is never absorbed. Direction is reading-aware
+  // (swipeTarget): under RTL the next photo sits to the LEFT, so a
+  // rightward drag advances.
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -76,16 +106,18 @@ export function ListingPhotoCarousel({
         onMoveShouldSetPanResponder: (_e, gs) =>
           Math.abs(gs.dx) > 6 && Math.abs(gs.dx) > Math.abs(gs.dy),
         onPanResponderRelease: (_e, gs) => {
-          if (gs.dx < -40) goTo(activeIndex + 1);
-          else if (gs.dx > 40) goTo(activeIndex - 1);
+          const target = swipeTarget(
+            gs.dx,
+            40,
+            activeRef.current,
+            totalRef.current,
+            isRTLRef.current,
+          );
+          if (target != null) goTo(target);
         },
       }),
-    [activeIndex, total], // total via goTo closure
+    [],
   );
-  // Avoid stale-closure: pin total to the ref so the responder's
-  // captured `total` updates between renders.
-  const totalRef = useRef(total);
-  totalRef.current = total;
 
   // Zero photos → placeholder (matches the previous ListingCard's
   // photoPlaceholder behavior so empty-listing UX doesn't regress).
@@ -117,24 +149,25 @@ export function ListingPhotoCarousel({
     <View
       style={[styles.container, { aspectRatio }]}
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-      // Web-only hover signals — RN Web supports onMouseEnter/Leave
-      // via the {...} spread; on native these props are ignored.
-      {...(Platform.OS === 'web'
-        ? {
-            onMouseEnter: () => setHovered(true),
-            onMouseLeave: () => setHovered(false),
-          }
-        : {})}
       {...(Platform.OS !== 'web' ? panResponder.panHandlers : {})}
     >
       {/* Strip of all photos, slid by transform. Width = N × container
-          width so each slide occupies exactly one container width. */}
+          width so each slide occupies exactly one container width.
+          translateX sign is direction-aware — see the RTL header. */}
       <View
         style={[
           styles.strip,
           {
             width: containerWidth * total,
-            transform: [{ translateX: -activeIndex * containerWidth }],
+            transform: [
+              {
+                translateX: stripTranslateX(
+                  activeIndex,
+                  containerWidth,
+                  isRTL,
+                ),
+              },
+            ],
             // CSS transition on web for smooth slide; on native the
             // transform jumps (acceptable for now; future polish:
             // Animated.timing).
@@ -161,37 +194,25 @@ export function ListingPhotoCarousel({
         ))}
       </View>
 
-      {/* Web arrows — hover-revealed. Positioned vertically centered
-          but with top inset so they sit BELOW the heart's hit zone
-          (heart is top:16, height 36 → bottom ~52). Arrows start at
-          top: 60 to guarantee no overlap. */}
-      {Platform.OS === 'web' && hovered ? (
+      {/* Web arrows — shared 44pt circle (A6), logical sides (A1):
+          next sits where the next photo enters from (left under RTL).
+          CarouselArrow stops propagation so card navigation never
+          fires from an arrow tap. */}
+      {Platform.OS === 'web' ? (
         <>
           {activeIndex > 0 ? (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation?.();
-                goTo(activeIndex - 1);
-              }}
-              style={[styles.arrow, styles.arrowLeft]}
-              accessibilityRole="button"
+            <CarouselArrow
+              side={prevArrowSide(isRTL)}
+              onPress={() => goTo(activeIndex - 1)}
               accessibilityLabel="Previous photo"
-            >
-              <Text style={styles.arrowGlyph}>‹</Text>
-            </Pressable>
+            />
           ) : null}
           {activeIndex < total - 1 ? (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation?.();
-                goTo(activeIndex + 1);
-              }}
-              style={[styles.arrow, styles.arrowRight]}
-              accessibilityRole="button"
+            <CarouselArrow
+              side={nextArrowSide(isRTL)}
+              onPress={() => goTo(activeIndex + 1)}
               accessibilityLabel="Next photo"
-            >
-              <Text style={styles.arrowGlyph}>›</Text>
-            </Pressable>
+            />
           ) : null}
         </>
       ) : null}
@@ -236,31 +257,6 @@ const styles = StyleSheet.create({
   slot: {
     height: '100%',
     position: 'relative',
-  },
-  arrow: {
-    position: 'absolute',
-    top: 60,
-    bottom: 12,
-    width: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 18,
-    // The bounded top/bottom + 36 width means the arrow rect floats
-    // vertically; transform centers it within that band.
-    zIndex: 10,
-  },
-  arrowLeft: {
-    start: spacing.sm,
-  },
-  arrowRight: {
-    end: spacing.sm,
-  },
-  arrowGlyph: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 22,
-    color: colors.ink,
-    lineHeight: 24,
   },
   dotsRow: {
     position: 'absolute',

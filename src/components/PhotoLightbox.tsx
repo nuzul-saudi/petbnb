@@ -18,6 +18,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 
+import { CarouselArrow } from '@/components/CarouselArrow';
+import {
+  nextArrowSide,
+  prevArrowSide,
+  swipeTarget,
+} from '@/lib/carousel-paging';
 import { toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, spacing } from '@/theme/tokens';
@@ -42,6 +48,8 @@ export function PhotoLightbox({
   onClose,
 }: PhotoLightboxProps) {
   const { t, locale } = useTranslation();
+  // Reading direction — from the locale, per src/theme/rtl.ts.
+  const isRTL = locale === 'ar';
 
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   // Lazy-load anchor — keep a Set of indices the user has visited
@@ -85,11 +93,13 @@ export function PhotoLightbox({
         onMoveShouldSetPanResponder: (_e, gs) =>
           Math.abs(gs.dx) > 6 && Math.abs(gs.dx) > Math.abs(gs.dy),
         onPanResponderRelease: (_e, gs) => {
-          if (gs.dx < -40) goTo(safeIndex + 1);
-          else if (gs.dx > 40) goTo(safeIndex - 1);
+          // Reading-direction-aware (Part A): under RTL the next photo
+          // is to the LEFT, so a rightward drag advances.
+          const target = swipeTarget(gs.dx, 40, safeIndex, total, isRTL);
+          if (target != null) goTo(target);
         },
       }),
-    [safeIndex],
+    [safeIndex, total, isRTL],
   );
 
   if (total === 0) return null;
@@ -141,22 +151,18 @@ export function PhotoLightbox({
         {Platform.OS === 'web' && total > 1 ? (
           <>
             {safeIndex > 0 ? (
-              <Pressable
+              <CarouselArrow
+                side={prevArrowSide(isRTL)}
                 onPress={() => goTo(safeIndex - 1)}
-                style={[styles.arrow, styles.arrowLeft]}
-                accessibilityRole="button"
-              >
-                <Text style={styles.arrowGlyph}>‹</Text>
-              </Pressable>
+                accessibilityLabel="Previous photo"
+              />
             ) : null}
             {safeIndex < total - 1 ? (
-              <Pressable
+              <CarouselArrow
+                side={nextArrowSide(isRTL)}
                 onPress={() => goTo(safeIndex + 1)}
-                style={[styles.arrow, styles.arrowRight]}
-                accessibilityRole="button"
-              >
-                <Text style={styles.arrowGlyph}>›</Text>
-              </Pressable>
+                accessibilityLabel="Next photo"
+              />
             ) : null}
           </>
         ) : null}
@@ -211,29 +217,5 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-  },
-  arrow: {
-    position: 'absolute',
-    top: '50%',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginTop: -24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    zIndex: 5,
-  },
-  arrowLeft: {
-    start: spacing.lg,
-  },
-  arrowRight: {
-    end: spacing.lg,
-  },
-  arrowGlyph: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 30,
-    color: colors.cream,
-    lineHeight: 32,
   },
 });

@@ -1,9 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
   type NativeScrollEvent,
@@ -11,7 +9,17 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 
-import { colors, fonts } from '@/theme/tokens';
+import { CarouselArrow } from '@/components/CarouselArrow';
+import {
+  clampIndex,
+  logicalToRaw,
+  nextArrowSide,
+  offsetForLogical,
+  prevArrowSide,
+  rawPageFromOffset,
+} from '@/lib/carousel-paging';
+import { useTranslation } from '@/lib/i18n';
+import { colors } from '@/theme/tokens';
 
 type Photo = { id: string; photo_url: string };
 
@@ -55,6 +63,11 @@ export function PhotoGallery({
   aspectRatio = DEFAULT_ASPECT,
   height,
 }: Props) {
+  // Reading direction — from the locale, per src/theme/rtl.ts
+  // (I18nManager.isRTL doesn't track web direction changes).
+  const { locale } = useTranslation();
+  const isRTL = locale === 'ar';
+
   // useWindowDimensions is reactive on web — the gallery re-measures if
   // the browser is resized. Dimensions.get('window') would freeze at
   // mount and the hero would stay stale until the next render.
@@ -64,12 +77,6 @@ export function PhotoGallery({
   //   • height passed → fixed-strip mode (admin listing screen, 220px).
   //     Width fills the viewport, aspect ratio is whatever you get.
   //   • height omitted → aspect-ratio mode with both caps.
-  //
-  // In aspect mode: start with natural (viewport × viewport/aspect),
-  // then clamp height if it exceeds MAX_GALLERY_HEIGHT (recomputing
-  // width to preserve aspect), then clamp width if still over
-  // MAX_GALLERY_WIDTH. Whichever cap binds first wins. For 5:2 the
-  // width cap binds first on desktop; for 4:3 the height cap does.
   let renderWidth: number;
   let renderHeight: number;
   if (height != null) {
@@ -88,32 +95,51 @@ export function PhotoGallery({
     }
   }
 
+  const total = photos.length;
+
+  // `index` is LOGICAL (reading order: 0 = first photo) and is written
+  // ONLY from scroll events (A3 — no optimistic writes; the visible
+  // photo is the single source of truth). Arrows just request a scroll.
   const [index, setIndex] = useState(0);
-  // 2026-06-26 — desktop browsers don't expose a usable affordance
-  // for horizontally swiping a paging ScrollView. Add a ref so the
-  // arrow buttons can programmatically scrollTo the prev/next page.
+  const indexRef = useRef(index);
+  indexRef.current = index;
   const scrollRef = useRef<ScrollView | null>(null);
 
+  // RTL strategy (Part A, 2026-07-11 — see docs/batch-decisions.md):
+  // browsers disagree about RTL scroll geometry, so the strip is FORCED
+  // to LTR (style direction:'ltr') and photos render in RAW order —
+  // reversed under RTL so the first photo sits at the visual right,
+  // where an RTL reader starts. All offset math stays positive LTR;
+  // logical↔raw mapping happens in the pure helpers.
+  const rawPhotos = isRTL ? [...photos].reverse() : photos;
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = e.nativeEvent.contentOffset.x;
-    // Page width matches each image's renderWidth, so dividing the
-    // scroll offset by it yields the active page index.
-    const i = Math.round(x / renderWidth);
-    if (i !== index) setIndex(i);
+    const raw = rawPageFromOffset(
+      e.nativeEvent.contentOffset.x,
+      renderWidth,
+      total,
+    );
+    const logical = logicalToRaw(raw, total, isRTL);
+    if (logical !== indexRef.current) setIndex(logical);
   };
 
-  const goPrev = () => {
-    if (index === 0) return;
-    const next = index - 1;
-    setIndex(next);
-    scrollRef.current?.scrollTo({ x: next * renderWidth, animated: true });
+  const scrollToLogical = (logical: number, animated: boolean) => {
+    scrollRef.current?.scrollTo({
+      x: offsetForLogical(logical, total, renderWidth, isRTL),
+      animated,
+    });
   };
-  const goNext = () => {
-    if (index >= photos.length - 1) return;
-    const next = index + 1;
-    setIndex(next);
-    scrollRef.current?.scrollTo({ x: next * renderWidth, animated: true });
-  };
+
+  // Keep the strip aligned to the current logical photo when geometry
+  // changes: mount (RTL starts at raw N-1 → needs an initial jump),
+  // browser resize (page width changes), photo-set change.
+  useEffect(() => {
+    scrollToLogical(clampIndex(indexRef.current, total), false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRTL, renderWidth, total]);
+
+  const goPrev = () => scrollToLogical(clampIndex(index - 1, total), true);
+  const goNext = () => scrollToLogical(clampIndex(index + 1, total), true);
 
   // alignSelf:'center' is a no-op on mobile (where renderWidth ===
   // viewportWidth) and centers the gallery on desktop (where the
@@ -124,24 +150,33 @@ export function PhotoGallery({
     alignSelf: 'center' as const,
   };
 
-  if (photos.length === 0) {
+  if (total === 0) {
     return <View style={[styles.placeholder, containerStyle]} />;
   }
 
-  const canPrev = photos.length > 1 && index > 0;
-  const canNext = photos.length > 1 && index < photos.length - 1;
+  const canPrev = total > 1 && index > 0;
+  const canNext = total > 1 && index < total - 1;
 
   return (
     <View style={containerStyle}>
       <ScrollView
         ref={scrollRef}
+        // LTR-forced geometry — the RTL adaptation is the reversed
+        // rawPhotos order, not the scroll direction. See RTL strategy
+        // comment above.
+        style={styles.stripLTR}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        onContentSizeChange={() => {
+          // First layout after mount — align to the logical index
+          // (raw N-1 in RTL; offset 0 is the WRONG photo there).
+          scrollToLogical(clampIndex(indexRef.current, total), false);
+        }}
       >
-        {photos.map((p) => (
+        {rawPhotos.map((p) => (
           <Image
             key={p.id}
             source={{ uri: p.photo_url }}
@@ -152,29 +187,22 @@ export function PhotoGallery({
         ))}
       </ScrollView>
 
-      {/* 2026-06-26 — prev / next arrow buttons. Desktop users
-          can't swipe a paging ScrollView with a mouse, so the dots
-          alone are confusing. Arrows only render when there's more
-          than one photo and there's somewhere to go. */}
+      {/* Logical arrows (A1): exactly one on the first/last photo, on
+          the side the target photo visually enters from — next is LEFT
+          under RTL. Shared 44pt circle (A6). */}
       {canPrev ? (
-        <Pressable
+        <CarouselArrow
+          side={prevArrowSide(isRTL)}
           onPress={goPrev}
-          style={[styles.arrow, styles.arrowLeft]}
-          accessibilityRole="button"
           accessibilityLabel="Previous photo"
-        >
-          <Text style={styles.arrowGlyph}>‹</Text>
-        </Pressable>
+        />
       ) : null}
       {canNext ? (
-        <Pressable
+        <CarouselArrow
+          side={nextArrowSide(isRTL)}
           onPress={goNext}
-          style={[styles.arrow, styles.arrowRight]}
-          accessibilityRole="button"
           accessibilityLabel="Next photo"
-        >
-          <Text style={styles.arrowGlyph}>›</Text>
-        </Pressable>
+        />
       ) : null}
 
       {photos.length > 1 ? (
@@ -195,32 +223,8 @@ const styles = StyleSheet.create({
   placeholder: {
     backgroundColor: colors.whisper,
   },
-  // 2026-06-26 — prev / next arrow buttons. Sized for both touch
-  // (44pt) and mouse target. Subtle background tint that doesn't
-  // compete with the photo content but stays visible against any
-  // image.
-  arrow: {
-    position: 'absolute',
-    top: '50%',
-    width: 44,
-    height: 44,
-    marginTop: -22,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowLeft: {
-    left: 12,
-  },
-  arrowRight: {
-    right: 12,
-  },
-  arrowGlyph: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 28,
-    color: '#FFFFFF',
-    lineHeight: 28,
+  stripLTR: {
+    direction: 'ltr',
   },
   dots: {
     position: 'absolute',

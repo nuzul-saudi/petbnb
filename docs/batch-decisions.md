@@ -422,3 +422,31 @@ follow all three rules:
 All three existing channels (`useMessages`, inquiry timeline,
 host-notifications) conform as of `6eb29a3`. New channels copy that
 pattern verbatim.
+
+## RTL horizontal paging on web (2026-07-11 — rule for all carousels)
+
+Locked after the Part A carousel fixes (two prod repros: dead arrows +
+index desync on the listing hero; blank photo on the host-home card).
+**Never do LTR offset math against an RTL-laid-out strip.** Browsers
+disagree about RTL scroll geometry (negative vs reverse scrollLeft
+models), so:
+
+1. **Scroll-based paging** (PhotoGallery): force the strip to LTR
+   geometry (`style direction:'ltr'`) and render items in RAW order —
+   reversed under RTL — so all offsets stay positive LTR math. Map
+   logical↔raw via `src/lib/carousel-paging.ts` (`logicalToRaw`,
+   `offsetForLogical`, `rawPageFromOffset`).
+2. **Transform-strip paging** (ListingPhotoCarousel): keep logical
+   order and flip the translate SIGN (`stripTranslateX`): a flex row
+   under RTL right-aligns, so revealing photo i slides the strip
+   RIGHT (+i·W), never left.
+3. **Index state derives from position, never optimistically** — from
+   normalized scroll events (scroll paging) or is the transform input
+   itself (strip paging). No setIndex-then-hope.
+4. **Arrows are logical, not physical**: next sits where the next
+   photo enters from (LEFT under RTL), via nextArrowSide/prevArrowSide
+   + the shared 44pt CarouselArrow. Swipe direction flips via
+   swipeTarget.
+
+The pure math is vitest-pinned (tests/carousel-paging.test.ts) in both
+directions so LTR can't regress while fixing RTL.
