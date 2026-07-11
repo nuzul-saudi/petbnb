@@ -130,14 +130,23 @@ test('golden path: browse → sign-in → inquiry → booking request', async ({
   await calendar.getByText('10', { exact: true }).click();
   await calendar.getByText('12', { exact: true }).click();
 
-  // Pet picker — deterministic seed name. Assert the tap registered by
-  // waiting for the per-pet services section, which only mounts once a
-  // pet is selected (guards against a lingering modal backdrop
-  // swallowing the click). Note: the row's accessibilityState={{checked}}
-  // is NOT rendered as aria-checked by react-native-web 0.21, so a
-  // getByRole('checkbox',{checked}) probe would be a false negative —
-  // this visible-section signal is the reliable one.
-  await page.getByText(PET_NAME).first().click();
+  // Picking a complete range auto-closes the picker. WAIT for the dialog
+  // to fully detach before touching the pet row: the 2026-07 failure
+  // (error-context snapshot showed dates set + "0 قطط") was the pet tap
+  // landing while the modal's backdrop was still fading out, so
+  // togglePet never fired. The dates persist ("10 أغس · 12 أغس · 2
+  // ليلة") — only the pet selection was lost.
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15_000 });
+
+  // Pet picker — click the checkbox ROW itself (role=checkbox), not its
+  // inner text node, so the press handler fires reliably. The seed pet
+  // is named "E2e cat" (lowercase); match case-insensitively. Assert the
+  // tap registered by waiting for the per-pet services section, which
+  // only mounts once a pet is selected. (The row's
+  // accessibilityState={{checked}} is NOT rendered as aria-checked by
+  // react-native-web 0.21, so a getByRole checked probe would be a false
+  // negative — this visible-section signal is the reliable one.)
+  await page.getByRole('checkbox', { name: new RegExp(PET_NAME, 'i') }).first().click();
   try {
     await expect(
       page.getByText(AR.perPetServices).first(),
