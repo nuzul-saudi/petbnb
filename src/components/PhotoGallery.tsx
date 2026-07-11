@@ -19,6 +19,7 @@ import {
   rawPageFromOffset,
 } from '@/lib/carousel-paging';
 import { useTranslation } from '@/lib/i18n';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { colors } from '@/theme/tokens';
 
 type Photo = { id: string; photo_url: string };
@@ -67,6 +68,8 @@ export function PhotoGallery({
   // (I18nManager.isRTL doesn't track web direction changes).
   const { locale } = useTranslation();
   const isRTL = locale === 'ar';
+  // S9 — honour reduced-motion: drop the crossfade to an instant swap.
+  const reducedMotion = useReducedMotion();
 
   // useWindowDimensions is reactive on web — the gallery re-measures if
   // the browser is resized. Dimensions.get('window') would freeze at
@@ -182,7 +185,7 @@ export function PhotoGallery({
             source={{ uri: p.photo_url }}
             style={{ width: renderWidth, height: renderHeight }}
             contentFit="cover"
-            transition={150}
+            transition={reducedMotion ? 0 : 150}
           />
         ))}
       </ScrollView>

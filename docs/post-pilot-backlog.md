@@ -63,6 +63,21 @@ legacy draft row can never again throw mid-promote. Not urgent — no
 sparse drafts survive the purge — do it next time the promote RPC is
 touched.
 
+### Gold-on-honey contrast audit (Wave 1b S9 — deferred to visual pass)
+The `colors.goldInk` (#5A4926) token exists for gold text that needs
+to stay legible on the honey/cream background (goldInk on honey ≈ 5:1;
+`theme.accentInk` already resolves to it in host mode). Several
+components still use static `colors.gold` / `colors.goldDeep` as a text
+colour — but some of those are DECORATIVE (e.g. the gold star glyphs in
+`ReviewCard`), where darkening to goldInk would be wrong. This is a
+per-site visual audit, not a blind swap: it needs the app running to
+tell reading-text (enforce goldInk) from decoration (leave gold). Folds
+into the founder's Wave 1b visual pass (same pass as the feed chip
+row). Sites to review: `ListingCard`, `CategoryStrip`,
+`bookings/[id]`, `listings/[id]`, `OwnerPetsSection`, the feed guest
+header. The reduced-motion and inbox/card a11y-label halves of S9 are
+already shipped.
+
 ## Product / lifecycle gaps
 
 ### Admin-disable should cascade to pending requests

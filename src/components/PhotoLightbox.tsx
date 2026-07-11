@@ -26,6 +26,7 @@ import {
 } from '@/lib/carousel-paging';
 import { toArabicDigits } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { colors, fonts, spacing } from '@/theme/tokens';
 
 export type LightboxPhoto = {
@@ -48,6 +49,8 @@ export function PhotoLightbox({
   onClose,
 }: PhotoLightboxProps) {
   const { t, locale } = useTranslation();
+  // S9 — honour reduced-motion: drop the crossfade to an instant swap.
+  const reducedMotion = useReducedMotion();
   // Reading direction — from the locale, per src/theme/rtl.ts.
   const isRTL = locale === 'ar';
 
@@ -140,7 +143,7 @@ export function PhotoLightbox({
               source={{ uri: photos[safeIndex].photo_url }}
               style={styles.image}
               contentFit="contain"
-              transition={120}
+              transition={reducedMotion ? 0 : 120}
             />
           ) : null}
         </View>

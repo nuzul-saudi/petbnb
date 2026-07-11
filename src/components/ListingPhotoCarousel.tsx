@@ -43,6 +43,7 @@ import {
   swipeTarget,
 } from '@/lib/carousel-paging';
 import { useTranslation } from '@/lib/i18n';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { colors, spacing } from '@/theme/tokens';
 
 export type CarouselPhoto = {
@@ -70,6 +71,8 @@ export function ListingPhotoCarousel({
   // Reading direction — from the locale, per src/theme/rtl.ts.
   const { locale } = useTranslation();
   const isRTL = locale === 'ar';
+  // S9 — honour reduced-motion: drop photo crossfades to instant.
+  const reducedMotion = useReducedMotion();
 
   const [activeIndex, setActiveIndex] = useState(0);
   // Highest index whose image has been requested. Lazy-load anchor:
@@ -138,7 +141,7 @@ export function ListingPhotoCarousel({
           source={{ uri: photos[0].photo_url }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
-          transition={150}
+          transition={reducedMotion ? 0 : 150}
         />
         {overlays}
       </View>
@@ -187,7 +190,7 @@ export function ListingPhotoCarousel({
                 source={{ uri: p.photo_url }}
                 style={StyleSheet.absoluteFill}
                 contentFit="cover"
-                transition={i === 0 ? 150 : 0}
+                transition={reducedMotion || i !== 0 ? 0 : 150}
               />
             ) : null}
           </View>

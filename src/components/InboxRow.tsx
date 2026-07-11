@@ -30,6 +30,12 @@ export type InboxRowProps = {
   unread?: boolean;
   unreadLabel?: string;
   title: string;
+  /**
+   * Screen-reader label for the whole row. Defaults to the title; pass a
+   * richer string (e.g. title + status + last message) when the visual
+   * pill/preview carry meaning a blind user would otherwise miss.
+   */
+  accessibilityLabel?: string;
   /** Trailing status pill node (<StatusPill …/>). */
   pill?: ReactNode;
   /** Middle content between the header and the message preview. */
@@ -52,6 +58,7 @@ export function InboxRow({
   unread,
   unreadLabel,
   title,
+  accessibilityLabel,
   pill,
   children,
   latestMessage,
@@ -63,7 +70,12 @@ export function InboxRow({
   const hasPreview = latestMessage !== undefined;
 
   return (
-    <Pressable onPress={onPress} style={styles.row}>
+    <Pressable
+      onPress={onPress}
+      style={styles.row}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+    >
       {leading ? <View style={styles.leading}>{leading}</View> : null}
       <View style={styles.body}>
         <View style={styles.header}>
