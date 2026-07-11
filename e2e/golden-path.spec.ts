@@ -48,6 +48,23 @@ test('golden path: browse → sign-in → inquiry → booking request', async ({
   // nudge, leave-guard). Accept everything — the flow should proceed.
   page.on('dialog', (d) => void d.accept());
 
+  // Diagnostics — the trace artifact isn't reachable from CI's runner
+  // egress, so surface the browser's own signals into the CI log. A JS
+  // exception in a render path, or a failed Supabase query (RLS/network),
+  // will show up here and name the cause directly.
+  const browserLog: string[] = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error' || m.type() === 'warning') {
+      browserLog.push(`[console.${m.type()}] ${m.text()}`);
+    }
+  });
+  page.on('pageerror', (e) => browserLog.push(`[pageerror] ${e.message}`));
+  page.on('requestfailed', (r) =>
+    browserLog.push(
+      `[requestfailed] ${r.url()} — ${r.failure()?.errorText ?? '?'}`,
+    ),
+  );
+
   // ── 1. Guest browses the feed ──────────────────────────────────────
   await page.goto('/');
   const card = page.getByText(LISTING_TITLE).first();
@@ -121,10 +138,31 @@ test('golden path: browse → sign-in → inquiry → booking request', async ({
   // getByRole('checkbox',{checked}) probe would be a false negative —
   // this visible-section signal is the reliable one.
   await page.getByText(PET_NAME).first().click();
-  await expect(
-    page.getByText(AR.perPetServices).first(),
-    'pet tap must reveal the per-pet services section',
-  ).toBeVisible({ timeout: 15_000 });
+  try {
+    await expect(
+      page.getByText(AR.perPetServices).first(),
+    ).toBeVisible({ timeout: 15_000 });
+  } catch {
+    // Bring the page's own state into the CI log: the pet row's ARIA
+    // subtree (role / disabled / checked) and any browser errors.
+    const row = await page
+      .getByText(PET_NAME)
+      .first()
+      .locator('xpath=ancestor-or-self::*[@role][1]')
+      .ariaSnapshot()
+      .catch(() => '(no role ancestor)');
+    const catsMeta = await page
+      .getByText(/\d+\s*قطط/)
+      .first()
+      .textContent()
+      .catch(() => '(no cats-count)');
+    throw new Error(
+      `pet tap did not reveal per-pet services (selection did not register).\n` +
+        `sticky cats-count: ${catsMeta}\n` +
+        `pet-row aria: ${row}\n` +
+        `browser log:\n${browserLog.join('\n') || '(empty)'}`,
+    );
+  }
 
   // ── 7. Submit → booking detail ─────────────────────────────────────
   await page.getByText(AR.submitRequest, { exact: true }).first().click();
