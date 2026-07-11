@@ -12,6 +12,8 @@ import { Redirect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/AppHeader';
+import { EmptyState } from '@/components/EmptyState';
+import { SkeletonList } from '@/components/SkeletonCard';
 import { useAuth } from '@/lib/auth';
 import { formatDate } from '@/lib/date';
 import { useHostNotifications } from '@/lib/host-notifications';
@@ -111,13 +113,9 @@ export default function NotificationsScreen() {
       </View>
 
       {items == null ? (
-        <View style={styles.centered}>
-          <Text style={styles.muted}>{t('notifications.loading')}</Text>
-        </View>
+        <SkeletonList />
       ) : items.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.muted}>{t('notifications.empty')}</Text>
-        </View>
+        <EmptyState title={t('notifications.empty')} />
       ) : (
         <FlatList
           data={items}
@@ -171,17 +169,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     color: colors.mossDeep,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  muted: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
   },
   list: {
     paddingHorizontal: spacing.lg,

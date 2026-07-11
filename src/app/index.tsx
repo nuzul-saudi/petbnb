@@ -18,7 +18,9 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { CategoryStrip } from '@/components/CategoryStrip';
+import { EmptyState } from '@/components/EmptyState';
 import { ListingCard } from '@/components/ListingCard';
+import { SkeletonList } from '@/components/SkeletonCard';
 import { SearchHero } from '@/components/SearchHero';
 import {
   listBlockedRangesByListing,
@@ -319,22 +321,16 @@ function HostHome() {
       </View>
 
       {loading ? (
-        <View style={styles.centered}>
-          <Text style={styles.centeredText}>{t('feed.loading')}</Text>
-        </View>
+        <SkeletonList />
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : items.length === 0 ? (
-        <View style={styles.placeholderContainer}>
-          <Text style={styles.placeholderTitle}>
-            {t('home.host_home_empty_title')}
-          </Text>
-          <Text style={styles.placeholderBody}>
-            {t('home.host_home_empty_body')}
-          </Text>
-        </View>
+        <EmptyState
+          title={t('home.host_home_empty_title')}
+          body={t('home.host_home_empty_body')}
+        />
       ) : (
         <SectionList
           sections={sections}
@@ -1053,17 +1049,13 @@ function OwnerFeedHome() {
       ) : null}
 
       {loading ? (
-        <View style={styles.centered}>
-          <Text style={styles.centeredText}>{t('feed.loading')}</Text>
-        </View>
+        <SkeletonList />
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : sortedItems.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.centeredText}>{t('feed.empty')}</Text>
-        </View>
+        <EmptyState title={t('feed.empty')} />
       ) : (
         <FlatList
           // Part C — re-mount on breakpoint change (numColumns is a
@@ -1192,14 +1184,6 @@ const styles = StyleSheet.create({
     // backgroundColor intentionally omitted — the themed AppShell
     // wrapper supplies it (cream in owner mode, honey in host mode).
   },
-  // --- placeholder (host) ---
-  placeholderContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.md,
-  },
   greeting: {
     fontFamily: fonts.headingBold,
     fontSize: 28,
@@ -1220,19 +1204,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14,
     color: colors.moss,
-  },
-  placeholderTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 18,
-    color: colors.ink,
-    textAlign: 'center',
-    marginTop: spacing.xl,
-  },
-  placeholderBody: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-    textAlign: 'center',
   },
   signOut: {
     marginTop: spacing.xl,
@@ -1510,12 +1481,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-  },
-  centeredText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-    textAlign: 'center',
   },
   errorText: {
     fontFamily: fonts.body,

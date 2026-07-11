@@ -19,7 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { InboxRow } from '@/components/InboxRow';
+import { SkeletonList } from '@/components/SkeletonCard';
 import { StatusPill } from '@/components/StatusPill';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/lib/auth';
@@ -98,22 +100,16 @@ export default function MyInquiriesScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading ? (
-        <View style={styles.centered}>
-          <Text style={styles.muted}>{t('common.loading')}</Text>
-        </View>
+        <SkeletonList />
       ) : rows.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>
-            {isHostMode
-              ? t('myinquiries.host_empty')
-              : t('myinquiries.empty')}
-          </Text>
-          <Text style={styles.emptyBody}>
-            {isHostMode
+        <EmptyState
+          title={isHostMode ? t('myinquiries.host_empty') : t('myinquiries.empty')}
+          body={
+            isHostMode
               ? t('myinquiries.host_empty_body')
-              : t('myinquiries.empty_body')}
-          </Text>
-        </View>
+              : t('myinquiries.empty_body')
+          }
+        />
       ) : (
         <FlatList
           data={rows}
@@ -192,31 +188,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: fonts.body,
     fontSize: 13,
-    color: colors.inkSoft,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
-  },
-  emptyTitle: {
-    fontFamily: fonts.headingBold,
-    fontSize: 16,
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  emptyBody: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.inkSoft,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  muted: {
-    fontFamily: fonts.body,
-    fontSize: 14,
     color: colors.inkSoft,
   },
   error: {

@@ -5,7 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { InboxRow } from '@/components/InboxRow';
+import { SkeletonList } from '@/components/SkeletonCard';
 import { StatusPill } from '@/components/StatusPill';
 import { useAuth } from '@/lib/auth';
 import {
@@ -103,13 +105,9 @@ export default function MyBookingsScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading ? (
-        <View style={styles.centered}>
-          <Text style={styles.muted}>{t('mybookings.loading')}</Text>
-        </View>
+        <SkeletonList />
       ) : bookings.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>{t('mybookings.empty')}</Text>
-        </View>
+        <EmptyState title={t('mybookings.empty')} />
       ) : (
         <FlatList
           data={bookings}
@@ -220,25 +218,6 @@ const styles = StyleSheet.create({
     color: colors.terracotta,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
-  },
-  muted: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-    textAlign: 'center',
-  },
-  emptyTitle: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-    textAlign: 'center',
   },
   list: {
     paddingHorizontal: spacing.xl,

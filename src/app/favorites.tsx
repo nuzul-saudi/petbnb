@@ -8,18 +8,20 @@
 
 import { logWarn } from '@/lib/log';
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { Screen } from '@/components/Screen';
+import { EmptyState } from '@/components/EmptyState';
+import { SkeletonList } from '@/components/SkeletonCard';
 import { ListingCard } from '@/components/ListingCard';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/lib/auth';
 import { listFavoriteListings } from '@/lib/favorites';
 import type { ListingFeedItem } from '@/lib/listings';
 import { useTranslation } from '@/lib/i18n';
-import { colors, fonts, spacing } from '@/theme/tokens';
+import { spacing } from '@/theme/tokens';
 
 export default function FavoritesScreen() {
   const router = useRouter();
@@ -61,14 +63,12 @@ export default function FavoritesScreen() {
   return (
     <Screen title={t('favorites.title')} back={{ href: '/' }} edges={['top', 'bottom']}>
       {loading ? (
-        <View style={styles.centered}>
-          <Text style={styles.muted}>{t('favorites.loading')}</Text>
-        </View>
+        <SkeletonList />
       ) : items.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>{t('favorites.empty_title')}</Text>
-          <Text style={styles.emptyBody}>{t('favorites.empty_body')}</Text>
-        </View>
+        <EmptyState
+          title={t('favorites.empty_title')}
+          body={t('favorites.empty_body')}
+        />
       ) : (
         <FlatList
           data={items}
@@ -100,30 +100,6 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
-  },
-  muted: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-  },
-  emptyTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  emptyBody: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.inkSoft,
-    textAlign: 'center',
   },
   list: {
     paddingHorizontal: spacing.xl,
