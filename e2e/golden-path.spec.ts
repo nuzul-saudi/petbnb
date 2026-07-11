@@ -36,6 +36,7 @@ const AR = {
   submitRequest: 'إرسال الطلب',
   addDate: 'إضافة تاريخ',
   nextMonth: 'الشهر التالي',
+  perPetServices: 'خدمات لكل قطة',
 };
 
 test('golden path: browse → sign-in → inquiry → booking request', async ({
@@ -112,13 +113,17 @@ test('golden path: browse → sign-in → inquiry → booking request', async ({
   await calendar.getByText('10', { exact: true }).click();
   await calendar.getByText('12', { exact: true }).click();
 
-  // Pet picker — deterministic seed name. The row is a checkbox; assert
-  // the tap actually registered (guards against a lingering modal
-  // backdrop swallowing the click) before relying on it for submit.
+  // Pet picker — deterministic seed name. Assert the tap registered by
+  // waiting for the per-pet services section, which only mounts once a
+  // pet is selected (guards against a lingering modal backdrop
+  // swallowing the click). Note: the row's accessibilityState={{checked}}
+  // is NOT rendered as aria-checked by react-native-web 0.21, so a
+  // getByRole('checkbox',{checked}) probe would be a false negative —
+  // this visible-section signal is the reliable one.
   await page.getByText(PET_NAME).first().click();
   await expect(
-    page.getByRole('checkbox', { checked: true }).first(),
-    'pet tap must flip the row checkbox to checked',
+    page.getByText(AR.perPetServices).first(),
+    'pet tap must reveal the per-pet services section',
   ).toBeVisible({ timeout: 15_000 });
 
   // ── 7. Submit → booking detail ─────────────────────────────────────
