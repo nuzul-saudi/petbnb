@@ -43,7 +43,8 @@ Actions):
 Required **seed data** (one-time, via the app):
 
 1. Account `e2e-owner@petbnb.local` (owner) — set a password via the normal
-   set-password flow; add one **vaccinated** pet named exactly `E2E Cat`.
+   set-password flow; add one **vaccinated** pet named `E2e cat` (the spec
+   matches the pet name case-insensitively, so exact casing doesn't matter).
 2. Account `e2e-host@petbnb.local` (host) — approved + verified, with one
    **approved** listing titled exactly `E2E Test Listing`, city **Riyadh**
    (a fresh browser's feed defaults to Riyadh — a Dammam listing is
@@ -60,6 +61,16 @@ Required **seed data** (one-time, via the app):
    `docs/data-hygiene-prelaunch.md` — never delete them. Booking requests
    accumulate one per CI run on the E2E accounts; trim those bookings
    periodically if noisy.
+
+> ⚠️ **Pre-passworded / dashboard-created accounts — onboarding trap.**
+> An account created ahead of time (e.g. a host provisioned from the admin
+> dashboard, or a pre-seeded login) must **NOT** be sent through the
+> `/name` screen to finish onboarding: that owner funnel silently assigns
+> `role='owner'` via the default door and there is no role switch to undo
+> it (a host can never be created on that email afterward — see the
+> onboarding-trap finding in `docs/incident-2026-07-11.md`). Deep-link a
+> would-be host straight to `/become-host/application` instead, so the
+> host application path — not the owner default — is what stamps the role.
 
 Analytics stay clean by construction: the E2E export env omits
 `POSTHOG_KEY`/`SENTRY_DSN`, so both SDKs no-op and are never imported.

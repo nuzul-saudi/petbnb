@@ -26,6 +26,43 @@ still powers is the OR-ed legacy clause in
 
 Not urgent; do it when touching the booking-request/junction code next.
 
+### Owner-vs-host role is assigned by the default door — no switch
+**Trigger:** the 2026-07-11 onboarding-trap finding
+(`docs/incident-2026-07-11.md`). Sign-in through the standard
+`/name` funnel silently stamps `role='owner'` via the default door,
+and there is **no role switch** — once an email is an owner it can
+never become a host (0039 email-uniqueness split), and vice versa.
+Tonight a pre-provisioned host account got trapped as an owner this
+way. **Product discussion required — this reopens the locked Q1/0039
+decision** ("two account types separated at the email level, no
+persona toggle"). Options range from a lightweight "this is an owner
+account — create a separate host account" interstitial before the
+default stamp, to a genuine role-add path. Not a code task yet: needs
+a founder call on whether the email-level split stays absolute.
+
+## Frontend hardening (optional — belt-and-braces)
+
+### Modal backdrop: disable pointer-events during the exit animation
+The 2026-07-11 E2E snapshot caught the date-picker's fading backdrop
+swallowing the very next tap (the pet-row tap landed on the closing
+modal, not the row). The E2E worked around it (wait for dialog
+detach), but the real UX is that a fast user tap during a modal's
+~150ms fade-out is silently eaten. Optional hardening: set
+`pointerEvents="none"` on the `SearchWhenModal` / RN `Modal` backdrop
+once `onClose` fires (visible→false) so the exit animation can't
+intercept. Low priority — no reported human-facing bug, only the
+robot hit it — but cheap and removes a whole flake/annoyance class.
+
+### `promote_listing_draft` coalesce-hardening for sparse legacy drafts
+The 42703 drift chain (0034 wholly unapplied → `listing_drafts`
+missing columns → promote RPC threw) was defused by 0052 + the
+pre-pilot purge of legacy sparse drafts. Belt-and-braces only:
+`promote_listing_draft` should `coalesce()` each draft column against
+the live listing value (or a safe default) so a genuinely sparse
+legacy draft row can never again throw mid-promote. Not urgent — no
+sparse drafts survive the purge — do it next time the promote RPC is
+touched.
+
 ## Product / lifecycle gaps
 
 ### Admin-disable should cascade to pending requests
