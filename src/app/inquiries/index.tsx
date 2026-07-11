@@ -19,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
+import { InboxRow } from '@/components/InboxRow';
+import { StatusPill } from '@/components/StatusPill';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/lib/auth';
 import { formatRelativeStamp } from '@/lib/date';
@@ -31,8 +33,7 @@ import {
 } from '@/lib/inquiries';
 import { logWarn } from '@/lib/log';
 import { useTheme } from '@/theme/theme';
-import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
-import type { Enums } from '@/types/database';
+import { colors, fonts, spacing } from '@/theme/tokens';
 
 export default function MyInquiriesScreen() {
   const router = useRouter();
@@ -136,100 +137,37 @@ export default function MyInquiriesScreen() {
                 )
               : '';
             return (
-              <Pressable
-                onPress={() =>
-                  router.push(`/inquiries/${item.id}` as never)
-                }
-                style={styles.row}
-              >
-                <View style={styles.rowAvatar}>
+              <InboxRow
+                onPress={() => router.push(`/inquiries/${item.id}` as never)}
+                leading={
                   <UserAvatar
                     avatarUrl={other?.avatar_url ?? null}
                     displayName={otherName}
                     size={44}
                   />
-                </View>
-                <View style={styles.rowBody}>
-                  <View style={styles.rowHeader}>
-                    <Text style={styles.rowName} numberOfLines={1}>
-                      {otherName}
-                    </Text>
-                    <StatusPill status={item.status} />
-                  </View>
-                  {listingTitle ? (
-                    <Text style={styles.rowListing} numberOfLines={1}>
-                      {listingTitle}
-                    </Text>
-                  ) : null}
-                  {/* 2026-06-29 — preview line. Branches off the
-                      one-row latest_message embed on the inquiry:
-                        deleted_at !== null \xe2\x86\x92 italic muted "(Message
-                                                  deleted)"
-                        body !== null      \xe2\x86\x92 first line of body
-                        no message at all  \xe2\x86\x92 italic muted "(No
-                                                  messages yet)"
-                      Single-line truncated. Status pill above is
-                      unchanged (Open/Converted, separate concern). */}
-                  {(() => {
-                    const lm = item.latest_message;
-                    if (lm && lm.deleted_at != null) {
-                      return (
-                        <Text
-                          style={[styles.rowPreview, styles.rowPreviewMuted]}
-                          numberOfLines={1}
-                        >
-                          {t('messages.preview_deleted')}
-                        </Text>
-                      );
-                    }
-                    if (lm && lm.body != null) {
-                      return (
-                        <Text style={styles.rowPreview} numberOfLines={1}>
-                          {lm.body}
-                        </Text>
-                      );
-                    }
-                    return (
-                      <Text
-                        style={[styles.rowPreview, styles.rowPreviewMuted]}
-                        numberOfLines={1}
-                      >
-                        {t('messages.preview_empty')}
-                      </Text>
-                    );
-                  })()}
+                }
+                title={otherName}
+                pill={<StatusPill kind="inquiry" status={item.status} />}
+                latestMessage={item.latest_message ?? null}
+                trailing={
                   <Text style={styles.rowMeta}>
                     {item.last_message_at
                       ? formatRelativeStamp(item.last_message_at, locale, t)
                       : t('myinquiries.no_messages_yet')}
                   </Text>
-                </View>
-              </Pressable>
+                }
+              >
+                {listingTitle ? (
+                  <Text style={styles.rowListing} numberOfLines={1}>
+                    {listingTitle}
+                  </Text>
+                ) : null}
+              </InboxRow>
             );
           }}
         />
       )}
     </SafeAreaView>
-  );
-}
-
-function StatusPill({ status }: { status: Enums<'inquiry_status'> }) {
-  const { t } = useTranslation();
-  // Visual taxonomy: open=active (gold), converted=resolved positively
-  // (moss), closed=archived (whisper, low-contrast).
-  const bg =
-    status === 'open'
-      ? colors.gold
-      : status === 'converted'
-        ? colors.moss
-        : colors.whisper;
-  const fg = status === 'closed' ? colors.inkSoft : colors.cream;
-  return (
-    <View style={[styles.pill, { backgroundColor: bg }]}>
-      <Text style={[styles.pillText, { color: fg }]}>
-        {t(`inquiry.status_${status}_pill`)}
-      </Text>
-    </View>
   );
 }
 
@@ -291,33 +229,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.paper,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    ...shadows.card,
-  },
-  rowAvatar: {
-    width: 44,
-  },
-  rowBody: {
-    flex: 1,
-    gap: 2,
-  },
-  rowHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  rowName: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 15,
-    color: colors.ink,
-    flex: 1,
-  },
   rowListing: {
     fontFamily: fonts.body,
     fontSize: 13,
@@ -327,27 +238,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
-  },
-  // 2026-06-29 — inbox preview line. Shows the latest message body,
-  // or italic-muted "(Message deleted)" / "(No messages yet)" when
-  // the thread has no live content. Sits between listing title and
-  // the relative-time meta line; truncated to single line.
-  rowPreview: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.ink,
-  },
-  rowPreviewMuted: {
-    color: colors.inkSoft,
-    fontStyle: 'italic',
-  },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.pill,
-  },
-  pillText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 11,
   },
 });
