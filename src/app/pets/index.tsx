@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
-import { AppHeader } from '@/components/AppHeader';
+import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
 import { PetAvatar } from '@/components/PetAvatar';
 import { useAuth } from '@/lib/auth';
@@ -18,9 +18,8 @@ import type { Tables } from '@/types/database';
 
 export default function PetsListScreen() {
   const router = useRouter();
-  const { t, locale, setLocale } = useTranslation();
+  const { t } = useTranslation();
   const { initializing, session, user } = useAuth();
-  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [pets, setPets] = useState<Tables<'pets'>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,15 +55,11 @@ export default function PetsListScreen() {
   if (!session || !user) return <Redirect href="/sign-in" />;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
-      <View style={styles.header}>
-        <Pressable onPress={() => router.replace('/profile')} style={styles.backLink}>
-          <Text style={styles.backText}>{t('pets.back')}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t('pets.list_title')}</Text>
-      </View>
-
+    <Screen
+      title={t('pets.list_title')}
+      back={{ href: '/profile' }}
+      edges={['top', 'bottom']}
+    >
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading ? (
@@ -130,7 +125,7 @@ export default function PetsListScreen() {
           fullWidth
         />
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -138,28 +133,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.cream,
-  },
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  backLink: {
-    paddingVertical: spacing.xs,
-  },
-  backText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-  },
-  title: {
-    flex: 1,
-    fontFamily: fonts.headingBold,
-    fontSize: 22,
-    color: colors.mossDeep,
   },
   error: {
     fontFamily: fonts.body,

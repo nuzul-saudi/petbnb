@@ -529,6 +529,7 @@
     "bio_label": "About you",
     "bio_hint": "Write at least {min} characters about yourself and your experience with pets.",
     "bio_placeholder": "I've loved cats since I was a kid…",
+    "avatar_label": "Profile photo",
     "avatar_hint": "Add a profile photo so customers can recognize you.",
     "avatar_link": "Add a profile photo →",
     "nafath_title": "Nafath verification — coming soon",
@@ -877,7 +878,8 @@
   "common": {
     "loading": "Loading…",
     "error": "Something went wrong, please try again later",
-    "retry": "Try again"
+    "retry": "Try again",
+    "back": "← Back"
   },
   "calendar": {
     "prev_month": "Previous month",

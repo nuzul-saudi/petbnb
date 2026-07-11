@@ -3,7 +3,7 @@
 // Reached by approved hosts from the profile-screen status panel
 // ("Complete your profile" CTA). Collects:
 //   - Hosting bio (free-text)
-//   - Profile picture (reuses the avatar block from /profile)
+//   - Profile picture (INLINE avatar picker — Wave 1b S4)
 //   - Nafath verification (STUB — gated behind NAFATH_ENABLED flag,
 //     off for now; the UI shows it as a future step so the user
 //     knows what's coming)
@@ -11,6 +11,14 @@
 // Submits → host_profile_complete=true → user can now create
 // listings. Listing INSERT RLS (0039 step 5) enforces this at the
 // DB layer; this screen is the friendly surface.
+//
+// Wave 1b S4 (2026-07-11): two founder-found fixes —
+//   1. The screen was a DEAD END (no back affordance). Now wrapped in
+//      <Screen back> so the host can return to /profile.
+//   2. The profile-picture step used to route AWAY to /profile to pick
+//      an avatar, which unmounted this screen and DESTROYED the typed
+//      bio. The avatar picker is now INLINE (same pick→preview→upload
+//      flow as /profile) so the bio survives — no navigation, no wipe.
 
 import { logWarn } from '@/lib/log';
 import { useState } from 'react';
@@ -22,13 +30,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 
+import { Screen } from '@/components/Screen';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
 import { markHostProfileComplete } from '@/lib/host-application';
-import { colors, fonts, radii, spacing } from '@/theme/tokens';
+import { pickAvatarPhoto, uploadAvatar, type AvatarSource } from '@/lib/avatars';
+import { supabase } from '@/lib/supabase';
+import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
 
 const MIN_BIO = 30;
 // Nafath stays disabled for MVP. The pre-launch task list (CLAUDE.md
@@ -45,6 +57,14 @@ export default function HostCompleteProfileScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Inline avatar state (mirrors /profile). previewUri renders
+  // immediately after the pick; the upload runs on "Save photo" so the
+  // user sees a preview and can change their mind. Crucially, this all
+  // happens WITHOUT leaving the screen, so the typed bio is preserved.
+  const [pendingPhoto, setPendingPhoto] = useState<AvatarSource | null>(null);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+
   if (initializing) return <SafeAreaView style={styles.safe} />;
   if (!session || !user) return <Redirect href="/sign-in" />;
   if (!profile) return <SafeAreaView style={styles.safe} />;
@@ -59,6 +79,41 @@ export default function HostCompleteProfileScreen() {
 
   const bioValid = bio.trim().length >= MIN_BIO;
   const canSubmit = bioValid && !submitting;
+
+  const onPickAvatar = async () => {
+    setError(null);
+    const source = await pickAvatarPhoto();
+    if (!source) return;
+    setPendingPhoto(source);
+    const preview =
+      source.kind === 'web-file'
+        ? URL.createObjectURL(source.file)
+        : source.uri;
+    setPreviewUri(preview);
+  };
+
+  const onSaveAvatar = async () => {
+    if (!supabase || !user || !pendingPhoto) return;
+    setAvatarSaving(true);
+    setError(null);
+    try {
+      const publicUrl = await uploadAvatar({ userId: user.id, source: pendingPhoto });
+      const { error: e } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+      if (e) throw e;
+      await refreshProfile();
+      setPendingPhoto(null);
+      // Keep previewUri — refreshProfile brings the new avatar_url and
+      // the render flips to it on next paint.
+    } catch (e) {
+      logWarn('[host_complete.avatar_save_failed]', e);
+      setError(t('profile.avatar_save_failed'));
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
 
   const onSubmit = async () => {
     if (!canSubmit || !user) return;
@@ -77,7 +132,7 @@ export default function HostCompleteProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen back={{ href: '/profile' }}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.heading}>{t('host_complete.title')}</Text>
         <Text style={styles.subtitle}>{t('host_complete.subtitle')}</Text>
@@ -98,24 +153,59 @@ export default function HostCompleteProfileScreen() {
           />
         </View>
 
-        {/* Profile picture step — handled on the /profile screen
-            itself via the avatar block. We just point the user
-            there if they haven't set one yet. */}
-        {!profile.avatar_url ? (
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>
-              {t('host_complete.avatar_hint')}
-            </Text>
-            <Pressable
-              onPress={() => router.push('/profile')}
-              style={styles.noticeLink}
-            >
-              <Text style={styles.noticeLinkText}>
-                {t('host_complete.avatar_link')}
-              </Text>
-            </Pressable>
+        {/* Profile picture — INLINE picker (Wave 1b S4). Pick → preview →
+            Save photo, all without leaving the screen so the bio above
+            is never lost. */}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>{t('host_complete.avatar_label')}</Text>
+          <Text style={styles.fieldHint}>{t('host_complete.avatar_hint')}</Text>
+          <View style={styles.avatarRow}>
+            {previewUri ?? profile.avatar_url ? (
+              <Image
+                source={{ uri: previewUri ?? profile.avatar_url ?? '' }}
+                style={styles.avatar}
+                contentFit="cover"
+                transition={150}
+              />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarInitial}>
+                  {profile.full_name?.trim().charAt(0) ?? '?'}
+                </Text>
+              </View>
+            )}
+            <View style={styles.avatarActions}>
+              <Pressable
+                onPress={onPickAvatar}
+                disabled={avatarSaving}
+                style={[styles.avatarButton, avatarSaving && styles.avatarButtonDisabled]}
+              >
+                <Text style={styles.avatarButtonText}>
+                  {previewUri || profile.avatar_url
+                    ? t('profile.avatar_change')
+                    : t('profile.avatar_add')}
+                </Text>
+              </Pressable>
+              {pendingPhoto ? (
+                <Pressable
+                  onPress={onSaveAvatar}
+                  disabled={avatarSaving}
+                  style={[
+                    styles.avatarButton,
+                    styles.avatarButtonPrimary,
+                    avatarSaving && styles.avatarButtonDisabled,
+                  ]}
+                >
+                  <Text style={[styles.avatarButtonText, styles.avatarButtonTextPrimary]}>
+                    {avatarSaving
+                      ? t('profile.avatar_uploading')
+                      : t('profile.avatar_save')}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
-        ) : null}
+        </View>
 
         {/* Nafath step — placeholder so applicants see it's coming. */}
         {NAFATH_ENABLED ? null : (
@@ -143,7 +233,7 @@ export default function HostCompleteProfileScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -195,28 +285,57 @@ const styles = StyleSheet.create({
     minHeight: 140,
     textAlignVertical: 'top',
   },
-  notice: {
-    backgroundColor: colors.whisper,
-    borderColor: colors.gold,
-    borderWidth: 1,
+  // Inline avatar block — mirrors /profile so the two read the same.
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    backgroundColor: colors.paper,
     borderRadius: radii.lg,
     padding: spacing.lg,
+    ...shadows.card,
+  },
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.whisper,
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontFamily: fonts.headingBold,
+    fontSize: 36,
+    color: colors.mossDeep,
+  },
+  avatarActions: {
+    flex: 1,
     gap: spacing.sm,
   },
-  noticeText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.ink,
-    lineHeight: 22,
+  avatarButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.whisper,
+    alignItems: 'center',
   },
-  noticeLink: {
-    alignSelf: 'flex-start',
+  avatarButtonPrimary: {
+    backgroundColor: colors.mossDeep,
+    borderColor: colors.mossDeep,
   },
-  noticeLinkText: {
+  avatarButtonDisabled: {
+    opacity: 0.5,
+  },
+  avatarButtonText: {
     fontFamily: fonts.bodyBold,
     fontSize: 13,
-    color: colors.mossDeep,
-    textDecorationLine: 'underline',
+    color: colors.ink,
+  },
+  avatarButtonTextPrimary: {
+    color: colors.cream,
   },
   nafathStub: {
     backgroundColor: colors.paper,

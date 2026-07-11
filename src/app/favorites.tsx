@@ -8,11 +8,11 @@
 
 import { logWarn } from '@/lib/log';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 
-import { AppHeader } from '@/components/AppHeader';
+import { Screen } from '@/components/Screen';
 import { ListingCard } from '@/components/ListingCard';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/lib/auth';
@@ -23,9 +23,8 @@ import { colors, fonts, spacing } from '@/theme/tokens';
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const { t, locale, setLocale } = useTranslation();
+  const { t } = useTranslation();
   const { initializing, session, user } = useAuth();
-  const toggleLocale = () => setLocale(locale === 'ar' ? 'en' : 'ar');
 
   const [items, setItems] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,15 +59,7 @@ export default function FavoritesScreen() {
   if (!session) return <Redirect href="/sign-in?returnTo=/favorites" />;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <AppHeader locale={locale} onLanguageToggle={toggleLocale} />
-      <View style={styles.header}>
-        <Pressable onPress={() => router.replace('/')} style={styles.backLink}>
-          <Text style={styles.backText}>{t('favorites.back')}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t('favorites.title')}</Text>
-      </View>
-
+    <Screen title={t('favorites.title')} back={{ href: '/' }} edges={['top', 'bottom']}>
       {loading ? (
         <View style={styles.centered}>
           <Text style={styles.muted}>{t('favorites.loading')}</Text>
@@ -102,35 +93,13 @@ export default function FavoritesScreen() {
           )}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  backLink: {
-    paddingVertical: spacing.xs,
-  },
-  backText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.inkSoft,
-  },
-  title: {
-    flex: 1,
-    fontFamily: fonts.headingBold,
-    fontSize: 22,
-    color: colors.mossDeep,
   },
   centered: {
     flex: 1,
