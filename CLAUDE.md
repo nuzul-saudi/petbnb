@@ -446,9 +446,16 @@ in the feed. Verification is **not** the visibility gate — that's
 
 ## 13. Known gaps from test round 1 (2026-05-27)
 
-> **Current state as of migration 0046 (2026-06-30) — live baseline.**
-> Apply state is tracked in [`docs/migration-apply-log.md`](./docs/migration-apply-log.md)
-> (confirmed applied through **0046**). Since this section's early rounds:
+> **Current state as of migration 0053 (2026-07-11) — live baseline.**
+> Apply state is tracked in [`docs/migration-apply-log.md`](./docs/migration-apply-log.md).
+> A full ledger-vs-database audit on **2026-07-11** confirmed **prod
+> conforms to the migration ledger**, with the SOLE delta being **0049**
+> (written-not-applied by design — Phase 2b email runbook). 0050 / 0051 /
+> 0052 / 0053 are all applied + verified; **0034** was the only historical
+> phantom (its `listing_drafts` half never ran) and has been repaired
+> (0052 + manual gap blocks). See
+> [`docs/audit-2026-07-11.md`](./docs/audit-2026-07-11.md). Since this
+> section's early rounds:
 > Steps 1–10 core flows, condition reports (Step 6), listings status +
 > two-copy edit (Step 8), the host-signup funnel (Step 4.6 / 0039),
 > two-way reviews + written-review surfacing (R2C6 + 2026-07-02), and the
