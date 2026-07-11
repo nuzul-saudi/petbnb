@@ -34,6 +34,7 @@ import {
   listPendingReviews,
   type AdminReview,
 } from '@/lib/admin';
+import { Chip } from '@/components/Chip';
 import { formatSAR } from '@/lib/format';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -104,44 +105,22 @@ export default function AdminListingsScreen() {
       {/* Filter chips. Tap toggles the dataset; URL param updates
           so back/forward survives. */}
       <View style={styles.filterRow}>
-        <Pressable
+        <Chip
+          label={t('admin.filter_all')}
+          selected={filter === 'all'}
           onPress={() => {
             setFilter('all');
             router.setParams({ filter: 'all' });
           }}
-          style={[
-            styles.filterChip,
-            filter === 'all' && styles.filterChipActive,
-          ]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              filter === 'all' && styles.filterChipTextActive,
-            ]}
-          >
-            {t('admin.filter_all')}
-          </Text>
-        </Pressable>
-        <Pressable
+        />
+        <Chip
+          label={t('admin.filter_review')}
+          selected={filter === 'review'}
           onPress={() => {
             setFilter('review');
             router.setParams({ filter: 'review' });
           }}
-          style={[
-            styles.filterChip,
-            filter === 'review' && styles.filterChipActive,
-          ]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              filter === 'review' && styles.filterChipTextActive,
-            ]}
-          >
-            {t('admin.filter_review')}
-          </Text>
-        </Pressable>
+        />
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -278,26 +257,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.md,
-  },
-  filterChip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.whisper,
-    backgroundColor: colors.paper,
-  },
-  filterChipActive: {
-    backgroundColor: colors.mossDeep,
-    borderColor: colors.mossDeep,
-  },
-  filterChipText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 13,
-    color: colors.ink,
-  },
-  filterChipTextActive: {
-    color: colors.cream,
   },
   error: {
     fontFamily: fonts.body,

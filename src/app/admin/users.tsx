@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { Chip } from '@/components/Chip';
 import { listAllUsers, type AdminUser } from '@/lib/admin';
 import { useTranslation } from '@/lib/i18n';
 import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
@@ -120,20 +121,12 @@ export default function AdminUsersScreen() {
         contentContainerStyle={styles.filterRow}
       >
         {FILTERS.map((f) => (
-          <Pressable
+          <Chip
             key={f.value}
+            label={t(f.i18nKey)}
+            selected={filter === f.value}
             onPress={() => setFilter(f.value)}
-            style={[styles.filterChip, filter === f.value && styles.filterChipActive]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                filter === f.value && styles.filterChipTextActive,
-              ]}
-            >
-              {t(f.i18nKey)}
-            </Text>
-          </Pressable>
+          />
         ))}
       </ScrollView>
 
@@ -236,36 +229,6 @@ const styles = StyleSheet.create({
   filterScrollContainer: {
     flexShrink: 0,
     minHeight: 52,
-  },
-  filterChip: {
-    paddingHorizontal: spacing.md,
-    // #5 (2026-06-28) \xe2\x80\x94 bumped from xs (4) to sm (8). The xs
-    // value clipped Arabic descenders (\xd8\xac, \xd8\xb9, \xd9\x8a) on iOS Safari
-    // because the glyph metrics push below a 4px-padded chip
-    // border. Same fix as the home page filter chips.
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.whisper,
-    backgroundColor: colors.paper,
-    marginEnd: spacing.xs,
-  },
-  filterChipActive: {
-    backgroundColor: colors.moss,
-    borderColor: colors.moss,
-  },
-  filterChipText: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    // #5 (2026-06-28) \xe2\x80\x94 explicit lineHeight. Without it, RN-Web's
-    // default line-height on iOS Safari was too tight for Arabic
-    // glyphs in this fontSize.
-    lineHeight: 18,
-    color: colors.inkSoft,
-  },
-  filterChipTextActive: {
-    color: colors.cream,
-    fontFamily: fonts.bodyBold,
   },
   error: {
     fontFamily: fonts.body,

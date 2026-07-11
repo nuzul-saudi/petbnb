@@ -18,6 +18,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { CategoryStrip } from '@/components/CategoryStrip';
+import { Chip } from '@/components/Chip';
 import { EmptyState } from '@/components/EmptyState';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonList } from '@/components/SkeletonCard';
@@ -792,23 +793,12 @@ function OwnerFeedHome() {
           filter; female-only sits on top of it. */}
       <View style={styles.cityRow}>
         {CITIES.map((c) => (
-          <Pressable
+          <Chip
             key={c.key}
+            label={pickLocalized(c.name_ar, c.name_en, locale)}
+            selected={city === c.key}
             onPress={() => setCity(c.key)}
-            style={[
-              styles.cityChip,
-              city === c.key && styles.filterChipActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                city === c.key && styles.filterChipTextActive,
-              ]}
-            >
-              {pickLocalized(c.name_ar, c.name_en, locale)}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
 
@@ -893,27 +883,16 @@ function OwnerFeedHome() {
             .map((key) => {
               const active = sortBy === key;
               return (
-                <Pressable
+                <Chip
                   key={key}
+                  label={t(`feed.sort_${key}`)}
+                  selected={active}
+                  showCheck
                   onPress={() => {
                     setSortBy(key);
                     setSortMenuOpen(false);
                   }}
-                  style={[
-                    styles.filterChip,
-                    active && styles.filterChipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      active && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {active ? '✓ ' : ''}
-                    {t(`feed.sort_${key}`)}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
         </ScrollView>
@@ -934,59 +913,26 @@ function OwnerFeedHome() {
           style={styles.filterRowScrollContainer}
           contentContainerStyle={styles.filterRowScrollable}
         >
-          <Pressable
+          <Chip
+            label={t('feed.female_filter')}
+            selected={femaleOnly}
+            showCheck
             onPress={() => setFemaleOnly((v) => !v)}
-            style={[
-              styles.filterChip,
-              femaleOnly && styles.filterChipActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                femaleOnly && styles.filterChipTextActive,
-              ]}
-            >
-              {femaleOnly ? '✓ ' : ''}
-              {t('feed.female_filter')}
-            </Text>
-          </Pressable>
+          />
 
-          <Pressable
+          <Chip
+            label={t('feed.grooming_filter')}
+            selected={groomingOnly}
+            showCheck
             onPress={() => setGroomingOnly((v) => !v)}
-            style={[
-              styles.filterChip,
-              groomingOnly && styles.filterChipActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                groomingOnly && styles.filterChipTextActive,
-              ]}
-            >
-              {groomingOnly ? '✓ ' : ''}
-              {t('feed.grooming_filter')}
-            </Text>
-          </Pressable>
+          />
 
-          <Pressable
+          <Chip
+            label={t('feed.no_resident_pets_filter')}
+            selected={noResidentPetsOnly}
+            showCheck
             onPress={() => setNoResidentPetsOnly((v) => !v)}
-            style={[
-              styles.filterChip,
-              noResidentPetsOnly && styles.filterChipActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                noResidentPetsOnly && styles.filterChipTextActive,
-              ]}
-            >
-              {noResidentPetsOnly ? '✓ ' : ''}
-              {t('feed.no_resident_pets_filter')}
-            </Text>
-          </Pressable>
+          />
 
           {/* Species chips — Round 12 / Step 5.7. Hidden while
               SPECIES_ENABLED is false (the launch is cat-only; a
@@ -995,24 +941,13 @@ function OwnerFeedHome() {
             ? (['cat', 'dog'] as const).map((s) => {
                 const active = speciesFilter === s;
                 return (
-                  <Pressable
+                  <Chip
                     key={s}
+                    label={`${speciesEmoji(s)} ${t(`species.${s}`)}`}
+                    selected={active}
+                    showCheck
                     onPress={() => setSpeciesFilter(active ? null : s)}
-                    style={[
-                      styles.filterChip,
-                      active && styles.filterChipActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        active && styles.filterChipTextActive,
-                      ]}
-                    >
-                      {active ? '✓ ' : ''}
-                      {speciesEmoji(s)} {t(`species.${s}`)}
-                    </Text>
-                  </Pressable>
+                  />
                 );
               })
             : null}
@@ -1021,24 +956,13 @@ function OwnerFeedHome() {
           {(['budget', 'midrange', 'premium'] as const).map((band) => {
             const active = priceBand === band;
             return (
-              <Pressable
+              <Chip
                 key={band}
+                label={t(`feed.price_band_${band}`)}
+                selected={active}
+                showCheck
                 onPress={() => setPriceBand(active ? null : band)}
-                style={[
-                  styles.filterChip,
-                  active && styles.filterChipActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    active && styles.filterChipTextActive,
-                  ]}
-                >
-                  {active ? '✓ ' : ''}
-                  {t(`feed.price_band_${band}`)}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </ScrollView>
@@ -1278,10 +1202,11 @@ const styles = StyleSheet.create({
   // (the parent is capped at 100dvh by +html.tsx, the feed
   // FlatList is flex:1, and without this pin the rows lost
   // their intrinsic height to satisfy the FlatList). minHeight
-  // is a hard floor sized to one chip row: filterChip
-  // paddingV:8×2 + border:2 + filterChipText fontSize:12 /
-  // lineHeight:18 = 36, plus filterRowScrollable paddingBottom:
-  // 12 = 48, rounded to 52 for safety.
+  // is a hard floor sized to one chip row: <Chip size="inline">
+  // paddingV:8×2 + border:2 + text lineHeight:18 = 36, plus
+  // filterRowScrollable paddingBottom:12 = 48, rounded to 52 for
+  // safety. (Chip's minHeight:32 floor is below this 36, so the
+  // content height wins — unchanged from the old filterChip.)
   filterRowScrollContainer: {
     flexShrink: 0,
     minHeight: 52,
@@ -1375,20 +1300,6 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     marginEnd: spacing.xs,
   },
-  filterChip: {
-    paddingHorizontal: spacing.md,
-    // 2026-06-26 \xe2\x80\x94 bumped paddingVertical from xs (4px) to sm
-    // (8px). The xs value was too tight for Arabic text on iOS
-    // Safari + the WhatsApp in-app browser: descenders on \xd8\xac, \xd8\xb9,
-    // \xd9\x8a pushed the bottom of the glyph below the chip border,
-    // making the chip look truncated. sm gives the text breathing
-    // room without visibly inflating the row.
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.whisper,
-    backgroundColor: colors.paper,
-  },
   // City selector row (7.2c). Wraps the per-city chips so they share
   // horizontal margin with the femaleOnly chip below; chips themselves
   // drop the margin since the row container provides it.
@@ -1399,31 +1310,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     // 2026-06-27 — same flexShrink:0 pin as compactBar above.
     flexShrink: 0,
-  },
-  cityChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.whisper,
-    backgroundColor: colors.paper,
-  },
-  filterChipActive: {
-    backgroundColor: colors.moss,
-    borderColor: colors.moss,
-  },
-  filterChipText: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    // 2026-06-26 \xe2\x80\x94 explicit lineHeight so Arabic glyphs with
-    // descenders render fully inside the chip on iOS Safari +
-    // WhatsApp in-app browser.
-    lineHeight: 18,
-    color: colors.inkSoft,
-  },
-  filterChipTextActive: {
-    color: colors.cream,
-    fontFamily: fonts.bodyBold,
   },
   list: {
     paddingHorizontal: spacing.xl,
