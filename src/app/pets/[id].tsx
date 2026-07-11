@@ -14,7 +14,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/components/AppHeader';
 import { BreedPicker, type BreedSelection } from '@/components/BreedPicker';
-import { DateField } from '@/components/DateField';
+import { SingleDateField } from '@/components/SingleDateField';
 import { SpeciesPicker } from '@/components/SpeciesPicker';
 import { useAuth } from '@/lib/auth';
 import { confirmDialog } from '@/lib/confirm';
@@ -453,23 +453,25 @@ export default function PetDetailScreen() {
           />
         </Field>
 
-        {/* Milestone A — vaccination dates + care notes. Test round 3
-            (2026-06-10) swapped the YYYY-MM-DD TextInput for the shared
-            DateField (calendar UX on web), max=today so future-dated
-            vaccinations can't be entered. */}
+        {/* Milestone A — vaccination dates + care notes. FIX 2
+            (2026-07-11) swapped the DateField for the shared
+            SingleDateField (one calendar for the whole app, via
+            RangeCalendar mode="single"). maxDate=today so future-dated
+            vaccinations can't be entered; no minDate so a past
+            vaccination date is reachable by paging back. */}
         <Field label={t('pets.rabies_vaccinated_at_label')}>
-          <DateField
+          <SingleDateField
             value={rabiesVaccinatedAt}
             onChange={setRabiesVaccinatedAt}
-            max={todayIso()}
+            maxDate={todayIso()}
           />
         </Field>
 
         <Field label={t('pets.fvrcp_vaccinated_at_label')}>
-          <DateField
+          <SingleDateField
             value={fvrcpVaccinatedAt}
             onChange={setFvrcpVaccinatedAt}
-            max={todayIso()}
+            maxDate={todayIso()}
           />
         </Field>
 

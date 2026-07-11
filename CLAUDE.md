@@ -338,20 +338,21 @@ launch.
   (see the item above) and pre-booking remains the highest-priority
   surface for admin spot-checks — pre-booking is where commission leaks.
 
-- **DateField → RangeCalendar single-mode migration.** Today
-  `src/components/DateField.tsx` (web calendar picker + native
-  TextInput fallback) is still alive at 4 callers — two on
-  `/listings/[id]/availability` (host blocked-range start/end)
-  and two on `/pets/[id]` (vaccination + booster dates). The
-  design-review batch (commit `ca4f48b`) deleted the dead
-  `AvailabilityCalendar.tsx` but deferred the DateField swap
-  because `RangeCalendar` has no `mode` prop yet. Pre-launch
-  fix: add `mode: 'single' | 'range'` to `RangeCalendar`,
-  reroute the 4 DateField callers, then delete `DateField.tsx`.
-  Single calendar component for the whole app. Cosmetic but
-  matters for design consistency — the two pickers render
-  differently today (text input vs. visual grid). Logged
-  during Round 6 design review.
+- **DateField → RangeCalendar single-mode migration. — ✅ SHIPPED
+  (FIX 2 tail, 2026-07-11).** `RangeCalendar` gained a `mode: 'single'
+  | 'range'` prop (+ a `maxDate` prop and no-implicit-lower-bound in
+  single mode so PAST dates like vaccinations are reachable). New
+  `src/components/SingleDateField.tsx` (a date card that opens a
+  single-mode `RangeCalendar` modal, Latin-digit display via
+  `formatDate`, optional ✕ clear) replaces the old inline input. By
+  2026-07-11 the only surviving `DateField` caller was `/pets/[id]`'s
+  two vaccination dates (availability had already migrated to a single
+  `RangeCalendar`, and `request.tsx` never used it) — those two swapped
+  to `SingleDateField` and **`DateField.tsx` is deleted**. One calendar
+  component for the whole app. **UX note for the visual pass:** paging
+  a month grid back to a far-past vaccination date is more taps than
+  the old native date input — acceptable (vaccinations are recent) but
+  worth an eyeball; the ✕ clear keeps the field optional.
 
 - **🔍 magnifier emoji on the home search button.** Flagged in
   the Claude Design handoff as off-roster (the rest of the UI is
@@ -696,7 +697,7 @@ round as the closing commits.
 | Fix | What | Commit | Status |
 |---|---|---|---|
 | FIX 1 | Sweep hardcoded `colors.moss` / `mossDeep` → `theme.accent` at host-mode surfaces (ListingCard, listing detail, HostHome, booking detail). Trust mark ✓ pinned via new `colors.verified` alias. Host names render in Reem Kufi (`fonts.headingBold`). | `7f67c79` + `f5b8ccd` | Applied. Static `mossDeep` left in StyleSheet blocks as defensive fallback (inline `theme.accent` always wins). |
-| FIX 2 | One date-range picker — delete `AvailabilityCalendar.tsx`; migrate 4 `DateField` callers to `RangeCalendar mode="single"`. | `ca4f48b` | **Partial.** AvailabilityCalendar (dead code) deleted. DateField migration deferred — `RangeCalendar` needs a `mode` prop first. Tracked in §11. |
+| FIX 2 | One date-range picker — delete `AvailabilityCalendar.tsx`; migrate `DateField` callers to `RangeCalendar mode="single"`. | `ca4f48b` + FIX-2-tail 2026-07-11 | **✅ DONE.** AvailabilityCalendar deleted (`ca4f48b`); `RangeCalendar` gained `mode`/`maxDate`; new `SingleDateField` wraps single-mode; the last caller (`/pets/[id]` vaccination dates) migrated and **`DateField.tsx` deleted**. One calendar for the whole app. |
 | FIX 3 | New `src/lib/date.ts` owns date math (collapsed `todayIso` / `addDaysIso` / `daysInMonth` / `firstWeekdayOfMonth` from two old homes) and adds `formatDate(iso, locale, style?)` returning Latin-digit display strings. Sweep raw ISO leaks at booking detail + booking list + request flow. Add regression test. | `9d44bfd` | Applied (with one missed leak: `src/app/admin/bookings.tsx:76` still pipes ISO through `toArabicDigits` — admin-only, cosmetic). |
 | FIX 4 | Route primary CTAs through the shared `<Button>` component (booking request submit, become-host submit, pet add). Remove hand-rolled `Pressable` + `styles.cta` / `styles.emptyButton`. | `0c184cc` | Applied at 4 sites. 🔍 magnifier emoji on `SearchHero` deferred — needs an SVG/icon-library decision. Tracked in §11. |
 | FIX 5 | Sticky booking-summary bar pinned to viewport on the request screen — running total + nights/pets summary + submit `<Button>` on the trailing edge. Top shadow + whisper top border. | `ae44df1` | Sticky bar applied. Scroll-to-field red-ring on blocked-date overlap applied (L4). **`KeyboardAvoidingView` wrapper now SHIPPED (2026-07-11)** — iOS `padding`, web/Android inert; still wants a real-device eyeball on the exact behavior. |
@@ -718,11 +719,15 @@ chain assumes a static viewport), shipped:
 | `a5086e5` | NEW `src/app/+html.tsx` — Expo Router web-only HTML shell override. Adds `viewport-fit=cover` to the viewport meta so iOS Safari supplies meaningful `env(safe-area-inset-*)`. Inline `<style id="petbnb-viewport-fix">` placed AFTER `ScrollViewStyleReset` to override its `height: 100%` with `height: 100vh; height: 100dvh;` (vh fallback + dvh override). Plus safe-area-aware FlatList bottom padding via `useSafeAreaInsets()` in both OwnerFeedHome and HostHome: `Math.max(insets.bottom, spacing.xxl) + spacing.md`. Verified `react-native-safe-area-context` web implementation does NOT read body env padding so body env() padding would double-pad — deliberately omitted. |
 | `914cb9e` | Pin `<SafeAreaView edges={['top','bottom','left','right']}>` explicitly on home — insulates against a future safe-area-context default change. |
 
-**Deferred items from Round 6 — all tracked in §11:** DateField
-→ RangeCalendar single-mode migration, magnifier emoji
-replacement, KeyboardAvoidingView around the booking sticky bar,
-scroll-to-field + red-ring on blocked-date overlap. None block
-function; all are pre-launch polish.
+**Deferred items from Round 6 — status (all were tracked in §11):**
+**all now shipped.** DateField → RangeCalendar single-mode migration
+(FIX 2 tail, 2026-07-11 — `DateField.tsx` deleted), magnifier emoji
+replacement (`SearchHero` now uses an on-brand label), the
+KeyboardAvoidingView around the booking sticky bar (FIX 5 tail,
+2026-07-11), and scroll-to-field + red-ring on blocked-date overlap
+(L4). None blocked function; the only remaining eyeball items are the
+two device/visual validations noted in §11 (the KAV behavior and the
+single-date past-navigation UX).
 
 ### Review surfacing on listing detail — 2026-07-02 (app-only)
 

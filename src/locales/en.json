@@ -879,7 +879,8 @@
     "loading": "Loading…",
     "error": "Something went wrong, please try again later",
     "retry": "Try again",
-    "back": "← Back"
+    "back": "← Back",
+    "select_date": "Select a date"
   },
   "calendar": {
     "prev_month": "Previous month",

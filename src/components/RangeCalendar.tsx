@@ -42,8 +42,26 @@ export type RangeCalendarProps = {
    * "tap end and nothing happens").
    */
   onRangeComplete?: (start: string, end: string) => void;
-  /** Earliest selectable day, 'yyyy-mm-dd'. Defaults to today. */
+  /**
+   * FIX 2 (2026-07-11) — 'range' (default): tap start then end, band
+   * highlight, onRangeComplete fires once both are set. 'single': one
+   * tap picks a single day (start === end) and onRangeComplete fires
+   * immediately with (date, date) — used by SingleDateField to retire
+   * the old DateField.
+   */
+  mode?: 'single' | 'range';
+  /**
+   * Earliest selectable day, 'yyyy-mm-dd'. In range mode defaults to
+   * today (no past booking). In single mode, omitting it means NO lower
+   * bound — so past dates (e.g. a vaccination date) are selectable.
+   */
   minDate?: string;
+  /**
+   * Latest selectable day, 'yyyy-mm-dd'. Days after it render dimmed +
+   * non-tappable (e.g. vaccination dates pass maxDate = today so a
+   * future date can't be entered). No upper bound when omitted.
+   */
+  maxDate?: string;
   /**
    * 2026-06-26 — half-open [start_date, end_date) ranges the host
    * has blocked. Days inside any range render dimmed (rose tint)
@@ -59,7 +77,9 @@ export function RangeCalendar({
   endDate,
   onChange,
   onRangeComplete,
+  mode = 'range',
   minDate,
+  maxDate,
   blockedRanges,
 }: RangeCalendarProps) {
   const { t, locale } = useTranslation();
@@ -88,7 +108,13 @@ export function RangeCalendar({
   const [viewMonth, setViewMonth] = useState<string>(initialAnchor);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
 
-  const min = minDate ?? todayIso();
+  // Range mode floors at today (no past booking). Single mode has no
+  // implicit lower bound — pass minDate explicitly to add one — so past
+  // dates (vaccination) are selectable; maxDate caps the top.
+  const min = minDate ?? (mode === 'range' ? todayIso() : undefined);
+
+  const outOfBounds = (date: string): boolean =>
+    (min != null && date < min) || (maxDate != null && date > maxDate);
 
   const monthCells = useMemo(
     () => buildMonth(viewMonth, locale),
@@ -96,7 +122,16 @@ export function RangeCalendar({
   );
 
   const onDayTap = (date: string) => {
-    if (date < min) return; // past day, ignored
+    if (outOfBounds(date)) return; // out of [min, max], ignored
+
+    // Single mode: one tap picks the day; start === end, complete now.
+    if (mode === 'single') {
+      onChange({ startDate: date, endDate: date });
+      if (onRangeComplete) {
+        setTimeout(() => onRangeComplete(date, date), 0);
+      }
+      return;
+    }
 
     // Rule 1: no start yet
     if (!startDate) {
@@ -169,9 +204,11 @@ export function RangeCalendar({
             return <View key={`empty-${idx}`} style={styles.dayCell} />;
           }
           const { date, day } = cell;
-          const isPast = date < min;
+          // Dimmed + non-tappable when out of [min, max] (past in range
+          // mode, or after maxDate in single mode).
+          const isPast = outOfBounds(date);
           // 2026-06-26 — host-blocked day. Visually rose-tinted +
-          // non-tappable; same disabled treatment as past dates.
+          // non-tappable; same disabled treatment as out-of-bounds days.
           const isBlocked = isDayBlocked(date);
           const isStart = startDate != null && date === startDate;
           const isEnd = endDate != null && date === endDate;
