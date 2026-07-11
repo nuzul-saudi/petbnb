@@ -450,3 +450,28 @@ models), so:
 
 The pure math is vitest-pinned (tests/carousel-paging.test.ts) in both
 directions so LTR can't regress while fixing RTL.
+
+## RLS / anon grant discipline (2026-07-11 — mandatory)
+
+Locked after the anon-feed outage: 0045 added `host.role='host'` to the
+anon-facing listings/profiles policy predicates but never extended
+0037's column-level grant to include `role`. Policy subqueries evaluate
+with CALLER privileges, so anon needed SELECT on `profiles.role`;
+Postgres reported the missing COLUMN privilege as the table-level
+`42501 permission denied for table profiles`. The public feed was
+invisible to every logged-out client from when 0045 applied until the
+S10 E2E robot (the first true anon client) surfaced it weeks later.
+
+1. **Grant-follows-predicate.** Any policy change that adds a column
+   reference on a COLUMN-GRANTED table (profiles is column-granted to
+   anon since 0037) MUST extend the grant to that column in the SAME
+   migration. A predicate reading a column the role can't SELECT fails
+   the whole policy with a table-level permission error — silently, for
+   exactly the role you forgot.
+
+2. **Editor-as-anon behavioral probe.** RLS verification for any change
+   touching an anon-facing (or role-restricted) path MUST include a
+   `begin; set local role anon; <read>; reset role; rollback;` probe
+   that asserts the real read SUCCEEDS — not just existence checks on
+   the policy/grant. Existence checks pass while behavior is broken:
+   the policy WAS correct here; the missing grant made it deny anyway.

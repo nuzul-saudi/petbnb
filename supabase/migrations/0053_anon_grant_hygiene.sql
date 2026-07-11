@@ -1,0 +1,106 @@
+-- ============================================================
+-- 0053 — anon grant hygiene + codify the role-column fix
+-- ============================================================
+-- WRITTEN, not applied. Strategy reviews line-by-line BEFORE Omar
+-- applies. UNWRAPPED — Omar adds begin/commit at apply time. Every
+-- statement is idempotent (grant/revoke are naturally so), safe to
+-- re-run.
+--
+-- ROOT CAUSE (proven live, 2026-07-11 — NOT drift; 0045 applied
+-- exactly as written, the FILE was wrong):
+-- 0037 exposed a NARROW column slice of public.profiles to anon
+--   grant select (id, full_name, full_name_en, avatar_url,
+--                 is_verified, is_suspended) on public.profiles to anon;
+-- 0045 then added `host.role = 'host'` to the anon-facing EXISTS
+-- subquery in listings_select_active_verified_or_own (and to
+-- profiles_select_public_host_anon) — but never extended the 0037
+-- grant to include `role`. 0045's own comment wrongly asserts the
+-- GRANTs "stay correctly scoped together."
+--
+-- Policy subqueries evaluate with CALLER privileges, so an anon
+-- client needs column SELECT on every column the predicate reads.
+-- anon lacked SELECT on profiles.role; Postgres reports a missing
+-- COLUMN privilege inside a policy as the table-level
+-- "permission denied for table profiles" (42501). Net effect: the
+-- ENTIRE public listings feed has been invisible to logged-out
+-- clients since 0045 applied. It surfaced only 2026-07-11 because
+-- the S10 E2E robot was the first true logged-out client; every
+-- human tester was authenticated (covered by the `to authenticated`
+-- profiles policy from 0002). Omar hotfixed live with statement 1
+-- below; this migration codifies it.
+--
+-- SECOND FINDING (grants dump, 2026-07-11): anon holds Supabase's
+-- default blanket INSERT / UPDATE / REFERENCES on BOTH public.profiles
+-- and public.listings (all columns). Inert today — there are no anon
+-- write POLICIES, so RLS denies every anon write regardless — but
+-- wrong at rest (defense in depth: a future permissive policy
+-- shouldn't silently ride a stale table-level grant). Statement 2
+-- revokes them.
+
+-- 1. Codify the live hotfix — anon needs SELECT on role for the 0045
+--    policy predicate. `role` is NOT PII (owner/host/admin); it joins
+--    the 6 columns 0037 already exposed. Grant is idempotent.
+grant select (role) on public.profiles to anon;
+
+-- 2. Revoke the inert-but-wrong default write grants. Revoking a grant
+--    that isn't held is a no-op, so this is safe in either state.
+revoke insert, update, references on public.profiles from anon;
+revoke insert, update, references on public.listings from anon;
+
+-- ============================================================
+-- Verification queries — run after the migration
+-- ============================================================
+--
+-- (i) anon's SELECT columns on profiles are EXACTLY the intended 7
+--     (the 0037 six + role) — no more, no less:
+--   select string_agg(column_name, ', ' order by column_name)
+--   from information_schema.column_privileges
+--   where grantee = 'anon'
+--     and table_schema = 'public'
+--     and table_name = 'profiles'
+--     and privilege_type = 'SELECT';
+--   expect: avatar_url, full_name, full_name_en, id, is_suspended,
+--           is_verified, role
+--
+-- (ii) anon holds NO INSERT / UPDATE / REFERENCES on either table
+--      (table-level or column-level):
+--   select table_name, privilege_type, count(*)
+--   from information_schema.role_table_grants
+--   where grantee = 'anon' and table_schema = 'public'
+--     and table_name in ('profiles','listings')
+--     and privilege_type in ('INSERT','UPDATE','REFERENCES')
+--   group by 1, 2
+--   union all
+--   select table_name, privilege_type, count(*)
+--   from information_schema.column_privileges
+--   where grantee = 'anon' and table_schema = 'public'
+--     and table_name in ('profiles','listings')
+--     and privilege_type in ('INSERT','UPDATE','REFERENCES')
+--   group by 1, 2;
+--   expect: 0 rows.
+--
+-- (iii) BEHAVIORAL — editor-as-anon read of a verified host's listing
+--       succeeds (the failure this migration fixes). Rollback-wrapped:
+--   begin;
+--   set local role anon;
+--   select l.id
+--   from public.listings l
+--   where l.status = 'approved'
+--     and exists (
+--       select 1 from public.profiles h
+--       where h.id = l.host_id and h.role = 'host'
+--         and h.is_verified and not h.is_suspended
+--     )
+--   limit 1;
+--   reset role;
+--   rollback;
+--   expect: >= 1 row (was 0 / 42501 before the role grant).
+--
+-- (iv) BEHAVIORAL — anon still CANNOT read profiles.phone (PII stays
+--      denied; the role grant didn't widen the slice). Rollback-wrapped:
+--   begin;
+--   set local role anon;
+--   select phone from public.profiles limit 1;   -- expect: ERROR 42501
+--   reset role;
+--   rollback;
+--   expect: permission denied for column phone (or table profiles).

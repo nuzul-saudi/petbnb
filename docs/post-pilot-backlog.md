@@ -100,6 +100,18 @@ posture — no host address, no exact geo, same rule as listing detail.
 - Sign-in email button arms on any single character — disable until a
   basic email-format check passes (rider previously sent; land it in the
   next convenient batch).
+- **`is_visible_host(uuid)` SECURITY DEFINER helper (optional).** The
+  anon-feed outage (0053) came from an anon-facing policy predicate that
+  read a column anon couldn't SELECT. A `security definer` helper —
+  `is_visible_host(host_id) → host exists AND role='host' AND
+  is_verified AND NOT is_suspended` — would let the listings/photos/etc.
+  visibility policies call one function instead of inlining an EXISTS
+  that depends on caller column grants (bypasses the grant-follows-
+  predicate trap entirely, same pattern as `is_admin`/`is_active_user`).
+  Retires this whole failure class. Deferred: it's a multi-policy
+  refactor (6 visibility sites per 0045) and the grant fix + the new
+  discipline rule already close the immediate hole; do it when a
+  visibility policy next needs to change anyway.
 
 ## UX decisions parked for pilot data
 

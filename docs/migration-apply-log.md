@@ -31,6 +31,9 @@ every time a migration is run on prod.
 | 0051 (`host_response_stats`, Phase 5 Part C) | 2026-07-09 | Applied (written in commit `870017c`). SECURITY DEFINER + STABLE + pinned `search_path`; grants to anon + authenticated per the migration's verification tail. Powers the response-time badge (ListingCard + listing detail). |
 | **Realtime publication toggle** (Phase 5 Part A — dashboard, not SQL) | 2026-07-09 | `public.messages` + `public.notifications` added to the `supabase_realtime` publication (Dashboard → Database → Replication). **Verify-first finding: the publication was EMPTY since birth** — so the Round 9 `useMessages` subscription (2026-06-12) had never received a single event, which explains ALL historical "chat/badge only updates on refresh" reports. Live-smoked by Omar post-toggle: notifications toast + bell fire live; message realtime confirmed after the `6eb29a3` channel-teardown fix. |
 | 0048 (`tos_accepted_at`, Phase 3) | 2026-07-06 | Applied wrapped in `begin / commit` (commit `7f0f024`). **All checks passed.** **(Q1)** `profiles.tos_accepted_at` present, `timestamptz`, nullable. **(Q2)** `guard_profile_tos_stamp` trigger wired with `has_when = true` — COLUMN-SCOPED per Strategy's constraint (the `WHEN (old.tos_accepted_at IS DISTINCT FROM new.tos_accepted_at)` clause keeps it out of every other profiles update). **(Q3) Behavioral (rollback-wrapped):** T1 `NULL → now()` PASS; T2 reset `→ NULL` rejected with `'notifications... monotonic forward-only'` (P0001) PASS; T3 unrelated `full_name` update unrestricted PASS — confirms other columns pass untouched (the guard doesn't fire). **(Q4)** `count(*) where tos_accepted_at is not null` = 0 — existing rows stay NULL (D2). Independent of 0049 (either applies first). Written-not-applied 0049 (email guard, Phase 2b) still pending Omar's runbook checkpoint. |
+| 0034 (`listings_accepts_species`) — **status corrected** | originally **NEVER applied** — repaired 2026-07-11 | ⚠️ Correction to the "Unconfirmed but presumed applied" note below: 0034 was **NOT** fully applied. The `listings` half (column + constraint + `listings_accepts_species_gin_idx`) was present, but the **`listing_drafts` half never ran** — surfaced 2026-07-11 when `promote_listing_draft` raised `42703 column d.accepts_species does not exist` on the first-ever field-edit approval in prod. Repaired via **0052** (listing_drafts column + constraint) plus **manual column/constraint/index blocks** Omar ran for any other 0034 gaps the drift audit flagged. The species filter "worked" only because the read path (`listings.accepts_species`) was present; the write/promote path through `listing_drafts` had never been exercised. |
+| 0052 (`repair_listing_drafts_species`) | 2026-07-11 | Applied + verified. `listing_drafts.accepts_species` present (`text[]` NOT NULL default `array['cat']`); `listing_drafts_accepts_species_valid` constraint present; drift-audit for `listings_accepts_species_gin_idx` run. **Legacy-draft purge:** pre-existing `listing_drafts` rows where `offers_vet is null` (pre-0041 snapshots) cleaned up so the newly-faithful snapshot path (0041 addon columns + accepts_species) has no half-populated legacy rows. Field-edit approval (`promote_listing_draft`) re-run post-repair — no `42703`. Client commit `e89b4c7` (faithful snapshot) safe to deploy once this is live. |
+| **Live hotfix — `grant select (role) on public.profiles to anon`** | 2026-07-11 (pending codification by 0053) | Applied live by Omar to unbreak the logged-out public feed. **Root cause:** 0045 added `host.role='host'` to the anon-facing listings/profiles policies but never extended 0037's column grant to include `role`; policy subqueries run with caller privileges, so anon hit `42501 permission denied for table profiles` (a missing COLUMN privilege reported at table level). Guest feed had been invisible since 0045 applied; the S10 E2E robot was the first true logged-out client to surface it. **Codified + hardened by written-not-applied 0053** (also revokes anon's inert default INSERT/UPDATE/REFERENCES on profiles + listings). |
 
 ## Unconfirmed but presumed applied
 
@@ -38,10 +41,15 @@ every time a migration is run on prod.
 paper-trail confirmation for any of these, but:
 
 - The deployed app currently uses functionality each of them adds (e.g.
-  `0034_listings_accepts_species` powers the species filter on the home
-  feed; `0038_is_admin_security_definer` is hit by every admin gate;
+  `0038_is_admin_security_definer` is hit by every admin gate;
   `0039_host_application_schema` is the entire host signup funnel that
   Omar test-drove in Round 4).
+- ⚠️ **`0034_listings_accepts_species` was the cautionary exception** —
+  presumed applied here, but only its `listings` half actually ran; the
+  `listing_drafts` half was missing and went undetected for weeks because
+  the read path worked. See the corrected 0034 row + 0052 above. This is
+  exactly the anomaly this section warns about: a partially-applied
+  migration whose gap only shows on a rarely-exercised write path.
 - If any were missing, the corresponding code paths would 500 or
   silently return empty rows, which Omar has not reported.
 
@@ -59,6 +67,7 @@ row.
 | Migration / toggle | Written | Waiting on |
 |---|---|---|
 | 0049 (`notifications_email_guard`, Phase 2b) | commit history | The 2b email deploy runbook (Resend key + Edge Function). Independent of 0050/0051. |
+| 0053 (`anon_grant_hygiene`) | commit history | Line-by-line review, then apply. Codifies the live `grant select (role)` hotfix + revokes anon's inert default INSERT/UPDATE/REFERENCES on profiles + listings. Idempotent; verification tail incl. an editor-as-anon behavioral probe (feed read succeeds, `profiles.phone` still denied). |
 
 *(0051 and the realtime publication toggle were applied/flipped
 2026-07-09 — moved to the Confirmed table above. The verify-first
