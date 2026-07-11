@@ -112,10 +112,32 @@ test('golden path: browse → sign-in → inquiry → booking request', async ({
   await calendar.getByText('10', { exact: true }).click();
   await calendar.getByText('12', { exact: true }).click();
 
-  // Pet picker — deterministic seed name.
+  // Pet picker — deterministic seed name. The row is a checkbox; assert
+  // the tap actually registered (guards against a lingering modal
+  // backdrop swallowing the click) before relying on it for submit.
   await page.getByText(PET_NAME).first().click();
+  await expect(
+    page.getByRole('checkbox', { checked: true }).first(),
+    'pet tap must flip the row checkbox to checked',
+  ).toBeVisible({ timeout: 15_000 });
 
   // ── 7. Submit → booking detail ─────────────────────────────────────
   await page.getByText(AR.submitRequest, { exact: true }).first().click();
-  await page.waitForURL(/\/bookings\//, { timeout: 30_000 });
+  // If the submit doesn't navigate, the screen shows an inline error
+  // (validation or a write/RLS rejection). Surface its text so the CI
+  // log names the cause instead of a bare navigation timeout.
+  try {
+    await page.waitForURL(/\/bookings\//, { timeout: 30_000 });
+  } catch (navErr) {
+    const inlineError = await page
+      .getByText(/تعذّر|يرجى اختيار|تاريخ (المغادرة|الوصول)|محجوبة|موقوفة/)
+      .first()
+      .textContent()
+      .catch(() => null);
+    throw new Error(
+      `booking submit did not navigate to /bookings/. On-screen error: ${
+        inlineError ?? '(none found)'
+      }`,
+    );
+  }
 });
