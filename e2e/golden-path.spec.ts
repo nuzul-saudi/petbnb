@@ -130,45 +130,41 @@ test('golden path: browse → sign-in → inquiry → booking request', async ({
   await calendar.getByText('10', { exact: true }).click();
   await calendar.getByText('12', { exact: true }).click();
 
-  // Picking a complete range auto-closes the picker. WAIT for the dialog
-  // to fully detach before touching the pet row: the 2026-07 failure
-  // (error-context snapshot showed dates set + "0 قطط") was the pet tap
-  // landing while the modal's backdrop was still fading out, so
-  // togglePet never fired. The dates persist ("10 أغس · 12 أغس · 2
-  // ليلة") — only the pet selection was lost.
+  // Picking a complete range auto-closes the picker; wait for the dialog
+  // to detach before touching the pet row.
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15_000 });
 
-  // Pet picker — click the checkbox ROW itself (role=checkbox), not its
-  // inner text node, so the press handler fires reliably. The seed pet
-  // is named "E2e cat" (lowercase); match case-insensitively. Assert the
-  // tap registered by waiting for the per-pet services section, which
-  // only mounts once a pet is selected. (The row's
-  // accessibilityState={{checked}} is NOT rendered as aria-checked by
-  // react-native-web 0.21, so a getByRole checked probe would be a false
-  // negative — this visible-section signal is the reliable one.)
-  await page.getByRole('checkbox', { name: new RegExp(PET_NAME, 'i') }).first().click();
+  // Pet picker. ROOT CAUSE of the earlier "0 قطط" failures: request.tsx
+  // auto-selects the pet on load when the owner has exactly ONE pet
+  // (`p.length === 1`), which is the seed reality here. Blindly tapping
+  // it then TOGGLED it OFF (togglePet is a toggle), leaving zero pets
+  // selected. So: wait for the row, and tap ONLY if it isn't already
+  // selected — i.e. if the per-pet services section (which mounts once a
+  // pet is selected) isn't showing yet. Robust to both the 1-pet
+  // auto-select seed and a hypothetical multi-pet owner. The seed pet is
+  // "E2e cat" (lowercase); match case-insensitively.
+  const petCheckbox = page
+    .getByRole('checkbox', { name: new RegExp(PET_NAME, 'i') })
+    .first();
+  await expect(petCheckbox, 'pet row must load').toBeVisible({ timeout: 15_000 });
+  const perPetServices = page.getByText(AR.perPetServices).first();
+  const alreadySelected = await perPetServices.isVisible().catch(() => false);
+  if (!alreadySelected) {
+    await petCheckbox.click();
+  }
   try {
-    await expect(
-      page.getByText(AR.perPetServices).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(perPetServices).toBeVisible({ timeout: 15_000 });
   } catch {
-    // Bring the page's own state into the CI log: the pet row's ARIA
-    // subtree (role / disabled / checked) and any browser errors.
-    const row = await page
-      .getByText(PET_NAME)
-      .first()
-      .locator('xpath=ancestor-or-self::*[@role][1]')
-      .ariaSnapshot()
-      .catch(() => '(no role ancestor)');
+    // Safety net — surface page state into the CI log if selection still
+    // isn't reflected (the trace artifact isn't reachable from CI egress).
     const catsMeta = await page
       .getByText(/\d+\s*قطط/)
       .first()
       .textContent()
       .catch(() => '(no cats-count)');
     throw new Error(
-      `pet tap did not reveal per-pet services (selection did not register).\n` +
+      `per-pet services not visible after ensuring pet selection.\n` +
         `sticky cats-count: ${catsMeta}\n` +
-        `pet-row aria: ${row}\n` +
         `browser log:\n${browserLog.join('\n') || '(empty)'}`,
     );
   }
