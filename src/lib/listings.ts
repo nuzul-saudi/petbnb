@@ -5,6 +5,7 @@ import { logWarn } from '@/lib/log';
 
 import type { CityKey } from '@/lib/cities';
 import { SPECIES_ENABLED } from '@/lib/features';
+import { buildListingDraftSnapshot } from '@/lib/listing-draft-snapshot';
 import { listingPhotoStoragePathFromUrl } from '@/lib/listing-photos';
 import { supabase } from '@/lib/supabase';
 import type { Tables, TablesInsert, TablesUpdate } from '@/types/database';
@@ -858,48 +859,17 @@ export async function updateListing(
   // then layer the patch on top. Every editable column ends up
   // populated; 8f's promote RPC can safely copy them all back onto
   // the listings row without risk of nulling untouched fields.
-  const snapshot: TablesInsert<'listing_drafts'> = {
-    listing_id: id,
-    city: (patch.city ?? current.city) as 'riyadh' | 'dammam',
-    neighborhood: patch.neighborhood ?? current.neighborhood,
-    title_ar: patch.title ?? current.title_ar,
-    title_en: current.title_en,
-    description_ar:
-      patch.description !== undefined
-        ? patch.description
-        : current.description_ar,
-    description_en: current.description_en,
-    nightly_price_sar: patch.nightlyPrice ?? current.nightly_price_sar,
-    max_concurrent_pets:
-      patch.maxConcurrentPets ?? current.max_concurrent_pets,
-    has_resident_pets: patch.hasResidentPets ?? current.has_resident_pets,
-    resident_pets_note:
-      patch.residentPetsNote !== undefined
-        ? patch.residentPetsNote
-        : current.resident_pets_note,
-    offers_grooming: patch.offersGrooming ?? current.offers_grooming,
-    // 0041 — per-host service-addon opt-ins on the snapshot.
-    // Listings rows have these as NOT NULL with default false; if
-    // current.offers_* is somehow null (pre-0041 row read before
-    // backfill, vanishingly unlikely), fall back to false.
-    offers_vet: patch.offersVet ?? current.offers_vet ?? false,
-    offers_insurance:
-      patch.offersInsurance ?? current.offers_insurance ?? false,
-    offers_transport:
-      patch.offersTransport ?? current.offers_transport ?? false,
-    host_gender: patch.hostGender ?? current.host_gender,
-    requires_vaccination:
-      patch.requiresVaccination ?? current.requires_vaccination,
-    // Gated — listing_drafts has no accepts_species column when
-    // 0034 isn't applied. Including it would error the snapshot
-    // insert.
-    ...(SPECIES_ENABLED
-      ? {
-          accepts_species:
-            patch.acceptsSpecies ?? current.accepts_species,
-        }
-      : {}),
-  };
+  // Built by the pure, unit-tested builder (B2): accepts_species is
+  // now ALWAYS carried from current (the old SPECIES_ENABLED omission
+  // would let the column default reset a listing's real species on
+  // approval). Requires listing_drafts.accepts_species — 0034,
+  // repaired in prod by 0052.
+  const snapshot = buildListingDraftSnapshot(
+    id,
+    patch,
+    current,
+    SPECIES_ENABLED,
+  );
 
   const { error: insertErr } = await supabase
     .from('listing_drafts')
