@@ -34,6 +34,7 @@ const AR = {
   composerPlaceholder: 'اكتب رسالتك…',
   send: 'إرسال',
   submitRequest: 'إرسال الطلب',
+  addDate: 'إضافة تاريخ',
   nextMonth: 'الشهر التالي',
 };
 
@@ -98,11 +99,18 @@ test('golden path: browse → sign-in → inquiry → booking request', async ({
   await page.getByText(AR.requestBooking).first().click();
   await page.waitForURL(/\/request/, { timeout: 30_000 });
 
-  // RangeCalendar: hop to next month so both days are in the future,
-  // then tap start (10th) and end (12th).
-  await page.getByLabel(AR.nextMonth).first().click();
-  await page.getByText('10', { exact: true }).first().click();
-  await page.getByText('12', { exact: true }).first().click();
+  // The RangeCalendar lives inside SearchWhenModal — it only mounts
+  // once the date card is tapped. Open it first, then hop to next
+  // month (so both days are future) and tap start (10th) + end (12th).
+  // Picking a complete range auto-applies and closes the modal
+  // (RangeCalendar.onRangeComplete), so no explicit "Apply" tap.
+  await page.getByText(AR.addDate).first().click();
+  await page.getByLabel(AR.nextMonth).click();
+  // Scope the day taps to the open dialog so a stray "10"/"12" on the
+  // request screen behind the modal can't be matched instead.
+  const calendar = page.getByRole('dialog');
+  await calendar.getByText('10', { exact: true }).click();
+  await calendar.getByText('12', { exact: true }).click();
 
   // Pet picker — deterministic seed name.
   await page.getByText(PET_NAME).first().click();
